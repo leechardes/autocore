@@ -1,0 +1,13 @@
+# Database dependencies for AutoCore
+
+# ORM and migrations
+sqlalchemy==2.0.23
+alembic==1.13.0
+
+# Utilities
+python-dotenv==1.0.0
+click==8.1.7  # Para CLI
+
+# Development
+ipython==8.18.1  # Console interativo
+tabulate==0.9.0  # Formatação de tabelas

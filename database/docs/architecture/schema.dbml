@@ -1,0 +1,617 @@
+// AutoCore Database Schema
+// Sistema de Controle Veicular Modular
+// Version: 1.0.0
+
+Project AutoCore {
+  database_type: 'SQLite'
+  note: 'Sistema modular de controle veicular com configuração dinâmica'
+}
+
+// ====================================
+// CORE TABLES - Sistema Principal
+// ====================================
+
+Table devices {
+  id integer [pk, increment]
+  uuid varchar(36) [unique, not null, note: 'UUID único do dispositivo']
+  name varchar(100) [not null]
+  type varchar(50) [not null, note: 'app_mobile, esp32_display, esp32_relay, esp32_can, esp32_control, multimedia']
+  mac_address varchar(17) [unique]
+  ip_address varchar(15)
+  firmware_version varchar(20)
+  hardware_version varchar(20)
+  status varchar(20) [default: 'offline', note: 'online, offline, error']
+  last_seen timestamp
+  configuration_json text [note: 'Configuração específica do dispositivo']
+  capabilities_json text [note: 'Capacidades do dispositivo']
+  is_active boolean [default: true]
+  created_at timestamp [default: 'CURRENT_TIMESTAMP']
+  updated_at timestamp
+  
+  indexes {
+    uuid [unique]
+    type
+    status
+  }
+}
+
+Table relay_boards {
+  id integer [pk, increment]
+  device_id integer [not null]
+  name varchar(100) [not null]
+  total_channels integer [not null, default: 16]
+  board_model varchar(50)
+  location varchar(100) [note: 'Ex: Compartimento motor, Painel, etc']
+  is_active boolean [default: true]
+  created_at timestamp [default: 'CURRENT_TIMESTAMP']
+  
+  indexes {
+    device_id
+  }
+}
+
+Table relay_channels {
+  id integer [pk, increment]
+  board_id integer [not null]
+  channel_number integer [not null, note: '1-16 ou conforme placa']
+  name varchar(100) [not null]
+  description text
+  function_type varchar(50) [note: 'toggle, momentary, pulse']
+  default_state boolean [default: false]
+  current_state boolean [default: false]
+  icon varchar(50)
+  color varchar(7) [note: 'Hex color']
+  protection_mode varchar(20) [note: 'none, confirm, password']
+  max_activation_time integer [note: 'Segundos - para proteção']
+  is_active boolean [default: true]
+  created_at timestamp [default: 'CURRENT_TIMESTAMP']
+  
+  indexes {
+    (board_id, channel_number) [unique]
+  }
+}
+
+// ====================================
+// UI CONFIGURATION - Interface
+// ====================================
+
+Table screens {
+  id integer [pk, increment]
+  name varchar(100) [not null]
+  title varchar(100) [not null]
+  icon varchar(50)
+  screen_type varchar(50) [note: 'dashboard, control, settings, diagnostic']
+  parent_id integer [note: 'Para sub-telas']
+  position integer [not null, default: 0]
+  
+  // Layout Configuration per Device Type
+  columns_mobile integer [default: 2, note: 'Colunas no app mobile']
+  columns_display_small integer [default: 2, note: 'Colunas no display 2.8"']
+  columns_display_large integer [default: 4, note: 'Colunas na multimídia']
+  columns_web integer [default: 4, note: 'Colunas no dashboard web']
+  
+  is_visible boolean [default: true]
+  required_permission varchar(50) [note: 'Permissão necessária para acessar a tela']
+  
+  // Device Type Visibility
+  show_on_mobile boolean [default: true]
+  show_on_display_small boolean [default: true]
+  show_on_display_large boolean [default: true]
+  show_on_web boolean [default: true]
+  show_on_controls boolean [default: false, note: 'Controles do volante']
+  
+  created_at timestamp [default: 'CURRENT_TIMESTAMP']
+  
+  indexes {
+    parent_id
+    position
+  }
+}
+
+Table screen_items {
+  id integer [pk, increment]
+  screen_id integer [not null]
+  item_type varchar(50) [not null, note: 'button, switch, gauge, display, slider, group']
+  name varchar(100) [not null]
+  label varchar(100) [not null]
+  icon varchar(50)
+  position integer [not null]
+  
+  // Size Configuration per Device Type
+  size_mobile varchar(20) [default: 'normal', note: 'small, normal, large, full-width']
+  size_display_small varchar(20) [default: 'normal']
+  size_display_large varchar(20) [default: 'normal']
+  size_web varchar(20) [default: 'normal']
+  
+  // Position Override per Device Type (optional)
+  position_mobile integer [note: 'Override da posição para mobile']
+  position_display_small integer
+  position_display_large integer
+  position_web integer
+  
+  // Device Type Visibility
+  show_on_mobile boolean [default: true]
+  show_on_display_small boolean [default: true]
+  show_on_display_large boolean [default: true]
+  show_on_web boolean [default: true]
+  show_on_controls boolean [default: false]
+  
+  // Visual Configuration
+  color_active varchar(7)
+  color_inactive varchar(7)
+  show_status boolean [default: true]
+  
+  // Visual Override per Device Type
+  icon_mobile varchar(50) [note: 'Ícone específico para mobile']
+  icon_display varchar(50) [note: 'Ícone para displays']
+  label_short varchar(50) [note: 'Label curto para displays pequenos']
+  
+  // Action Configuration
+  action_type varchar(50) [note: 'relay, can_command, mqtt_publish, navigate, macro']
+  action_target varchar(200) [note: 'ID do relé, comando CAN, tópico MQTT, etc']
+  action_payload text [note: 'JSON com payload da ação']
+  
+  // Behavior Configuration
+  behavior_type varchar(50) [note: 'toggle, momentary, timer, value']
+  confirm_action boolean [default: false]
+  confirm_message text
+  
+  // Behavior Override per Device Type
+  confirm_on_mobile boolean [note: 'Requer confirmação apenas no mobile']
+  confirm_on_display boolean [note: 'Requer confirmação nos displays']
+  
+  // Advanced Controls (New)
+  mutex_group varchar(50) [note: 'Grupo de exclusão mútua - apenas um ativo']
+  requires_confirmation boolean [default: false]
+  confirmation_message text
+  hold_duration integer [note: 'Tempo em ms para botões hold/momentary']
+  is_emergency boolean [default: false, note: 'Se é ação de emergência']
+  haptic_feedback varchar(20) [note: 'light, medium, heavy']
+  sound_effect varchar(50) [note: 'Nome do efeito sonoro']
+  
+  // Data Configuration (for displays)
+  data_source varchar(50) [note: 'can_signal, mqtt_topic, calculation']
+  data_path varchar(200) [note: 'Path do dado a exibir']
+  data_format varchar(50) [note: 'number, text, percentage, temperature, etc']
+  data_unit varchar(20) [note: 'RPM, °C, V, A, etc']
+  
+  // Display Format Override
+  data_format_mobile varchar(50) [note: 'Formato específico para mobile']
+  data_format_display varchar(50) [note: 'Formato para displays']
+  
+  // Visibility Conditions
+  visibility_condition text [note: 'JSON com condições']
+  
+  is_active boolean [default: true]
+  created_at timestamp [default: 'CURRENT_TIMESTAMP']
+  
+  indexes {
+    (screen_id, position)
+    show_on_mobile
+    show_on_display_small
+  }
+}
+
+Table quick_actions {
+  id integer [pk, increment]
+  name varchar(100) [not null]
+  label varchar(100) [not null]
+  icon varchar(50)
+  description text
+  action_sequence text [not null, note: 'JSON array de ações a executar']
+  category varchar(50)
+  show_in_dashboard boolean [default: true]
+  position integer
+  is_active boolean [default: true]
+  created_at timestamp [default: 'CURRENT_TIMESTAMP']
+  
+  indexes {
+    position
+  }
+}
+
+// ====================================
+// CAN CONFIGURATION - FuelTech
+// ====================================
+
+Table can_signals {
+  id integer [pk, increment]
+  signal_name varchar(100) [not null, unique]
+  can_id varchar(8) [not null, note: 'CAN ID em hex']
+  start_bit integer [not null]
+  length_bits integer [not null]
+  byte_order varchar(20) [note: 'little_endian, big_endian']
+  data_type varchar(20) [note: 'uint8, uint16, int16, float, etc']
+  scale_factor float [default: 1.0]
+  offset float [default: 0.0]
+  unit varchar(20)
+  min_value float
+  max_value float
+  description text
+  category varchar(50) [note: 'engine, transmission, sensors, etc']
+  is_active boolean [default: true]
+  created_at timestamp [default: 'CURRENT_TIMESTAMP']
+  
+  indexes {
+    signal_name [unique]
+    can_id
+    category
+  }
+}
+
+Table can_commands {
+  id integer [pk, increment]
+  command_name varchar(100) [not null, unique]
+  can_id varchar(8) [not null]
+  payload_template text [not null, note: 'Template do payload em hex']
+  description text
+  category varchar(50)
+  requires_confirmation boolean [default: true]
+  timeout_ms integer [default: 1000]
+  retry_count integer [default: 3]
+  is_active boolean [default: true]
+  created_at timestamp [default: 'CURRENT_TIMESTAMP']
+  
+  indexes {
+    command_name [unique]
+  }
+}
+
+// ====================================
+// MQTT CONFIGURATION
+// ====================================
+
+Table mqtt_topics {
+  id integer [pk, increment]
+  topic_pattern varchar(200) [not null, unique]
+  topic_type varchar(50) [note: 'command, status, telemetry, config']
+  direction varchar(20) [note: 'publish, subscribe, both']
+  qos integer [default: 1, note: '0, 1, 2']
+  retained boolean [default: false]
+  payload_format varchar(20) [note: 'json, string, binary']
+  description text
+  is_active boolean [default: true]
+  created_at timestamp [default: 'CURRENT_TIMESTAMP']
+  
+  indexes {
+    topic_pattern [unique]
+    topic_type
+  }
+}
+
+// ====================================
+// DEVICE SPECIFIC CONFIGURATIONS
+// ====================================
+
+Table device_display_configs {
+  id integer [pk, increment]
+  device_type varchar(50) [not null, unique, note: 'mobile, display_small, display_large, web, controls']
+  
+  // Display Capabilities
+  screen_width integer [note: 'Largura em pixels']
+  screen_height integer [note: 'Altura em pixels']
+  touch_enabled boolean [default: true]
+  color_depth integer [note: 'Bits de cor']
+  
+  // UI Preferences
+  default_theme_id integer
+  default_font_size varchar(20) [note: 'small, normal, large']
+  show_animations boolean [default: true]
+  haptic_feedback boolean [default: true]
+  sound_feedback boolean [default: false]
+  
+  // Layout Defaults
+  default_columns integer [default: 2]
+  max_columns integer [default: 4]
+  min_button_height integer [default: 48, note: 'Altura mínima em dp/pixels']
+  item_spacing integer [default: 8, note: 'Espaçamento entre itens']
+  
+  // Feature Availability
+  can_show_gauges boolean [default: true]
+  can_show_graphs boolean [default: true]
+  can_show_camera boolean [default: false]
+  can_play_audio boolean [default: false]
+  supports_multi_touch boolean [default: true]
+  
+  // Navigation
+  navigation_type varchar(50) [note: 'bottom_nav, side_menu, top_tabs, hardware_buttons']
+  show_back_button boolean [default: true]
+  show_home_button boolean [default: true]
+  
+  // Performance
+  max_fps integer [default: 60]
+  cache_size_mb integer [default: 50]
+  
+  created_at timestamp [default: 'CURRENT_TIMESTAMP']
+  updated_at timestamp
+  
+  indexes {
+    device_type [unique]
+  }
+}
+
+Table device_control_mappings {
+  id integer [pk, increment]
+  device_type varchar(50) [not null, note: 'Tipo do dispositivo']
+  control_input varchar(50) [not null, note: 'button_prev, button_next, button_select, swipe_left, swipe_right, etc']
+  
+  // Action Mapping
+  action_type varchar(50) [not null, note: 'navigate, execute, toggle, scroll']
+  action_target varchar(200) [note: 'screen_id, item_id, command, etc']
+  action_params text [note: 'JSON com parâmetros adicionais']
+  
+  // Conditions
+  context_screen_id integer [note: 'Aplicável apenas em tela específica']
+  requires_long_press boolean [default: false]
+  repeat_on_hold boolean [default: false]
+  repeat_delay_ms integer [default: 500]
+  
+  is_active boolean [default: true]
+  created_at timestamp [default: 'CURRENT_TIMESTAMP']
+  
+  indexes {
+    (device_type, control_input)
+    context_screen_id
+  }
+}
+
+// ====================================
+// THEMES & CUSTOMIZATION
+// ====================================
+
+Table themes {
+  id integer [pk, increment]
+  name varchar(100) [not null, unique]
+  description text
+  
+  // Cores Principais
+  primary_color varchar(7) [not null]
+  secondary_color varchar(7) [not null]
+  background_color varchar(7) [not null]
+  surface_color varchar(7) [not null]
+  
+  // Cores de Estado
+  success_color varchar(7) [not null]
+  warning_color varchar(7) [not null]
+  error_color varchar(7) [not null]
+  info_color varchar(7) [not null]
+  
+  // Texto
+  text_primary varchar(7) [not null]
+  text_secondary varchar(7) [not null]
+  
+  // Configurações Adicionais
+  border_radius integer [default: 12]
+  shadow_style varchar(50) [default: 'neumorphic']
+  font_family varchar(100)
+  
+  is_active boolean [default: true]
+  is_default boolean [default: false]
+  created_at timestamp [default: 'CURRENT_TIMESTAMP']
+  
+  indexes {
+    name [unique]
+  }
+}
+
+// ====================================
+// USER & PERMISSIONS
+// ====================================
+
+Table users {
+  id integer [pk, increment]
+  username varchar(50) [not null, unique]
+  password_hash varchar(255) [not null]
+  full_name varchar(100)
+  email varchar(100) [unique]
+  role varchar(50) [not null, default: 'operator', note: 'admin, technician, operator, viewer']
+  pin_code varchar(10) [note: 'PIN para ações rápidas']
+  is_active boolean [default: true]
+  last_login timestamp
+  created_at timestamp [default: 'CURRENT_TIMESTAMP']
+  updated_at timestamp
+  
+  indexes {
+    username [unique]
+    email [unique]
+    role
+  }
+}
+
+Table permissions {
+  id integer [pk, increment]
+  role varchar(50) [not null]
+  resource varchar(100) [not null]
+  action varchar(50) [not null, note: 'create, read, update, delete, execute']
+  is_allowed boolean [default: true]
+  created_at timestamp [default: 'CURRENT_TIMESTAMP']
+  
+  indexes {
+    (role, resource, action) [unique]
+  }
+}
+
+// ====================================
+// MACROS & AUTOMATION
+// ====================================
+
+Table macros {
+  id integer [pk, increment]
+  name varchar(100) [not null, unique]
+  label varchar(100) [not null]
+  description text
+  icon varchar(50)
+  category varchar(50) [note: 'lighting, safety, convenience, emergency']
+  trigger_type varchar(50) [note: 'manual, scheduled, condition, event, emergency']
+  trigger_config text [note: 'JSON com configuração do trigger']
+  
+  // Behavior
+  requires_confirmation boolean [default: false]
+  confirmation_message text
+  is_emergency boolean [default: false]
+  
+  is_active boolean [default: true]
+  last_executed timestamp
+  execution_count integer [default: 0]
+  created_at timestamp [default: 'CURRENT_TIMESTAMP']
+  updated_at timestamp
+  
+  indexes {
+    name [unique]
+    trigger_type
+    category
+  }
+}
+
+Table macro_actions {
+  id integer [pk, increment]
+  macro_id integer [not null]
+  sequence integer [not null, note: 'Ordem de execução']
+  action_type varchar(50) [not null, note: 'relay, can_command, mqtt_publish, delay, screen_navigate']
+  action_target varchar(200) [note: 'ID ou nome do alvo']
+  action_payload text [note: 'JSON com dados da ação']
+  delay_ms integer [default: 0, note: 'Delay antes da próxima ação']
+  
+  // Conditions
+  condition_check text [note: 'JSON com condições para executar']
+  
+  is_active boolean [default: true]
+  created_at timestamp [default: 'CURRENT_TIMESTAMP']
+  
+  indexes {
+    (macro_id, sequence) [unique]
+  }
+}
+
+// ====================================
+// LOGGING & MONITORING
+// ====================================
+
+Table event_logs {
+  id integer [pk, increment]
+  timestamp timestamp [not null, default: 'CURRENT_TIMESTAMP']
+  event_type varchar(50) [not null, note: 'command, status_change, error, warning, info']
+  source varchar(100) [not null, note: 'Device UUID ou sistema']
+  target varchar(100)
+  action varchar(100)
+  payload text
+  user_id integer
+  ip_address varchar(15)
+  status varchar(20) [note: 'success, failed, pending']
+  error_message text
+  
+  indexes {
+    timestamp
+    event_type
+    source
+    user_id
+  }
+}
+
+Table telemetry_data {
+  id integer [pk, increment]
+  timestamp timestamp [not null, default: 'CURRENT_TIMESTAMP']
+  device_id integer [not null]
+  data_type varchar(50) [not null]
+  data_key varchar(100) [not null]
+  data_value text [not null]
+  unit varchar(20)
+  
+  indexes {
+    (timestamp, device_id)
+    data_type
+    data_key
+  }
+}
+
+// ====================================
+// SYSTEM STATUS
+// ====================================
+
+Table system_status {
+  id integer [pk, increment]
+  key varchar(100) [not null, unique, note: 'Chave única do estado']
+  value text [not null, note: 'Valor atual']
+  data_type varchar(20) [note: 'boolean, integer, string, json']
+  description text
+  updated_at timestamp [default: 'CURRENT_TIMESTAMP']
+  updated_by integer
+  
+  indexes {
+    key [unique]
+  }
+}
+
+// ====================================
+// CONFIGURATION TEMPLATES
+// ====================================
+
+Table config_templates {
+  id integer [pk, increment]
+  name varchar(100) [not null, unique]
+  description text
+  template_type varchar(50) [note: 'vehicle, screen, device']
+  configuration_json text [not null]
+  is_public boolean [default: false]
+  created_by integer
+  created_at timestamp [default: 'CURRENT_TIMESTAMP']
+  
+  indexes {
+    name [unique]
+    template_type
+  }
+}
+
+// ====================================
+// RELATIONSHIPS
+// ====================================
+
+Ref: relay_boards.device_id > devices.id [delete: cascade]
+Ref: relay_channels.board_id > relay_boards.id [delete: cascade]
+Ref: screens.parent_id > screens.id
+Ref: screen_items.screen_id > screens.id [delete: cascade]
+Ref: macro_actions.macro_id > macros.id [delete: cascade]
+Ref: device_display_configs.default_theme_id > themes.id
+Ref: device_control_mappings.context_screen_id > screens.id
+Ref: event_logs.user_id > users.id
+Ref: telemetry_data.device_id > devices.id
+Ref: config_templates.created_by > users.id
+Ref: system_status.updated_by > users.id
+
+// ====================================
+// NOTES
+// ====================================
+
+Note: '''
+# AutoCore Database Schema
+
+## Principais Características:
+1. **Modularidade**: Cada tabela tem responsabilidade específica
+2. **Flexibilidade**: Uso extensivo de JSON para configurações dinâmicas
+3. **Rastreabilidade**: Logs completos de todas as ações
+4. **Escalabilidade**: Estrutura preparada para crescimento
+
+## Tabelas Principais:
+- **devices**: Todos os dispositivos do sistema
+- **relay_boards/channels**: Controle de relés
+- **screens/screen_items**: Interface configurável com controles avançados
+- **can_signals/commands**: Comunicação CAN
+- **mqtt_topics**: Configuração MQTT
+- **themes**: Personalização visual
+- **users/permissions**: Controle de acesso
+- **macros/macro_actions**: Automação e sequências
+- **system_status**: Estado global do sistema
+- **event_logs**: Auditoria
+
+## Novos Recursos:
+- **Mutex Groups**: Botões mutuamente exclusivos
+- **Hold/Momentary**: Controles com pressão contínua
+- **Emergency Stop**: Sistema de parada de emergência
+- **Macros Avançados**: Sequências complexas de ações
+- **Haptic Feedback**: Feedback tátil configurável
+
+## Índices Estratégicos:
+- Otimizados para queries mais comuns
+- Unique constraints para integridade
+- Performance em buscas por timestamp
+'''

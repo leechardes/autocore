@@ -1,0 +1,32 @@
+[Unit]
+Description=AutoCore Gateway - MQTT Bridge
+After=network.target mosquitto.service
+Wants=mosquitto.service
+
+[Service]
+Type=simple
+User=pi
+Group=pi
+WorkingDirectory=/home/pi/autocore/gateway
+
+# Ambiente virtual isolado
+Environment="PATH=/home/pi/autocore/gateway/.venv/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
+Environment="PYTHONPATH=/home/pi/autocore/database"
+
+# Comando com venv específico
+ExecStart=/home/pi/autocore/gateway/.venv/bin/python main.py
+
+# Restart policy
+Restart=always
+RestartSec=10
+
+# Logs
+StandardOutput=journal
+StandardError=journal
+
+# Limites para Pi Zero
+MemoryLimit=100M
+CPUQuota=50%
+
+[Install]
+WantedBy=multi-user.target

@@ -1,0 +1,1329 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>AutoCore - Controle Veicular</title>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
+        
+        :root {
+            /* Tesla-inspired + Neumorphism Color Palette */
+            --bg-primary: #1C1C1E;
+            --bg-secondary: #2C2C2E;
+            --bg-tertiary: #242426;
+            
+            --surface-light: #35353A;
+            --surface-dark: #151517;
+            
+            --text-primary: #FFFFFF;
+            --text-secondary: #8E8E93;
+            --text-tertiary: #636366;
+            
+            --accent-blue: #007AFF;
+            --accent-green: #32D74B;
+            --accent-orange: #FF9500;
+            --accent-red: #FF3B30;
+            
+            /* Neumorphism Shadows */
+            --shadow-raised: 8px 8px 16px rgba(0, 0, 0, 0.5), 
+                           -8px -8px 16px rgba(255, 255, 255, 0.03);
+            --shadow-inset: inset 4px 4px 8px rgba(0, 0, 0, 0.5),
+                           inset -4px -4px 8px rgba(255, 255, 255, 0.03);
+            --shadow-subtle: 4px 4px 8px rgba(0, 0, 0, 0.3),
+                           -4px -4px 8px rgba(255, 255, 255, 0.02);
+            
+            /* Spacing System */
+            --spacing-xs: 4px;
+            --spacing-sm: 8px;
+            --spacing-md: 16px;
+            --spacing-lg: 24px;
+            --spacing-xl: 32px;
+            --spacing-2xl: 48px;
+            
+            /* Border Radius */
+            --radius-sm: 12px;
+            --radius-md: 16px;
+            --radius-lg: 24px;
+            --radius-xl: 32px;
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            -webkit-tap-highlight-color: transparent;
+        }
+
+        body {
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+            background: linear-gradient(135deg, #1C1C1E 0%, #242426 100%);
+            color: var(--text-primary);
+            overflow-x: hidden;
+            touch-action: manipulation;
+            -webkit-font-smoothing: antialiased;
+            min-height: 100vh;
+        }
+
+        /* App Container */
+        .app-container {
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+            max-width: 428px;
+            margin: 0 auto;
+            position: relative;
+            background: var(--bg-primary);
+        }
+
+        /* Header with Neumorphic style */
+        .header {
+            padding: var(--spacing-md) var(--spacing-lg);
+            padding-top: max(env(safe-area-inset-top), var(--spacing-lg));
+            background: var(--bg-secondary);
+            position: sticky;
+            top: 0;
+            z-index: 100;
+            box-shadow: 0 2px 20px rgba(0, 0, 0, 0.3);
+        }
+
+        .header-content {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .logo {
+            display: flex;
+            align-items: center;
+            gap: var(--spacing-sm);
+        }
+
+        .logo-icon {
+            width: 32px;
+            height: 32px;
+            background: linear-gradient(135deg, var(--accent-blue), #0051D5);
+            border-radius: var(--radius-sm);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: 700;
+            font-size: 18px;
+            box-shadow: var(--shadow-subtle);
+        }
+
+        .logo-text {
+            font-size: 20px;
+            font-weight: 600;
+            letter-spacing: -0.5px;
+            background: linear-gradient(135deg, #FFFFFF, #8E8E93);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+
+        .battery-display {
+            background: var(--bg-primary);
+            padding: 8px 16px;
+            border-radius: var(--radius-lg);
+            box-shadow: var(--shadow-inset);
+            display: flex;
+            align-items: center;
+            gap: var(--spacing-sm);
+        }
+
+        .battery-icon {
+            width: 28px;
+            height: 14px;
+            border: 2px solid var(--text-secondary);
+            border-radius: 3px;
+            position: relative;
+            background: var(--bg-primary);
+        }
+
+        .battery-icon::after {
+            content: '';
+            position: absolute;
+            right: -5px;
+            top: 3px;
+            width: 3px;
+            height: 8px;
+            background: var(--text-secondary);
+            border-radius: 0 2px 2px 0;
+        }
+
+        .battery-level {
+            height: 100%;
+            background: linear-gradient(90deg, var(--accent-green), #00C851);
+            border-radius: 1px;
+            transition: width 0.3s ease;
+        }
+
+        .battery-voltage {
+            font-size: 13px;
+            font-weight: 500;
+            color: var(--text-secondary);
+        }
+
+        /* Main Dashboard */
+        .dashboard {
+            flex: 1;
+            padding: var(--spacing-lg);
+            padding-bottom: calc(90px + env(safe-area-inset-bottom));
+        }
+
+        /* Vehicle Card - Neumorphic */
+        .vehicle-card {
+            background: var(--bg-secondary);
+            border-radius: var(--radius-xl);
+            padding: var(--spacing-xl);
+            margin-bottom: var(--spacing-xl);
+            box-shadow: var(--shadow-raised);
+            position: relative;
+            overflow: hidden;
+        }
+
+        .vehicle-card::before {
+            content: '';
+            position: absolute;
+            top: -50%;
+            left: -50%;
+            width: 200%;
+            height: 200%;
+            background: radial-gradient(circle, rgba(0, 122, 255, 0.1) 0%, transparent 70%);
+            animation: pulse 4s ease-in-out infinite;
+        }
+
+        @keyframes pulse {
+            0%, 100% { opacity: 0.5; }
+            50% { opacity: 1; }
+        }
+
+        .vehicle-visual {
+            display: flex;
+            justify-content: center;
+            margin-bottom: var(--spacing-lg);
+            position: relative;
+            z-index: 1;
+        }
+
+        .vehicle-silhouette {
+            width: 180px;
+            height: 100px;
+            background: linear-gradient(135deg, var(--surface-light), var(--surface-dark));
+            border-radius: var(--radius-md);
+            box-shadow: var(--shadow-subtle);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            position: relative;
+        }
+
+        .vehicle-silhouette svg {
+            width: 140px;
+            height: auto;
+            fill: var(--text-tertiary);
+        }
+
+        .vehicle-status {
+            display: flex;
+            justify-content: space-around;
+            position: relative;
+            z-index: 1;
+        }
+
+        .status-indicator {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: var(--spacing-xs);
+        }
+
+        .status-value {
+            font-size: 18px;
+            font-weight: 600;
+            color: var(--text-primary);
+        }
+
+        .status-label {
+            font-size: 11px;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            color: var(--text-tertiary);
+        }
+
+        .status-indicator.active .status-value {
+            color: var(--accent-green);
+        }
+
+        /* Control Categories Grid */
+        .control-categories {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: var(--spacing-md);
+            margin-bottom: var(--spacing-xl);
+        }
+
+        .category-card {
+            background: var(--bg-secondary);
+            border-radius: var(--radius-lg);
+            padding: var(--spacing-lg);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            gap: var(--spacing-sm);
+            min-height: 110px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            box-shadow: var(--shadow-raised);
+            position: relative;
+            overflow: hidden;
+        }
+
+        .category-card::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: linear-gradient(135deg, transparent, rgba(255, 255, 255, 0.02));
+            opacity: 0;
+            transition: opacity 0.3s ease;
+        }
+
+        .category-card:active {
+            transform: scale(0.98);
+            box-shadow: var(--shadow-inset);
+        }
+
+        .category-card:active::before {
+            opacity: 1;
+        }
+
+        .category-icon {
+            width: 40px;
+            height: 40px;
+            background: var(--bg-primary);
+            border-radius: var(--radius-md);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 20px;
+            box-shadow: var(--shadow-inset);
+        }
+
+        .category-card.active .category-icon {
+            background: linear-gradient(135deg, var(--accent-blue), #0051D5);
+            box-shadow: 0 4px 12px rgba(0, 122, 255, 0.3);
+        }
+
+        .category-label {
+            font-size: 13px;
+            font-weight: 500;
+            color: var(--text-secondary);
+            text-align: center;
+        }
+
+        .category-card.active .category-label {
+            color: var(--text-primary);
+        }
+
+        .category-badge {
+            position: absolute;
+            top: 12px;
+            right: 12px;
+            min-width: 20px;
+            height: 20px;
+            padding: 0 6px;
+            background: var(--accent-orange);
+            border-radius: 10px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 11px;
+            font-weight: 600;
+            color: white;
+        }
+
+        /* Quick Actions */
+        .quick-actions {
+            margin-bottom: var(--spacing-lg);
+        }
+
+        .section-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: var(--spacing-md);
+        }
+
+        .section-title {
+            font-size: 13px;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            color: var(--text-tertiary);
+        }
+
+        .action-cards {
+            display: flex;
+            gap: var(--spacing-sm);
+            overflow-x: auto;
+            padding-bottom: var(--spacing-xs);
+            scrollbar-width: none;
+        }
+
+        .action-cards::-webkit-scrollbar {
+            display: none;
+        }
+
+        .action-card {
+            flex-shrink: 0;
+            background: var(--bg-secondary);
+            padding: 12px 20px;
+            border-radius: var(--radius-lg);
+            display: flex;
+            align-items: center;
+            gap: var(--spacing-sm);
+            cursor: pointer;
+            transition: all 0.2s ease;
+            box-shadow: var(--shadow-subtle);
+            border: 1px solid transparent;
+        }
+
+        .action-card:active {
+            background: var(--accent-blue);
+            transform: scale(0.98);
+            border-color: var(--accent-blue);
+        }
+
+        .action-card:active .action-icon,
+        .action-card:active .action-text {
+            color: white;
+        }
+
+        .action-icon {
+            font-size: 16px;
+        }
+
+        .action-text {
+            font-size: 13px;
+            font-weight: 500;
+            color: var(--text-secondary);
+            white-space: nowrap;
+        }
+
+        /* Control Screen */
+        .control-screen {
+            display: none;
+            padding: var(--spacing-lg);
+            padding-bottom: calc(90px + env(safe-area-inset-bottom));
+            animation: slideIn 0.3s ease;
+        }
+
+        .control-screen.active {
+            display: block;
+        }
+
+        @keyframes slideIn {
+            from {
+                opacity: 0;
+                transform: translateX(20px);
+            }
+            to {
+                opacity: 1;
+                transform: translateX(0);
+            }
+        }
+
+        .controls-grid {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: var(--spacing-md);
+        }
+
+        .control-tile {
+            background: var(--bg-secondary);
+            border-radius: var(--radius-lg);
+            padding: var(--spacing-lg);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            gap: var(--spacing-sm);
+            min-height: 120px;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            box-shadow: var(--shadow-raised);
+            position: relative;
+        }
+
+        .control-tile:active {
+            transform: scale(0.98);
+            box-shadow: var(--shadow-inset);
+        }
+
+        .control-tile.active {
+            background: linear-gradient(135deg, var(--bg-secondary), var(--surface-light));
+        }
+
+        .control-tile.active .control-tile-icon {
+            color: var(--accent-green);
+            text-shadow: 0 0 20px rgba(50, 215, 75, 0.5);
+        }
+
+        .control-tile-icon {
+            font-size: 32px;
+            color: var(--text-tertiary);
+            transition: all 0.3s ease;
+        }
+
+        .control-tile-label {
+            font-size: 12px;
+            font-weight: 500;
+            color: var(--text-secondary);
+            text-align: center;
+        }
+
+        .control-tile.active .control-tile-label {
+            color: var(--text-primary);
+        }
+
+        /* Switch Controls */
+        .switch-control {
+            background: var(--bg-secondary);
+            border-radius: var(--radius-lg);
+            padding: var(--spacing-md) var(--spacing-lg);
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            margin-bottom: var(--spacing-md);
+            box-shadow: var(--shadow-raised);
+            cursor: pointer;
+            transition: all 0.2s ease;
+        }
+
+        .switch-control:active {
+            transform: scale(0.99);
+        }
+
+        .switch-info {
+            display: flex;
+            align-items: center;
+            gap: var(--spacing-md);
+        }
+
+        .switch-icon {
+            width: 40px;
+            height: 40px;
+            background: var(--bg-primary);
+            border-radius: var(--radius-md);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 20px;
+            box-shadow: var(--shadow-inset);
+        }
+
+        .switch-control.active .switch-icon {
+            background: linear-gradient(135deg, var(--accent-green), #00C851);
+            box-shadow: 0 4px 12px rgba(50, 215, 75, 0.3);
+        }
+
+        .switch-label {
+            font-size: 14px;
+            font-weight: 500;
+            color: var(--text-primary);
+        }
+
+        .switch-toggle {
+            width: 51px;
+            height: 31px;
+            background: var(--bg-primary);
+            border-radius: 16px;
+            position: relative;
+            box-shadow: var(--shadow-inset);
+            transition: background 0.3s ease;
+        }
+
+        .switch-control.active .switch-toggle {
+            background: linear-gradient(135deg, var(--accent-green), #00C851);
+        }
+
+        .switch-toggle-handle {
+            position: absolute;
+            top: 3px;
+            left: 3px;
+            width: 25px;
+            height: 25px;
+            background: var(--bg-secondary);
+            border-radius: 50%;
+            box-shadow: var(--shadow-subtle);
+            transition: transform 0.3s ease;
+        }
+
+        .switch-control.active .switch-toggle-handle {
+            transform: translateX(20px);
+            background: white;
+        }
+
+        /* Winch Special Control */
+        .winch-panel {
+            background: var(--bg-secondary);
+            border-radius: var(--radius-xl);
+            padding: var(--spacing-xl);
+            margin: var(--spacing-lg) 0;
+            box-shadow: var(--shadow-raised);
+        }
+
+        .winch-status {
+            text-align: center;
+            margin-bottom: var(--spacing-xl);
+        }
+
+        .winch-status-label {
+            font-size: 12px;
+            color: var(--text-tertiary);
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .winch-status-value {
+            font-size: 24px;
+            font-weight: 600;
+            color: var(--accent-green);
+            margin-top: var(--spacing-xs);
+        }
+
+        .winch-controls {
+            display: flex;
+            gap: var(--spacing-md);
+        }
+
+        .winch-button {
+            flex: 1;
+            background: var(--bg-primary);
+            border: none;
+            border-radius: var(--radius-lg);
+            padding: var(--spacing-lg);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: var(--spacing-sm);
+            cursor: pointer;
+            transition: all 0.2s ease;
+            box-shadow: var(--shadow-raised);
+        }
+
+        .winch-button:active {
+            background: var(--accent-orange);
+            transform: scale(0.95);
+            box-shadow: var(--shadow-inset);
+        }
+
+        .winch-button:active .winch-button-icon,
+        .winch-button:active .winch-button-label {
+            color: white;
+        }
+
+        .winch-button-icon {
+            font-size: 28px;
+            color: var(--text-secondary);
+        }
+
+        .winch-button-label {
+            font-size: 13px;
+            font-weight: 500;
+            color: var(--text-secondary);
+        }
+
+        .winch-warning {
+            text-align: center;
+            margin-top: var(--spacing-lg);
+            font-size: 11px;
+            color: var(--text-tertiary);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: var(--spacing-xs);
+        }
+
+        /* Bottom Navigation Bar */
+        .bottom-nav {
+            position: fixed;
+            bottom: 0;
+            left: 0;
+            right: 0;
+            background: var(--bg-secondary);
+            box-shadow: 0 -2px 20px rgba(0, 0, 0, 0.3);
+            padding-bottom: env(safe-area-inset-bottom);
+        }
+
+        .nav-container {
+            max-width: 428px;
+            margin: 0 auto;
+            display: flex;
+            padding: var(--spacing-sm);
+        }
+
+        .nav-item {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            padding: var(--spacing-sm);
+            gap: 4px;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            border-radius: var(--radius-md);
+            position: relative;
+        }
+
+        .nav-item::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 50%;
+            transform: translateX(-50%);
+            width: 24px;
+            height: 3px;
+            background: var(--accent-blue);
+            border-radius: 2px;
+            opacity: 0;
+            transition: opacity 0.3s ease;
+        }
+
+        .nav-item.active::before {
+            opacity: 1;
+        }
+
+        .nav-item:active {
+            transform: scale(0.95);
+        }
+
+        .nav-icon {
+            font-size: 22px;
+            color: var(--text-tertiary);
+            transition: color 0.2s ease;
+        }
+
+        .nav-item.active .nav-icon {
+            color: var(--accent-blue);
+        }
+
+        .nav-label {
+            font-size: 10px;
+            font-weight: 500;
+            color: var(--text-tertiary);
+            transition: color 0.2s ease;
+        }
+
+        .nav-item.active .nav-label {
+            color: var(--accent-blue);
+        }
+
+        /* Emergency FAB */
+        .emergency-button {
+            position: fixed;
+            bottom: 110px;
+            right: 20px;
+            width: 56px;
+            height: 56px;
+            background: linear-gradient(135deg, var(--accent-red), #C1121F);
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            box-shadow: 0 4px 20px rgba(255, 59, 48, 0.4);
+            cursor: pointer;
+            transition: all 0.2s ease;
+            z-index: 1000;
+        }
+
+        .emergency-button:active {
+            transform: scale(0.9);
+        }
+
+        .emergency-icon {
+            font-size: 24px;
+            color: white;
+        }
+
+        /* Mode Selection Cards */
+        .mode-selection {
+            display: flex;
+            flex-direction: column;
+            gap: var(--spacing-md);
+        }
+
+        .mode-card {
+            background: var(--bg-secondary);
+            border-radius: var(--radius-lg);
+            padding: var(--spacing-lg);
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            box-shadow: var(--shadow-raised);
+            border: 2px solid transparent;
+        }
+
+        .mode-card:active {
+            transform: scale(0.99);
+        }
+
+        .mode-card.active {
+            border-color: var(--accent-blue);
+            background: linear-gradient(135deg, var(--bg-secondary), var(--surface-light));
+        }
+
+        .mode-info {
+            display: flex;
+            align-items: center;
+            gap: var(--spacing-md);
+        }
+
+        .mode-icon {
+            width: 44px;
+            height: 44px;
+            background: var(--bg-primary);
+            border-radius: var(--radius-md);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 22px;
+            box-shadow: var(--shadow-inset);
+        }
+
+        .mode-card.active .mode-icon {
+            background: linear-gradient(135deg, var(--accent-blue), #0051D5);
+            box-shadow: 0 4px 12px rgba(0, 122, 255, 0.3);
+        }
+
+        .mode-text {
+            display: flex;
+            flex-direction: column;
+        }
+
+        .mode-title {
+            font-size: 15px;
+            font-weight: 500;
+            color: var(--text-primary);
+        }
+
+        .mode-subtitle {
+            font-size: 12px;
+            color: var(--text-tertiary);
+        }
+
+        .mode-check {
+            width: 24px;
+            height: 24px;
+            border: 2px solid var(--text-tertiary);
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .mode-card.active .mode-check {
+            background: var(--accent-blue);
+            border-color: var(--accent-blue);
+        }
+
+        .mode-card.active .mode-check::after {
+            content: '✓';
+            color: white;
+            font-size: 14px;
+        }
+    </style>
+</head>
+<body>
+    <div class="app-container">
+        <!-- Header -->
+        <div class="header">
+            <div class="header-content">
+                <div class="logo">
+                    <div class="logo-icon">A</div>
+                    <div class="logo-text">AutoCore</div>
+                </div>
+                <div class="battery-display">
+                    <div class="battery-icon">
+                        <div class="battery-level" style="width: 75%"></div>
+                    </div>
+                    <span class="battery-voltage">12.8V</span>
+                </div>
+            </div>
+        </div>
+
+        <!-- Dashboard Screen -->
+        <div id="dashboard" class="screen active">
+            <div class="dashboard">
+                <!-- Vehicle Status Card -->
+                <div class="vehicle-card">
+                    <div class="vehicle-visual">
+                        <div class="vehicle-silhouette">
+                            <svg viewBox="0 0 200 100">
+                                <path d="M40 60 L50 40 L80 35 L120 35 L150 40 L160 60 L160 70 L150 75 L50 75 L40 70 Z" 
+                                      fill="currentColor" opacity="0.8"/>
+                                <circle cx="60" cy="75" r="8" fill="currentColor"/>
+                                <circle cx="140" cy="75" r="8" fill="currentColor"/>
+                            </svg>
+                        </div>
+                    </div>
+                    <div class="vehicle-status">
+                        <div class="status-indicator active">
+                            <div class="status-value">ON</div>
+                            <div class="status-label">Sistema</div>
+                        </div>
+                        <div class="status-indicator">
+                            <div class="status-value">4x4</div>
+                            <div class="status-label">Tração</div>
+                        </div>
+                        <div class="status-indicator">
+                            <div class="status-value">P</div>
+                            <div class="status-label">Marcha</div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Control Categories -->
+                <div class="control-categories">
+                    <div class="category-card" onclick="showScreen('lighting')">
+                        <div class="category-icon">💡</div>
+                        <div class="category-label">Iluminação</div>
+                        <div class="category-badge">3</div>
+                    </div>
+                    <div class="category-card" onclick="showScreen('actions')">
+                        <div class="category-icon">⚡</div>
+                        <div class="category-label">Ações</div>
+                    </div>
+                    <div class="category-card" onclick="showScreen('winch')">
+                        <div class="category-icon">⚙️</div>
+                        <div class="category-label">Guincho</div>
+                    </div>
+                    <div class="category-card" onclick="showScreen('traction')">
+                        <div class="category-icon">🚙</div>
+                        <div class="category-label">Tração</div>
+                    </div>
+                </div>
+
+                <!-- Quick Actions -->
+                <div class="quick-actions">
+                    <div class="section-header">
+                        <div class="section-title">Ações Rápidas</div>
+                    </div>
+                    <div class="action-cards">
+                        <div class="action-card" onclick="quickAction(this)">
+                            <span class="action-icon">🏕️</span>
+                            <span class="action-text">Camping</span>
+                        </div>
+                        <div class="action-card" onclick="quickAction(this)">
+                            <span class="action-icon">🚨</span>
+                            <span class="action-text">Emergência</span>
+                        </div>
+                        <div class="action-card" onclick="quickAction(this)">
+                            <span class="action-icon">✨</span>
+                            <span class="action-text">Show</span>
+                        </div>
+                        <div class="action-card" onclick="quickAction(this)">
+                            <span class="action-icon">🌙</span>
+                            <span class="action-text">Noturno</span>
+                        </div>
+                        <div class="action-card" onclick="quickAction(this)">
+                            <span class="action-icon">🔒</span>
+                            <span class="action-text">Travar</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Lighting Screen -->
+        <div id="lighting" class="control-screen">
+            <div class="section-header">
+                <div class="section-title">Controles de Iluminação</div>
+            </div>
+            
+            <div class="switch-control" onclick="toggleSwitch(this)">
+                <div class="switch-info">
+                    <div class="switch-icon">💡</div>
+                    <div class="switch-label">Farol Alto</div>
+                </div>
+                <div class="switch-toggle">
+                    <div class="switch-toggle-handle"></div>
+                </div>
+            </div>
+
+            <div class="switch-control" onclick="toggleSwitch(this)">
+                <div class="switch-info">
+                    <div class="switch-icon">🔦</div>
+                    <div class="switch-label">Farol Baixo</div>
+                </div>
+                <div class="switch-toggle">
+                    <div class="switch-toggle-handle"></div>
+                </div>
+            </div>
+
+            <div class="switch-control" onclick="toggleSwitch(this)">
+                <div class="switch-info">
+                    <div class="switch-icon">💠</div>
+                    <div class="switch-label">LED Barra Frontal</div>
+                </div>
+                <div class="switch-toggle">
+                    <div class="switch-toggle-handle"></div>
+                </div>
+            </div>
+
+            <div class="switch-control" onclick="toggleSwitch(this)">
+                <div class="switch-info">
+                    <div class="switch-icon">🔴</div>
+                    <div class="switch-label">LED Traseiro</div>
+                </div>
+                <div class="switch-toggle">
+                    <div class="switch-toggle-handle"></div>
+                </div>
+            </div>
+
+            <div class="controls-grid">
+                <div class="control-tile" onclick="toggleTile(this)">
+                    <div class="control-tile-icon">🌫️</div>
+                    <div class="control-tile-label">Neblina</div>
+                </div>
+                <div class="control-tile" onclick="toggleTile(this)">
+                    <div class="control-tile-icon">⚠️</div>
+                    <div class="control-tile-label">Alerta</div>
+                </div>
+                <div class="control-tile" onclick="toggleTile(this)">
+                    <div class="control-tile-icon">🚨</div>
+                    <div class="control-tile-label">Strobo</div>
+                </div>
+                <div class="control-tile" onclick="toggleTile(this)">
+                    <div class="control-tile-icon">🏠</div>
+                    <div class="control-tile-label">Cortesia</div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Winch Screen -->
+        <div id="winch" class="control-screen">
+            <div class="section-header">
+                <div class="section-title">Controle do Guincho</div>
+            </div>
+            
+            <div class="winch-panel">
+                <div class="winch-status">
+                    <div class="winch-status-label">Status do Sistema</div>
+                    <div class="winch-status-value">PRONTO</div>
+                </div>
+                
+                <div class="winch-controls">
+                    <button class="winch-button" 
+                            onmousedown="winchAction('in', true)" 
+                            onmouseup="winchAction('in', false)"
+                            ontouchstart="winchAction('in', true)" 
+                            ontouchend="winchAction('in', false)">
+                        <div class="winch-button-icon">⬆️</div>
+                        <div class="winch-button-label">RECOLHER</div>
+                    </button>
+                    
+                    <button class="winch-button" 
+                            onmousedown="winchAction('out', true)" 
+                            onmouseup="winchAction('out', false)"
+                            ontouchstart="winchAction('out', true)" 
+                            ontouchend="winchAction('out', false)">
+                        <div class="winch-button-icon">⬇️</div>
+                        <div class="winch-button-label">SOLTAR</div>
+                    </button>
+                </div>
+                
+                <div class="winch-warning">
+                    <span>⚠️</span>
+                    <span>Mantenha pressionado para operar</span>
+                </div>
+            </div>
+        </div>
+
+        <!-- Traction Screen -->
+        <div id="traction" class="control-screen">
+            <div class="section-header">
+                <div class="section-title">Modo de Tração</div>
+            </div>
+            
+            <div class="mode-selection">
+                <div class="mode-card" onclick="selectMode(this)">
+                    <div class="mode-info">
+                        <div class="mode-icon">🚗</div>
+                        <div class="mode-text">
+                            <div class="mode-title">4x2</div>
+                            <div class="mode-subtitle">Tração traseira</div>
+                        </div>
+                    </div>
+                    <div class="mode-check"></div>
+                </div>
+                
+                <div class="mode-card active" onclick="selectMode(this)">
+                    <div class="mode-info">
+                        <div class="mode-icon">🚙</div>
+                        <div class="mode-text">
+                            <div class="mode-title">4x4 High</div>
+                            <div class="mode-subtitle">Tração integral</div>
+                        </div>
+                    </div>
+                    <div class="mode-check"></div>
+                </div>
+                
+                <div class="mode-card" onclick="selectMode(this)">
+                    <div class="mode-info">
+                        <div class="mode-icon">🛻</div>
+                        <div class="mode-text">
+                            <div class="mode-title">4x4 Low</div>
+                            <div class="mode-subtitle">Força reduzida</div>
+                        </div>
+                    </div>
+                    <div class="mode-check"></div>
+                </div>
+            </div>
+            
+            <div class="section-header" style="margin-top: 32px;">
+                <div class="section-title">Bloqueios</div>
+            </div>
+            
+            <div class="switch-control" onclick="toggleSwitch(this)">
+                <div class="switch-info">
+                    <div class="switch-icon">🔒</div>
+                    <div class="switch-label">Diferencial Dianteiro</div>
+                </div>
+                <div class="switch-toggle">
+                    <div class="switch-toggle-handle"></div>
+                </div>
+            </div>
+            
+            <div class="switch-control" onclick="toggleSwitch(this)">
+                <div class="switch-info">
+                    <div class="switch-icon">🔒</div>
+                    <div class="switch-label">Diferencial Traseiro</div>
+                </div>
+                <div class="switch-toggle">
+                    <div class="switch-toggle-handle"></div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Actions Screen -->
+        <div id="actions" class="control-screen">
+            <div class="section-header">
+                <div class="section-title">Auxiliares</div>
+            </div>
+            
+            <div class="controls-grid">
+                <div class="control-tile momentary" 
+                     onmousedown="momentaryAction(this, true)" 
+                     onmouseup="momentaryAction(this, false)"
+                     ontouchstart="momentaryAction(this, true)" 
+                     ontouchend="momentaryAction(this, false)">
+                    <div class="control-tile-icon">📯</div>
+                    <div class="control-tile-label">Buzina</div>
+                </div>
+                
+                <div class="control-tile" onclick="toggleTile(this)">
+                    <div class="control-tile-icon">🔌</div>
+                    <div class="control-tile-label">Tomada 12V</div>
+                </div>
+                
+                <div class="control-tile" onclick="toggleTile(this)">
+                    <div class="control-tile-icon">💨</div>
+                    <div class="control-tile-label">Compressor</div>
+                </div>
+                
+                <div class="control-tile" onclick="toggleTile(this)">
+                    <div class="control-tile-icon">📻</div>
+                    <div class="control-tile-label">Rádio VHF</div>
+                </div>
+                
+                <div class="control-tile" onclick="toggleTile(this)">
+                    <div class="control-tile-icon">🌡️</div>
+                    <div class="control-tile-label">Climatizador</div>
+                </div>
+                
+                <div class="control-tile" onclick="toggleTile(this)">
+                    <div class="control-tile-icon">🔊</div>
+                    <div class="control-tile-label">Som Externo</div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Bottom Navigation -->
+        <div class="bottom-nav">
+            <div class="nav-container">
+                <div class="nav-item active" onclick="showScreen('dashboard')">
+                    <span class="nav-icon">📊</span>
+                    <span class="nav-label">Painel</span>
+                </div>
+                <div class="nav-item" onclick="showScreen('lighting')">
+                    <span class="nav-icon">💡</span>
+                    <span class="nav-label">Luzes</span>
+                </div>
+                <div class="nav-item" onclick="showScreen('winch')">
+                    <span class="nav-icon">⚙️</span>
+                    <span class="nav-label">Guincho</span>
+                </div>
+                <div class="nav-item" onclick="showScreen('traction')">
+                    <span class="nav-icon">🚙</span>
+                    <span class="nav-label">Tração</span>
+                </div>
+                <div class="nav-item" onclick="showScreen('actions')">
+                    <span class="nav-icon">⚡</span>
+                    <span class="nav-label">Aux</span>
+                </div>
+            </div>
+        </div>
+
+        <!-- Emergency Button -->
+        <div class="emergency-button" onclick="emergencyStop()">
+            <span class="emergency-icon">🛑</span>
+        </div>
+    </div>
+
+    <script>
+        // Haptic feedback helper
+        function haptic(intensity = 10) {
+            if (navigator.vibrate) {
+                navigator.vibrate(intensity);
+            }
+        }
+
+        // Screen navigation
+        function showScreen(screenId) {
+            // Hide all screens
+            document.querySelectorAll('.control-screen, #dashboard').forEach(screen => {
+                screen.classList.remove('active');
+                screen.style.display = 'none';
+            });
+            
+            // Show selected screen
+            const screen = document.getElementById(screenId);
+            if (screen) {
+                if (screenId === 'dashboard') {
+                    screen.classList.add('active');
+                    screen.style.display = 'block';
+                } else {
+                    screen.classList.add('active');
+                    screen.style.display = 'block';
+                }
+            }
+            
+            // Update nav
+            document.querySelectorAll('.nav-item').forEach(item => item.classList.remove('active'));
+            const navMap = {
+                'dashboard': 0,
+                'lighting': 1, 
+                'winch': 2,
+                'traction': 3,
+                'actions': 4
+            };
+            if (navMap[screenId] !== undefined) {
+                document.querySelectorAll('.nav-item')[navMap[screenId]].classList.add('active');
+            }
+            
+            haptic(15);
+        }
+
+        // Toggle switch control
+        function toggleSwitch(element) {
+            element.classList.toggle('active');
+            haptic(20);
+            
+            const label = element.querySelector('.switch-label').textContent;
+            const isActive = element.classList.contains('active');
+            console.log(`MQTT: ${label} = ${isActive ? 'ON' : 'OFF'}`);
+        }
+
+        // Toggle tile control
+        function toggleTile(element) {
+            element.classList.toggle('active');
+            haptic(20);
+            
+            const label = element.querySelector('.control-tile-label').textContent;
+            const isActive = element.classList.contains('active');
+            console.log(`MQTT: ${label} = ${isActive ? 'ON' : 'OFF'}`);
+        }
+
+        // Select mode (exclusive)
+        function selectMode(element) {
+            element.parentElement.querySelectorAll('.mode-card').forEach(card => {
+                card.classList.remove('active');
+            });
+            element.classList.add('active');
+            haptic(30);
+            
+            const mode = element.querySelector('.mode-title').textContent;
+            console.log(`MQTT: Traction = ${mode}`);
+        }
+
+        // Momentary action
+        function momentaryAction(element, pressed) {
+            if (pressed) {
+                element.style.background = 'linear-gradient(135deg, #FF9500, #FF6200)';
+                element.style.transform = 'scale(0.95)';
+                haptic(50);
+                console.log('MQTT: Momentary = ON');
+            } else {
+                element.style.background = '';
+                element.style.transform = '';
+                console.log('MQTT: Momentary = OFF');
+            }
+        }
+
+        // Winch control
+        function winchAction(direction, pressed) {
+            if (pressed) {
+                haptic([50, 50, 50]);
+                console.log(`MQTT: Winch ${direction} = START`);
+            } else {
+                console.log(`MQTT: Winch ${direction} = STOP`);
+            }
+        }
+
+        // Quick action
+        function quickAction(element) {
+            haptic(20);
+            const action = element.querySelector('.action-text').textContent;
+            console.log(`MQTT: Quick Action = ${action}`);
+            
+            // Visual feedback
+            element.style.background = 'var(--accent-blue)';
+            setTimeout(() => {
+                element.style.background = '';
+            }, 300);
+        }
+
+        // Emergency stop
+        function emergencyStop() {
+            haptic([100, 50, 100, 50, 100]);
+            
+            if (confirm('🛑 PARADA DE EMERGÊNCIA\n\nDesligar todos os sistemas?')) {
+                document.querySelectorAll('.switch-control.active, .control-tile.active').forEach(el => {
+                    el.classList.remove('active');
+                });
+                console.log('MQTT: EMERGENCY STOP');
+                alert('✅ Sistemas desligados');
+            }
+        }
+
+        // Battery simulation
+        setInterval(() => {
+            const voltage = (11.5 + Math.random() * 2).toFixed(1);
+            document.querySelector('.battery-voltage').textContent = voltage + 'V';
+            const percent = ((parseFloat(voltage) - 11) / 3) * 100;
+            document.querySelector('.battery-level').style.width = Math.min(100, Math.max(0, percent)) + '%';
+        }, 5000);
+
+        // Initialize first screen properly
+        document.getElementById('dashboard').style.display = 'block';
+    </script>
+</body>
+</html>
