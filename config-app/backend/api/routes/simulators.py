@@ -272,6 +272,7 @@ async def get_board_channels_with_state(board_id: int):
                 "color": channel.color,
                 "function_type": channel.function_type,
                 "protection_mode": channel.protection_mode,
+                "allow_in_macro": getattr(channel, 'allow_in_macro', True),  # Campo novo com fallback
                 "simulated_state": False
             }
             

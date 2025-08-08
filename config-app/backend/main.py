@@ -24,8 +24,8 @@ from shared.repositories import devices, relays, telemetry, events, config
 # Import MQTT Monitor
 from services.mqtt_monitor import mqtt_monitor
 
-# Import Routes
-from api.routes import simulators
+# Import Routes  
+from api.routes import simulators, macros
 
 # ====================================
 # CONFIGURAÇÃO
@@ -1259,6 +1259,8 @@ async def seed_can_signals():
 @app.websocket("/ws/mqtt")
 async def websocket_mqtt_monitor(websocket: WebSocket):
     """WebSocket para streaming de mensagens MQTT em tempo real"""
+    print(f"🔌 WebSocket connection attempt from: {websocket.client}")
+    print(f"   Headers: {websocket.headers}")
     await mqtt_monitor.add_websocket(websocket)
     try:
         while True:
@@ -1286,6 +1288,12 @@ async def websocket_mqtt_monitor(websocket: WebSocket):
 async def get_mqtt_status():
     """Retorna status da conexão MQTT"""
     return mqtt_monitor.get_stats()
+
+@app.post("/api/mqtt/clear", tags=["MQTT"])
+async def clear_mqtt_history():
+    """Limpa o histórico de mensagens MQTT"""
+    mqtt_monitor.message_history.clear()
+    return {"success": True, "message": "Histórico limpo"}
 
 class MQTTPublishRequest(BaseModel):
     """Request para publicar mensagem MQTT"""
@@ -1336,6 +1344,7 @@ async def get_mqtt_topics():
 
 # Registrar routers
 app.include_router(simulators.router)
+app.include_router(macros.router)
 
 # ====================================
 # MAIN
@@ -1348,5 +1357,9 @@ if __name__ == "__main__":
         host="0.0.0.0",
         port=8000,
         reload=True,
-        log_level="info"
+        log_level="info",
+        # Configurações para WebSocket
+        ws_max_size=16777216,  # 16MB max message size
+        ws_ping_interval=20,
+        ws_ping_timeout=20
     )

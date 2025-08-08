@@ -83,6 +83,7 @@ class RelayChannel(Base):
     color = Column(String(7), nullable=True)  # Hex color
     protection_mode = Column(String(20), nullable=True)  # none, confirm, password
     max_activation_time = Column(Integer, nullable=True)  # segundos
+    allow_in_macro = Column(Boolean, default=True)  # Permitir usar em macros
     is_active = Column(Boolean, default=True)
     created_at = Column(DateTime, default=func.now())
     updated_at = Column(DateTime, default=func.now(), onupdate=func.now())

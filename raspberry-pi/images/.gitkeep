@@ -1,0 +1,9 @@
+# Imagens do Raspberry Pi OS
+
+Este diretório contém as imagens do sistema operacional, mas elas não são commitadas no Git devido ao tamanho.
+
+## Imagem Atual:
+- 2025-05-13-raspios-bookworm-armhf-lite.img.xz (493MB)
+
+## Download:
+https://downloads.raspberrypi.com/raspios_lite_armhf/images/raspios_lite_armhf-2025-05-13/

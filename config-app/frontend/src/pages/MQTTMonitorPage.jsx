@@ -100,6 +100,7 @@ const MQTTMonitorPage = () => {
   };
   
   useEffect(() => {
+    // Conectar imediatamente
     connectWebSocket();
     
     return () => {
@@ -147,11 +148,30 @@ const MQTTMonitorPage = () => {
   }, [messages, filter, typeFilter, deviceFilter]);
   
   const connectWebSocket = () => {
+    // Prevenir múltiplas conexões
+    if (ws.current && ws.current.readyState === WebSocket.CONNECTING) {
+      console.log('WebSocket já está conectando...');
+      return;
+    }
+    
+    if (ws.current && ws.current.readyState === WebSocket.OPEN) {
+      console.log('WebSocket já está conectado');
+      return;
+    }
+    
     // Usar a mesma porta do frontend para evitar CORS
     const host = window.location.hostname;
     const wsUrl = `ws://${host}:8000/ws/mqtt`;
     console.log('Conectando WebSocket:', wsUrl);
-    ws.current = new WebSocket(wsUrl);
+    
+    try {
+      // Criar WebSocket sem headers extras
+      ws.current = new WebSocket(wsUrl);
+    } catch (error) {
+      console.error('Erro ao criar WebSocket:', error);
+      toast.error('Erro ao conectar WebSocket');
+      return;
+    }
     
     ws.current.onopen = () => {
       console.log('WebSocket conectado');
@@ -159,30 +179,79 @@ const MQTTMonitorPage = () => {
       toast.success('Conectado ao Monitor MQTT');
     };
     
+    ws.current.onerror = (error) => {
+      console.error('WebSocket error:', error);
+      console.error('ReadyState:', ws.current.readyState);
+      console.error('URL:', ws.current.url);
+      toast.error('Erro na conexão WebSocket');
+    };
+    
     ws.current.onmessage = (event) => {
-      const data = JSON.parse(event.data);
-      
-      if (data.type === 'mqtt_status') {
-        setConnected(data.data.status === 'connected');
-      } else if (data.type === 'mqtt_message' && !isPaused) {
-        const msg = data.data;
-        setMessages(prev => [...prev.slice(-500), msg]); // Manter últimas 500 mensagens
+      try {
+        const data = JSON.parse(event.data);
         
-        // Atualizar stats
-        setStats(prev => ({
-          total: prev.total + 1,
-          received: msg.direction === 'received' ? prev.received + 1 : prev.received,
-          sent: msg.direction === 'sent' ? prev.sent + 1 : prev.sent,
-          devices: msg.device_uuid ? new Set([...prev.devices, msg.device_uuid]) : prev.devices
-        }));
-      } else if (data.type === 'history') {
-        setMessages(data.data);
-        setStats({
-          total: data.data.length,
-          received: data.data.filter(m => m.direction === 'received').length,
+        // Debug - ver mensagem recebida
+        console.log('WebSocket message received:', data);
+        
+        if (data.type === 'mqtt_status') {
+          setConnected(data.data.status === 'connected');
+        } else if (data.type === 'mqtt_message' && !isPaused) {
+          const msg = data.data;
+          
+          // Garantir que a mensagem tem todos os campos necessários
+          const processedMsg = {
+            ...msg,
+            timestamp: msg.timestamp || new Date().toISOString(),
+            topic: msg.topic || 'unknown',
+            payload: msg.payload || {},
+            message_type: msg.message_type || msg.type || 'message',
+            direction: msg.direction || 'received',
+            qos: msg.qos !== undefined ? msg.qos : 0
+          };
+          
+          setMessages(prev => [...prev.slice(-500), processedMsg]); // Manter últimas 500 mensagens
+          
+          // Atualizar stats
+          setStats(prev => ({
+            total: prev.total + 1,
+            received: processedMsg.direction === 'received' ? prev.received + 1 : prev.received,
+            sent: processedMsg.direction === 'sent' ? prev.sent + 1 : prev.sent,
+            devices: processedMsg.device_uuid ? new Set([...prev.devices, processedMsg.device_uuid]) : prev.devices
+          }));
+          
+          // Atualizar estado dos canais se for mensagem de estado de relé
+          if (processedMsg.message_type === 'relay_state' && processedMsg.topic.includes('/relays/state')) {
+            try {
+              const payloadData = typeof processedMsg.payload === 'string' 
+                ? JSON.parse(processedMsg.payload) 
+                : processedMsg.payload;
+              
+              if (payloadData.channels && payloadData.board_id === selectedBoard) {
+                // Atualizar estado dos canais com base na mensagem MQTT
+                setBoardChannels(prevChannels => 
+                  prevChannels.map(channel => ({
+                    ...channel,
+                    simulated_state: payloadData.channels[channel.channel_number.toString()] || false
+                  }))
+                );
+                console.log('Estado dos canais atualizado via MQTT:', payloadData.channels);
+              }
+            } catch (e) {
+              console.error('Erro atualizando estado dos canais:', e);
+            }
+          }
+        } else if (data.type === 'history') {
+          setMessages(data.data);
+          setStats({
+            total: data.data.length,
+            received: data.data.filter(m => m.direction === 'received').length,
           sent: data.data.filter(m => m.direction === 'sent').length,
           devices: new Set(data.data.filter(m => m.device_uuid).map(m => m.device_uuid))
         });
+        }
+      } catch (error) {
+        console.error('Erro processando mensagem WebSocket:', error);
+        console.error('Dados recebidos:', event.data);
       }
     };
     
@@ -244,10 +313,26 @@ const MQTTMonitorPage = () => {
     toast.success('Template carregado');
   };
   
-  const clearMessages = () => {
-    setMessages([]);
-    setStats({ total: 0, received: 0, sent: 0, devices: new Set() });
-    toast.success('Mensagens limpas');
+  const clearMessages = async () => {
+    // Limpar no backend também
+    try {
+      const response = await fetch('http://localhost:8000/api/mqtt/clear', {
+        method: 'POST'
+      });
+      if (response.ok) {
+        setMessages([]);
+        setFilteredMessages([]);
+        setStats({ total: 0, received: 0, sent: 0, devices: new Set() });
+        toast.success('Histórico limpo no servidor e localmente');
+      }
+    } catch (error) {
+      console.error('Erro ao limpar histórico:', error);
+      // Limpar apenas localmente se falhar
+      setMessages([]);
+      setFilteredMessages([]);
+      setStats({ total: 0, received: 0, sent: 0, devices: new Set() });
+      toast.warning('Limpo apenas localmente');
+    }
   };
   
   const exportMessages = () => {
@@ -270,17 +355,21 @@ const MQTTMonitorPage = () => {
       console.log('Copiando mensagem:', msg);
       
       // Formatar a mensagem completa para copiar
-      const timestamp = msg.timestamp ? new Date(msg.timestamp).toLocaleTimeString() : 'N/A';
+      const timestamp = msg.timestamp ? new Date(msg.timestamp).toLocaleString('pt-BR') : 'N/A';
       const payload = msg.payload ? formatPayload(msg.payload) : '';
-      const messageType = msg.message_type || 'unknown';
+      const messageType = msg.message_type || msg.type || 'unknown';
       const topic = msg.topic || 'N/A';
       const qos = msg.qos !== undefined ? msg.qos : 0;
       
-      const formattedMessage = `${messageType}
-${topic}
+      const formattedMessage = `=== MQTT Message ===
+Tipo: ${messageType}
+Tópico: ${topic}
+QoS: ${qos}
+Timestamp: ${timestamp}
+
+Payload:
 ${payload}
-${timestamp}
-QoS: ${qos}`;
+==================`;
       
       console.log('Mensagem formatada:', formattedMessage);
       
@@ -321,9 +410,15 @@ QoS: ${qos}`;
       'telemetry': 'bg-purple-500',
       'command': 'bg-orange-500',
       'response': 'bg-yellow-500',
+      'relay': 'bg-pink-500',
       'relay_status': 'bg-pink-500',
       'relay_state': 'bg-rose-500',     // Estado dos relés
-      'relay_command': 'bg-amber-500',   // Comandos de relé
+      'relay_command': 'bg-amber-500',   // Comandos de relé para ESP32
+      'macro_status': 'bg-violet-500',   // Status de macros
+      'state_save': 'bg-teal-500',       // Save state
+      'state_restore': 'bg-teal-600',    // Restore state
+      'mode_change': 'bg-lime-500',      // Mudança de modo
+      'system_command': 'bg-red-500',    // Comandos do sistema
       'discovery': 'bg-cyan-500',
       'gateway_status': 'bg-indigo-500'
     };
@@ -331,12 +426,24 @@ QoS: ${qos}`;
   };
   
   const formatPayload = (payload) => {
-    try {
-      const obj = JSON.parse(payload);
-      return JSON.stringify(obj, null, 2);
-    } catch {
-      return payload;
+    // Se já for um objeto, formata diretamente
+    if (typeof payload === 'object' && payload !== null) {
+      return JSON.stringify(payload, null, 2);
     }
+    
+    // Se for string, tenta fazer parse
+    if (typeof payload === 'string') {
+      try {
+        const obj = JSON.parse(payload);
+        return JSON.stringify(obj, null, 2);
+      } catch {
+        // Se não for JSON válido, retorna como está
+        return payload;
+      }
+    }
+    
+    // Para outros tipos, converte para string
+    return String(payload);
   };
   
   // Simulator functions
@@ -602,9 +709,15 @@ QoS: ${qos}`;
                     <SelectItem value="telemetry">Telemetria</SelectItem>
                     <SelectItem value="command">Comando</SelectItem>
                     <SelectItem value="response">Resposta</SelectItem>
+                    <SelectItem value="relay">Relé</SelectItem>
                     <SelectItem value="relay_status">Relé Status</SelectItem>
                     <SelectItem value="relay_state">Estado Relés</SelectItem>
                     <SelectItem value="relay_command">Comando Relés</SelectItem>
+                    <SelectItem value="macro_status">Macro Status</SelectItem>
+                    <SelectItem value="state_save">Save State</SelectItem>
+                    <SelectItem value="state_restore">Restore State</SelectItem>
+                    <SelectItem value="mode_change">Mudança Modo</SelectItem>
+                    <SelectItem value="system_command">Sistema</SelectItem>
                     <SelectItem value="discovery">Discovery</SelectItem>
                     <SelectItem value="gateway_status">Gateway Status</SelectItem>
                   </SelectContent>
@@ -633,27 +746,29 @@ QoS: ${qos}`;
                     >
                       <div className="flex items-start justify-between">
                         <div className="space-y-1 flex-1">
-                          <div className="flex items-center gap-2">
-                            <Badge className={`${getMessageTypeColor(msg.message_type)} text-white`}>
-                              {msg.message_type || 'unknown'}
+                          <div className="flex items-center gap-2 flex-wrap">
+                            <Badge className={`${getMessageTypeColor(msg.message_type || msg.type)} text-white`}>
+                              {msg.message_type || msg.type || 'unknown'}
                             </Badge>
                             
                             {msg.direction === 'sent' ? (
-                              <ArrowUpCircle className="h-4 w-4 text-green-500" />
+                              <ArrowUpCircle className="h-4 w-4 text-green-500" title="Enviado" />
                             ) : (
-                              <ArrowDownCircle className="h-4 w-4 text-blue-500" />
+                              <ArrowDownCircle className="h-4 w-4 text-blue-500" title="Recebido" />
                             )}
                             
-                            <span className="font-mono text-sm">{msg.topic}</span>
+                            <span className="font-mono text-sm font-semibold">{msg.topic || 'N/A'}</span>
                             
                             {msg.device_uuid && (
-                              <Badge variant="outline">{msg.device_uuid}</Badge>
+                              <Badge variant="outline" className="text-xs">{msg.device_uuid}</Badge>
                             )}
                           </div>
                           
-                          <pre className="text-xs bg-muted p-2 rounded overflow-x-auto">
-                            {formatPayload(msg.payload)}
-                          </pre>
+                          <div className="mt-2">
+                            <pre className="text-xs bg-muted p-3 rounded overflow-x-auto max-h-[300px]">
+                              {formatPayload(msg.payload)}
+                            </pre>
+                          </div>
                           
                           <div className="flex items-center gap-4 text-xs text-muted-foreground">
                             <span className="flex items-center gap-1">

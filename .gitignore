@@ -108,6 +108,23 @@ config-app/backend/update_relay_types.py
 reports/
 scripts/temp/
 
+# Raspberry Pi Configuration (SENSITIVE - Contains Credentials)
+RASPBERRY_PI_CONFIG.md
+raspberry_pi_config.md
+PI_CONFIG.md
+pi_config.md
+*_CREDENTIALS.md
+*_credentials.md
+
+# Raspberry Pi OS Images (Too large for Git)
+raspberry-pi/images/*.img
+raspberry-pi/images/*.img.xz
+raspberry-pi/images/*.iso
+raspberry-pi/images/*.zip
+*.img
+*.img.xz
+*.iso
+
 # Keep these
 !.gitkeep
 !requirements.txt

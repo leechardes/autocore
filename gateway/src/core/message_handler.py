@@ -34,6 +34,9 @@ class MessageHandler:
             'relay': self._handle_relay_status,
             'response': self._handle_command_response,
             'discovery': self._handle_device_discovery,
+            'relay_command': self._handle_relay_command,  # Comandos de macros
+            'system_command': self._handle_system_command,  # Comandos do sistema
+            'macro_status': self._handle_macro_status,  # Status de macros
         }
     
     async def handle_message(self, topic: str, payload: str, qos: int):
@@ -74,9 +77,9 @@ class MessageHandler:
         device_uuid = None
         message_type = None
         
-        if len(parts) >= 4 and parts[0] == 'autocore':
+        if len(parts) >= 2 and parts[0] == 'autocore':
             if parts[1] == 'devices':
-                device_uuid = parts[2]
+                device_uuid = parts[2] if len(parts) > 2 else None
                 if len(parts) >= 4:
                     message_type = parts[3]
                 if len(parts) >= 6 and parts[4] == 'relay':
@@ -84,6 +87,18 @@ class MessageHandler:
             elif parts[1] == 'discovery':
                 device_uuid = parts[2] if len(parts) > 2 else None
                 message_type = 'discovery'
+            elif parts[1] == 'relay' and len(parts) >= 4 and parts[3] == 'command':
+                # autocore/relay/{id}/command - Comandos de macros para relés
+                device_uuid = parts[2]  # ID do relé ou "all"
+                message_type = 'relay_command'
+            elif parts[1] == 'system':
+                # autocore/system/{command} - Comandos do sistema
+                device_uuid = 'system'
+                message_type = 'system_command'
+            elif parts[1] == 'macro' and len(parts) >= 4 and parts[3] == 'status':
+                # autocore/macro/{id}/status - Status de macros
+                device_uuid = parts[2]  # ID da macro
+                message_type = 'macro_status'
         
         return MessageContext(
             topic=topic,
@@ -213,6 +228,75 @@ class MessageHandler:
             
         except Exception as e:
             logger.error(f"❌ Erro ao processar descoberta: {e}")
+    
+    async def _handle_relay_command(self, context: MessageContext, data: Dict[str, Any]):
+        """Processa comando de relé vindo de macros"""
+        try:
+            relay_id = context.device_uuid  # ID do relé ou "all"
+            command = data.get('command', 'toggle')
+            source = data.get('source', 'unknown')
+            
+            logger.info(f"⚡ Comando de relé recebido: {relay_id} -> {command} (de {source})")
+            
+            # Se for comando para todos os relés
+            if relay_id == 'all':
+                # Obter todos os dispositivos de relé
+                relay_devices = await self.device_manager.get_devices_by_type('esp32_relay')
+                for device in relay_devices:
+                    # Enviar comando para cada dispositivo
+                    await self.device_manager.send_relay_command(
+                        device_uuid=device['uuid'],
+                        channel='all',
+                        command=command,
+                        source=source
+                    )
+                logger.info(f"✅ Comando enviado para {len(relay_devices)} placas de relé")
+            else:
+                # Comando para relé específico
+                # Precisamos mapear o ID do relé para o dispositivo correto
+                # Por enquanto, vamos assumir que temos apenas uma placa
+                relay_devices = await self.device_manager.get_devices_by_type('esp32_relay')
+                if relay_devices:
+                    device = relay_devices[0]  # Primeira placa encontrada
+                    await self.device_manager.send_relay_command(
+                        device_uuid=device['uuid'],
+                        channel=int(relay_id) if relay_id.isdigit() else relay_id,
+                        command=command,
+                        source=source
+                    )
+                    logger.info(f"✅ Comando enviado para relé {relay_id}")
+                else:
+                    logger.warning(f"⚠️ Nenhuma placa de relé encontrada para processar comando")
+            
+        except Exception as e:
+            logger.error(f"❌ Erro ao processar comando de relé: {e}")
+    
+    async def _handle_system_command(self, context: MessageContext, data: Dict[str, Any]):
+        """Processa comando do sistema"""
+        try:
+            logger.info(f"🔧 Comando do sistema recebido: {context.topic}")
+            
+            # Por enquanto, apenas logar
+            # Futuramente, processar comandos como shutdown, restart, etc.
+            logger.debug(f"Payload do sistema: {data}")
+            
+        except Exception as e:
+            logger.error(f"❌ Erro ao processar comando do sistema: {e}")
+    
+    async def _handle_macro_status(self, context: MessageContext, data: Dict[str, Any]):
+        """Processa status de macro"""
+        try:
+            macro_id = context.device_uuid
+            status = data.get('status')
+            name = data.get('name', 'Unknown')
+            
+            logger.info(f"📊 Status de macro {macro_id} ({name}): {status}")
+            
+            # Por enquanto, apenas logar
+            # Futuramente, pode-se armazenar histórico ou notificar UI
+            
+        except Exception as e:
+            logger.error(f"❌ Erro ao processar status de macro: {e}")
     
     def get_stats(self) -> Dict[str, Any]:
         """Retorna estatísticas do message handler"""

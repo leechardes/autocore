@@ -204,6 +204,8 @@ class RelayRepository(BaseRepository):
                     channel.color = config_data['color']
                 if 'protection_mode' in config_data:
                     channel.protection_mode = config_data['protection_mode']
+                if 'allow_in_macro' in config_data:
+                    channel.allow_in_macro = config_data['allow_in_macro']
                 
                 session.commit()
                 return True
@@ -340,7 +342,8 @@ class RelayRepository(BaseRepository):
                 icon=channel_data.get('icon'),
                 color=channel_data.get('color'),
                 protection_mode=channel_data.get('protection_mode', 'none'),
-                max_activation_time=channel_data.get('max_activation_time')
+                max_activation_time=channel_data.get('max_activation_time'),
+                allow_in_macro=channel_data.get('allow_in_macro', True)
             )
             session.add(channel)
             session.commit()
@@ -707,3 +710,80 @@ relays = RelayRepository()
 telemetry = TelemetryRepository()
 events = EventRepository()
 config = ConfigRepository()
+class MacroRepository:
+    """Repository para Macros e Automações"""
+    
+    def __init__(self):
+        from src.models.models import Macro
+        self.Macro = Macro
+    
+    def get_all(self, active_only=True):
+        """Lista todas as macros"""
+        with SessionLocal() as session:
+            query = session.query(self.Macro)
+            if active_only:
+                query = query.filter_by(is_active=True)
+            return query.order_by(self.Macro.name).all()
+    
+    def get_by_id(self, macro_id):
+        """Busca macro por ID"""
+        with SessionLocal() as session:
+            return session.query(self.Macro).filter_by(id=macro_id).first()
+    
+    def create(self, macro_data):
+        """Cria nova macro"""
+        with SessionLocal() as session:
+            macro = self.Macro(
+                name=macro_data.get('name'),
+                description=macro_data.get('description'),
+                trigger_type=macro_data.get('trigger_type', 'manual'),
+                trigger_config=macro_data.get('trigger_config'),
+                action_sequence=macro_data.get('action_sequence'),
+                condition_logic=macro_data.get('condition_logic'),
+                is_active=macro_data.get('is_active', True)
+            )
+            session.add(macro)
+            session.commit()
+            session.refresh(macro)
+            return macro
+    
+    def update(self, macro_id, update_data):
+        """Atualiza macro existente"""
+        with SessionLocal() as session:
+            macro = session.query(self.Macro).filter_by(id=macro_id).first()
+            if not macro:
+                return None
+            
+            # Atualizar campos
+            for key, value in update_data.items():
+                if hasattr(macro, key) and value is not None:
+                    setattr(macro, key, value)
+            
+            session.commit()
+            session.refresh(macro)
+            return macro
+    
+    def delete(self, macro_id):
+        """Remove macro"""
+        with SessionLocal() as session:
+            macro = session.query(self.Macro).filter_by(id=macro_id).first()
+            if not macro:
+                return False
+            
+            session.delete(macro)
+            session.commit()
+            return True
+    
+    def execute(self, macro_id):
+        """Registra execução de macro"""
+        from datetime import datetime
+        with SessionLocal() as session:
+            macro = session.query(self.Macro).filter_by(id=macro_id).first()
+            if macro:
+                macro.last_executed = datetime.now()
+                macro.execution_count = (macro.execution_count or 0) + 1
+                session.commit()
+                session.refresh(macro)
+            return macro
+
+macros = MacroRepository()

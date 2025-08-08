@@ -106,18 +106,36 @@ class MQTTMonitor:
             # Tentar parse JSON
             try:
                 payload_json = json.loads(payload)
-                payload = json.dumps(payload_json, indent=2)
+                # Limitar tamanho do payload formatado para evitar overflow
+                # Usar formato compacto sempre para evitar problemas
+                payload = json.dumps(payload_json)
+                if len(payload) > 1000:  # Limitar a 1KB
+                    # Para payloads grandes, enviar resumo
+                    summary = {
+                        "truncated": True,
+                        "original_size": len(payload),
+                        "keys": list(payload_json.keys()) if isinstance(payload_json, dict) else "array"
+                    }
+                    # Incluir primeiros campos se for dict
+                    if isinstance(payload_json, dict):
+                        for key in list(payload_json.keys())[:3]:
+                            summary[key] = payload_json[key]
+                    payload = json.dumps(summary)
             except:
-                pass  # Manter como string se não for JSON
+                # Se não for JSON, limitar tamanho da string
+                if len(payload) > 1000:
+                    payload = payload[:997] + "..."
         except:
             payload = str(message.payload)
+            if len(payload) > 1000:
+                payload = payload[:997] + "..."
             
         # Extrair device_uuid e tipo do tópico
         device_uuid = None
         message_type = None
         
         parts = topic.split('/')
-        if len(parts) >= 3:
+        if len(parts) >= 2 and parts[0] == 'autocore':
             if parts[1] == 'devices' and len(parts) >= 4:
                 device_uuid = parts[2]
                 # Tratar casos especiais de relés
@@ -132,6 +150,25 @@ class MQTTMonitor:
                     message_type = 'command'
                 else:
                     message_type = parts[3]
+            elif parts[1] == 'relay' and len(parts) >= 4:
+                # autocore/relay/{id}/command ou status
+                device_uuid = parts[2]  # ID do relé
+                message_type = f'relay_{parts[3]}'  # relay_command ou relay_status
+            elif parts[1] == 'macro' and len(parts) >= 4:
+                # autocore/macro/{id}/status
+                device_uuid = parts[2]  # ID da macro
+                message_type = 'macro_status'
+            elif parts[1] == 'state':
+                # autocore/state/save ou restore
+                message_type = f'state_{parts[2] if len(parts) > 2 else "unknown"}'
+            elif parts[1] == 'modes':
+                # autocore/modes/{mode}
+                message_type = 'mode_change'
+                device_uuid = parts[2] if len(parts) > 2 else None
+            elif parts[1] == 'system':
+                # autocore/system/{command}
+                message_type = 'system_command'
+                device_uuid = parts[2] if len(parts) > 2 else None
             elif parts[1] == 'discovery':
                 message_type = 'discovery'
                 if len(parts) > 2:
@@ -235,12 +272,21 @@ class MQTTMonitor:
             }
         })
         
-        # Enviar histórico recente (últimas 50 mensagens)
-        if self.message_history:
-            recent = self.message_history[-50:]
+        # Enviar histórico recente apenas se houver poucas mensagens
+        if self.message_history and len(self.message_history) <= 10:
+            recent = self.message_history[-10:]
             await websocket.send_json({
                 "type": "history",
                 "data": [msg.to_dict() for msg in recent]
+            })
+        elif self.message_history:
+            # Se houver muitas mensagens, enviar apenas contagem
+            await websocket.send_json({
+                "type": "history_info",
+                "data": {
+                    "count": len(self.message_history),
+                    "message": f"{len(self.message_history)} mensagens no histórico. Novas mensagens serão mostradas em tempo real."
+                }
             })
             
         # Iniciar task de streaming para este websocket

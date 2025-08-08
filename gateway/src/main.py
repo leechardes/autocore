@@ -70,6 +70,9 @@ class AutoCoreGateway:
                 message_handler=self.message_handler
             )
             
+            # Dar acesso ao MQTT client para o device_manager poder enviar comandos
+            self.device_manager.mqtt_client = self.mqtt_client
+            
             logger.info("✅ Componentes inicializados com sucesso")
             
         except Exception as e:

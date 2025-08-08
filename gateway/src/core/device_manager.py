@@ -252,6 +252,63 @@ class DeviceManager:
         except Exception as e:
             logger.error(f"❌ Erro ao processar descoberta: {e}")
     
+    async def get_devices_by_type(self, device_type: str) -> List[Dict[str, Any]]:
+        """Retorna dispositivos de um tipo específico"""
+        result = []
+        try:
+            # Buscar no database
+            all_devices = devices.get_all(active_only=True)
+            for device in all_devices:
+                if device.type == device_type:
+                    result.append({
+                        'uuid': device.uuid,
+                        'name': device.name,
+                        'type': device.type,
+                        'status': device.status,
+                        'id': device.id
+                    })
+            
+            logger.debug(f"Encontrados {len(result)} dispositivos do tipo {device_type}")
+            return result
+            
+        except Exception as e:
+            logger.error(f"❌ Erro ao buscar dispositivos por tipo: {e}")
+            return []
+    
+    async def send_relay_command(self, device_uuid: str, channel: Any, command: str, source: str = 'gateway'):
+        """Envia comando de relé para dispositivo específico"""
+        try:
+            # Preparar payload
+            payload = {
+                'channel': channel,
+                'command': command,
+                'source': source,
+                'timestamp': datetime.now().isoformat()
+            }
+            
+            # Tópico do dispositivo
+            topic = f'autocore/devices/{device_uuid}/relay/command'
+            
+            # Publicar comando via MQTT (assumindo que temos acesso ao cliente MQTT)
+            # Precisamos de uma referência ao mqtt_client aqui
+            if hasattr(self, 'mqtt_client'):
+                await self.mqtt_client.publish(topic, json.dumps(payload), qos=1)
+                logger.info(f"📤 Comando de relé enviado: {device_uuid} canal {channel} -> {command}")
+            else:
+                logger.error("❌ Cliente MQTT não disponível no device_manager")
+            
+            # Log evento
+            events.log(
+                event_type='relay_command',
+                source='gateway',
+                action='send',
+                target=device_uuid,
+                payload=payload
+            )
+            
+        except Exception as e:
+            logger.error(f"❌ Erro ao enviar comando de relé: {e}")
+    
     async def check_offline_devices(self):
         """Verifica dispositivos que ficaram offline"""
         try:

@@ -25,6 +25,7 @@ class MQTTClient:
         self.reconnect_attempts = 0
         self.max_reconnect_attempts = 10
         self.message_queue = asyncio.Queue()
+        self.loop = None  # Referência ao event loop principal
         
         # Estatísticas
         self.stats = {
@@ -38,6 +39,12 @@ class MQTTClient:
         """Conecta ao broker MQTT"""
         try:
             logger.info(f"🔗 Conectando ao broker MQTT {self.config.MQTT_BROKER}:{self.config.MQTT_PORT}")
+            
+            # Guardar referência ao event loop atual
+            try:
+                self.loop = asyncio.get_running_loop()
+            except RuntimeError:
+                self.loop = asyncio.get_event_loop()
             
             # Criar cliente MQTT
             self.client = mqtt.Client(
@@ -132,7 +139,7 @@ class MQTTClient:
             logger.info(f"🔄 Tentando reconectar... (tentativa {self.reconnect_attempts})")
     
     def _on_message(self, client, userdata, message):
-        """Callback de mensagem recebida"""
+        """Callback de mensagem recebida - roda em thread do Paho MQTT"""
         try:
             self.stats['messages_received'] += 1
             self.stats['last_message_time'] = datetime.now()
@@ -144,11 +151,46 @@ class MQTTClient:
                 logger.error(f"❌ Erro decodificação mensagem: {message.topic}")
                 return
             
-            # Enqueue mensagem para processamento assíncrono
-            asyncio.create_task(self._handle_message(message.topic, payload, message.qos))
+            # Log simples para debug
+            logger.debug(f"📨 Mensagem recebida: {message.topic}")
+            
+            # Processar mensagem usando o loop principal se disponível
+            if self.loop:
+                try:
+                    # run_coroutine_threadsafe é a forma correta quando em thread diferente
+                    future = asyncio.run_coroutine_threadsafe(
+                        self._handle_message(message.topic, payload, message.qos),
+                        self.loop
+                    )
+                    # Não precisamos esperar o resultado
+                except Exception as e:
+                    logger.debug(f"Não foi possível usar loop principal: {e}")
+                    # Processar de forma síncrona se necessário
+                    self._handle_message_sync(message.topic, payload, message.qos)
+            else:
+                # Se não há loop, processar de forma síncrona
+                self._handle_message_sync(message.topic, payload, message.qos)
             
         except Exception as e:
             logger.error(f"❌ Erro processar mensagem: {e}")
+    
+    def _handle_message_sync(self, topic: str, payload: str, qos: int):
+        """Processa mensagem de forma síncrona (fallback)"""
+        try:
+            # Validar tópico
+            if not self.config.is_valid_device_topic(topic):
+                logger.warning(f"⚠️ Tópico inválido: {topic}")
+                return
+            
+            # Log da mensagem (debug)
+            logger.debug(f"📨 [Sync] Recebido: {topic} | {payload[:100]}")
+            
+            # Por enquanto, apenas logar a mensagem
+            # O processamento real seria feito de forma assíncrona
+            logger.info(f"📥 Mensagem processada (sync): {topic}")
+            
+        except Exception as e:
+            logger.error(f"❌ Erro ao processar mensagem sync {topic}: {e}")
     
     async def _handle_message(self, topic: str, payload: str, qos: int):
         """Processa mensagem de forma assíncrona"""

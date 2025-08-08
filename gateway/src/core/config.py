@@ -86,6 +86,10 @@ class Config:
             'autocore/devices/+/response',
             'autocore/devices/+/relay/status',
             'autocore/discovery/+',
+            # Comandos de macros/sistema
+            'autocore/relay/+/command',  # Comandos para relés
+            'autocore/system/+',  # Comandos do sistema
+            'autocore/macro/+/status',  # Status de macros
         ]
     
     def get_device_topic(self, device_uuid: str, topic_type: str) -> str:
@@ -105,11 +109,21 @@ class Config:
         return topic_patterns[topic_type]
     
     def is_valid_device_topic(self, topic: str) -> bool:
-        """Verifica se o tópico é válido para dispositivo"""
+        """Verifica se o tópico é válido para o gateway processar"""
         parts = topic.split('/')
-        return (
-            len(parts) >= 3 and
-            parts[0] == 'autocore' and
-            parts[1] == 'devices' and
-            len(parts[2]) > 0  # UUID não vazio
-        )
+        
+        # Tópicos válidos começam com 'autocore'
+        if len(parts) < 2 or parts[0] != 'autocore':
+            return False
+        
+        # Tipos de tópicos aceitos
+        valid_prefixes = [
+            'devices',     # Dispositivos ESP32
+            'discovery',   # Descoberta de dispositivos
+            'relay',       # Comandos de relés (macros)
+            'system',      # Comandos do sistema
+            'macro',       # Status de macros
+            'gateway',     # Status do gateway
+        ]
+        
+        return parts[1] in valid_prefixes

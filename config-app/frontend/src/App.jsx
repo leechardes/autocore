@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react'
-import { Car, Gauge, Cpu, ToggleLeft, Monitor, Radio, Palette, Settings, Menu, Sun, Moon, RefreshCw, Plus, FileJson, Activity } from 'lucide-react'
+import { Car, Gauge, Cpu, ToggleLeft, Monitor, Radio, Palette, Settings, Menu, Sun, Moon, RefreshCw, Plus, FileJson, Activity, Play, Zap } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Toaster } from 'sonner'
@@ -12,6 +12,7 @@ import DeviceThemesPage from './pages/DeviceThemesPage.jsx'
 import CANBusPage from './pages/CANBusPage.jsx'
 import CANParametersPage from './pages/CANParametersPage.jsx'
 import MQTTMonitorPage from './pages/MQTTMonitorPage.jsx'
+import MacrosPage from './pages/MacrosPage.jsx'
 import ThemeSelector from './components/ThemeSelector'
 import api from '@/lib/api'
 
@@ -74,9 +75,16 @@ function App() {
     {
       id: 'relays',
       name: 'Relés',
-      icon: ToggleLeft,
+      icon: Zap,
       title: 'Configuração de Relés',
       description: 'Configurar canais e placas de relé'
+    },
+    {
+      id: 'macros',
+      name: 'Macros',
+      icon: Play,
+      title: 'Macros e Automações',
+      description: 'Gerenciar sequências de ações programáveis'
     },
     {
       id: 'screens',
@@ -400,6 +408,10 @@ function App() {
 
           {currentPage === 'relays' && (
             <RelaysPage />
+          )}
+          
+          {currentPage === 'macros' && (
+            <MacrosPage />
           )}
 
           {currentPage === 'screens' && (

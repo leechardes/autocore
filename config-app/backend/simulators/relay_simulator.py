@@ -47,8 +47,10 @@ class RelayBoardSimulator:
             self.is_connected = True
             
             # Inscrever nos tópicos de comando
-            client.subscribe(self.relay_command_topic)
+            relay_topic = f"{self.base_topic}/relay/command"
+            client.subscribe(relay_topic)
             client.subscribe(f"{self.base_topic}/commands/+")
+            logger.info(f"📡 Inscrito em: {relay_topic}")
             
             # Publicar status online
             self.publish_status("online")
@@ -167,8 +169,10 @@ class RelayBoardSimulator:
     
     async def set_relay_state(self, channel: int, state: bool, is_momentary: bool = False):
         """Define o estado de um relé"""
+        logger.info(f"🔧 set_relay_state chamado: canal={channel}, state={state}, momentary={is_momentary}")
+        
         if channel < 1 or channel > self.total_channels:
-            logger.warning(f"Canal inválido: {channel}")
+            logger.warning(f"Canal inválido: {channel} (range: 1-{self.total_channels})")
             return False
         
         # Se é momentâneo e está ligando, registra heartbeat
@@ -190,8 +194,12 @@ class RelayBoardSimulator:
         
         # Só atualiza e publica se o estado mudou
         old_state = self.channel_states[channel]
+        logger.info(f"📊 Estado atual do canal {channel}: {old_state} -> Novo estado: {state}")
+        
         if old_state != state:
             self.channel_states[channel] = state
+            logger.info(f"✅ Estado alterado! Canal {channel}: {old_state} -> {state}")
+            logger.info(f"📌 Estados atuais de todos os canais: {self.channel_states}")
             
             # Publicar estado atualizado
             self.publish_relay_states()
@@ -199,7 +207,9 @@ class RelayBoardSimulator:
             # Publicar telemetria
             self.publish_telemetry(channel, state)
             
-            logger.info(f"Relé {channel} -> {'ON' if state else 'OFF'}")
+            logger.info(f"⚡ Relé {channel} -> {'ON' if state else 'OFF'}")
+        else:
+            logger.info(f"⏸️ Estado não mudou, canal {channel} já está {'ON' if state else 'OFF'}")
         
         return True
     
@@ -304,13 +314,60 @@ class RelayBoardSimulator:
                 if not self.message_queue.empty():
                     topic, payload = self.message_queue.get()
                     
-                    if topic == self.relay_command_topic:
-                        # Comando para definir estado de relé
+                    logger.info(f"📨 Processando comando: {topic}")
+                    logger.debug(f"Payload: {payload}")
+                    
+                    if topic.endswith("/relay/command"):
+                        # Comando de relé do gateway
                         channel = payload.get("channel")
-                        state = payload.get("state")
+                        command = payload.get("command", "toggle")
+                        source = payload.get("source", "unknown")
                         
-                        if channel and state is not None:
-                            await self.set_relay_state(channel, state)
+                        logger.info(f"⚡ Comando de relé recebido:")
+                        logger.info(f"   📍 Canal: {channel} (tipo: {type(channel)})")
+                        logger.info(f"   📍 Comando: {command}")
+                        logger.info(f"   📍 Fonte: {source}")
+                        logger.info(f"   📍 Payload completo: {payload}")
+                        
+                        if channel == "all":
+                            # Comando para todos os relés
+                            state = command == "on"
+                            for ch in self.channel_states:
+                                self.channel_states[ch] = state
+                            logger.info(f"📌 Todos os relés -> {'ON' if state else 'OFF'}")
+                        elif channel is not None:
+                            # Comando para canal específico
+                            # Converter para int se for string numérica
+                            try:
+                                ch = int(channel)
+                                logger.info(f"🔢 Canal convertido para int: {ch}")
+                            except (ValueError, TypeError):
+                                logger.warning(f"❌ Canal inválido (não numérico): {channel}")
+                                ch = None
+                            
+                            if ch and ch in self.channel_states:
+                                logger.info(f"🎯 Canal {ch} encontrado nos estados. Executando comando: {command}")
+                                if command == "on":
+                                    logger.info(f"💡 Ligando canal {ch}")
+                                    await self.set_relay_state(ch, True)
+                                elif command == "off":
+                                    logger.info(f"🔌 Desligando canal {ch}")
+                                    await self.set_relay_state(ch, False)
+                                elif command == "toggle":
+                                    logger.info(f"🔄 Alternando canal {ch}")
+                                    await self.toggle_relay(ch)
+                                else:
+                                    logger.warning(f"⚠️ Comando desconhecido: {command}")
+                                logger.info(f"✅ Comando processado para canal {ch}")
+                            else:
+                                logger.warning(f"❌ Canal inválido ou fora do range: {ch}")
+                                logger.warning(f"   Estados disponíveis: {list(self.channel_states.keys())}")
+                        else:
+                            logger.warning(f"⚠️ Canal é None no payload")
+                        
+                        # Sempre publicar estado após comando
+                        logger.info("📡 Publicando estados atualizados...")
+                        self.publish_relay_states()
                             
                     elif "commands" in topic:
                         # Outros comandos
