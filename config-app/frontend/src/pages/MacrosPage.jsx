@@ -15,7 +15,8 @@ import {
   Sparkles,
   Mountain,
   Power,
-  ParkingCircle
+  ParkingCircle,
+  HelpCircle
 } from 'lucide-react';
 import MacroActionEditor from '@/components/MacroActionEditor';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -31,6 +32,7 @@ import { Switch } from '@/components/ui/switch';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { toast } from '@/hooks/use-toast';
 import api from '@/lib/api';
+import HelpButtonSimple from '@/components/HelpButtonSimple';
 
 const MacrosPage = () => {
   const [macros, setMacros] = useState([]);
@@ -343,7 +345,18 @@ const MacrosPage = () => {
           </p>
         </div>
         
-        <Dialog open={showCreate} onOpenChange={setShowCreate}>
+        <div className="flex items-center gap-2">
+          <Button 
+            variant="outline"
+            size="sm"
+            onClick={() => alert('Ajuda - Macros e Automações\n\n• Crie sequências de comandos automatizadas\n• Use delays para temporização\n• Salve e restaure estados\n• Canais momentâneos não podem ser usados\n• Teste sempre antes de usar em produção')}
+            className="gap-2"
+          >
+            <HelpCircle className="h-4 w-4" />
+            Ajuda
+          </Button>
+          
+          <Dialog open={showCreate} onOpenChange={setShowCreate}>
           <DialogTrigger asChild>
             <Button>
               <Plus className="mr-2 h-4 w-4" />
@@ -403,6 +416,7 @@ const MacrosPage = () => {
             </div>
           </DialogContent>
         </Dialog>
+        </div>
       </div>
 
       {/* Estatísticas */}

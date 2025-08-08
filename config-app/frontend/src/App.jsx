@@ -14,6 +14,8 @@ import CANParametersPage from './pages/CANParametersPage.jsx'
 import MQTTMonitorPage from './pages/MQTTMonitorPage.jsx'
 import MacrosPage from './pages/MacrosPage.jsx'
 import ThemeSelector from './components/ThemeSelector'
+import HelpModal from './components/HelpModal'
+import { AutoCoreLogoCompact } from './components/AutoCoreLogo'
 import api from '@/lib/api'
 
 function App() {
@@ -249,15 +251,7 @@ function App() {
       <nav className={`${mobileMenuOpen ? 'translate-x-0' : '-translate-x-full'} fixed inset-y-0 left-0 z-50 w-64 bg-card border-r transition-transform duration-300 ease-in-out md:relative md:translate-x-0`}>
         {/* Logo */}
         <div className="flex h-16 items-center justify-between border-b px-6">
-          <div className="flex items-center space-x-2">
-            <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-primary">
-              <Car className="h-5 w-5 text-primary-foreground" />
-            </div>
-            <div>
-              <h1 className="text-lg font-semibold">AutoCore</h1>
-              <p className="text-xs text-muted-foreground">Config App</p>
-            </div>
-          </div>
+          <AutoCoreLogoCompact />
           <Button
             variant="ghost"
             size="icon"
@@ -328,7 +322,7 @@ function App() {
             </div>
           </div>
           
-          <div className="flex items-center space-x-4">
+          <div className="flex items-center space-x-2">
             {/* Theme Selector */}
             <ThemeSelector />
             
@@ -336,6 +330,9 @@ function App() {
             <Button variant="ghost" size="icon" onClick={refreshData} disabled={refreshing}>
               <RefreshCw className={`h-4 w-4 ${refreshing ? 'animate-spin' : ''}`} />
             </Button>
+            
+            {/* Help Button */}
+            <HelpModal currentPage={currentPage} />
           </div>
         </header>
 

@@ -1,165 +1,188 @@
-# 🍓 Raspberry Pi Zero 2 W - AutoCore Gateway
+# Raspberry Pi Setup - AutoCore Gateway
 
-## 📦 Conteúdo
+## Visão Geral
 
-Este diretório contém tudo necessário para configurar uma Raspberry Pi Zero 2 W como gateway do AutoCore.
+Este diretório contém scripts e ferramentas para configurar o Raspberry Pi Zero 2W como gateway central do sistema AutoCore.
 
-### 📁 Estrutura
-```
-raspberry-pi/
-├── images/         # Imagem do SO (493MB)
-│   └── 2025-05-13-raspios-bookworm-armhf-lite.img.xz
-├── docs/          # Documentação completa
-│   ├── SETUP_GUIDE.md    # Guia completo passo-a-passo
-│   ├── QUICK_START.md    # Setup rápido em 5 minutos
-│   └── IMAGER_CONFIG.md  # Configuração do Raspberry Pi Imager
-└── scripts/       # Scripts de automação
-```
+## Requisitos
 
-## 🚀 Quick Start
+- **Hardware**: Raspberry Pi Zero 2W
+- **SD Card**: Mínimo 16GB (recomendado 32GB ou 64GB)
+- **Fonte**: 5V/2.5A (importante para estabilidade)
+- **Sistema**: Raspberry Pi OS 64-bit Desktop (recomendado)
 
-### 1. Gravar SO no SD Card
+## Scripts Disponíveis
+
+### setup_raspberry_pi.sh
+Script completo de setup automatizado que:
+- Baixa a imagem do Raspberry Pi OS
+- Verifica integridade com SHA256
+- Grava no SD Card usando dd
+- Configura WiFi e SSH automaticamente
+- Ejeta o cartão com segurança
+
+**Uso:**
 ```bash
-# Use Raspberry Pi Imager com a imagem em images/
-# Configurações pré-definidas em docs/IMAGER_CONFIG.md
+sudo ./setup_raspberry_pi.sh
 ```
 
-### 2. Conectar
+### monitor_boot.sh
+Monitora continuamente a rede até encontrar o Raspberry Pi:
+- Verifica a cada 10 segundos
+- Notifica quando encontrar (som no macOS)
+- Mostra IP e instruções de conexão
+
+**Uso:**
 ```bash
-ssh leechardes@autocore.local
-# Senha: lee159753
+./monitor_boot.sh
 ```
 
-### 3. Instalar AutoCore
+### find_raspberry.sh
+Busca o Raspberry Pi na rede local:
+- Tenta por hostname (raspberrypi.local)
+- Varre a rede procurando por SSH
+- Identifica por MAC address da Raspberry Pi Foundation
+
+**Uso:**
 ```bash
-# Setup automático
-wget https://raw.githubusercontent.com/leechardes/AutoCore/main/scripts/pi_initial_setup.sh
-chmod +x pi_initial_setup.sh
-./pi_initial_setup.sh
+./find_raspberry.sh
 ```
 
-## 📋 Especificações
+### download_64bit_desktop.sh
+Baixa e prepara a versão recomendada (64-bit Desktop):
+- Download da imagem oficial
+- Verificação de integridade
+- Preparação para gravação
 
-### Hardware
-- **Modelo:** Raspberry Pi Zero 2 W
-- **CPU:** BCM2710A1, quad-core 64-bit SoC @ 1GHz
-- **RAM:** 512MB LPDDR2
-- **WiFi:** 802.11 b/g/n 2.4GHz
-- **GPIO:** 40 pinos
-- **Alimentação:** 5V via micro USB
-
-### Sistema Operacional
-- **OS:** Raspberry Pi OS Lite (32-bit)
-- **Versão:** Bookworm (Debian 12)
-- **Kernel:** 6.6.x
-- **Arquitetura:** armhf (32-bit)
-- **Tamanho:** ~493MB comprimido, ~2GB instalado
-
-## 🔧 Configurações Padrão
-
-### Credenciais
-```yaml
-Hostname: autocore
-Username: leechardes
-Password: lee159753
-```
-
-### Portas
-```yaml
-SSH: 22
-API: 8000
-MQTT: 1883
-Frontend: 3000
-```
-
-### Serviços
-- **autocore-config** - API Backend
-- **autocore-gateway** - Gateway MQTT
-- **mosquitto** - Broker MQTT
-
-## 📊 Performance
-
-### Uso de Recursos (idle)
-- **RAM:** ~80MB / 512MB
-- **CPU:** ~5%
-- **Temp:** ~45°C
-- **SD:** ~2GB usado
-
-### Capacidade
-- **Dispositivos ESP32:** 50+
-- **Mensagens MQTT/seg:** 1000+
-- **Uptime:** 24/7
-
-## 🛠️ Manutenção
-
-### Comandos Úteis
+**Uso:**
 ```bash
-ac-status   # Status geral
-ac-monitor  # Monitor tempo real
-ac-backup   # Fazer backup
-ac-logs     # Ver logs
-ac-restart  # Reiniciar serviços
+./download_64bit_desktop.sh
 ```
 
-### Backup
+## Processo de Setup Recomendado
+
+### Opção 1: Raspberry Pi Imager (Mais Fácil)
+
+1. **Instale o Raspberry Pi Imager:**
+   ```bash
+   brew install --cask raspberry-pi-imager
+   ```
+
+2. **Configure no Imager:**
+   - Device: Raspberry Pi Zero 2W
+   - OS: Raspberry Pi OS (64-bit) - Desktop recomendado
+   - Storage: Seu SD Card
+
+3. **Configurações (engrenagem):**
+   - Hostname: raspberrypi
+   - Enable SSH: Yes
+   - Username: pi
+   - Password: sua escolha
+   - Configure WiFi: Sua rede e senha
+   - Locale: America/Sao_Paulo
+
+### Opção 2: Script Automatizado
+
+1. **Execute o setup completo:**
+   ```bash
+   sudo ./setup_raspberry_pi.sh
+   ```
+
+2. **Escolha opção 1** para setup completo
+
+3. **Insira credenciais** quando solicitado
+
+## Primeiro Boot
+
+### Indicadores LED
+
+- **Verde PISCANDO**: Boot normal, sistema carregando
+- **Verde FIXO**: Problema com SD Card ou boot
+- **Sem LED**: Problema de alimentação
+
+### Tempo de Boot
+
+- **Primeiro boot**: 3-5 minutos (expansão do filesystem)
+- **Boots seguintes**: 1-2 minutos
+
+### Conexão SSH
+
+Após o boot completo:
+
 ```bash
-# Database
-cp ~/AutoCore/database/autocore.db ~/backups/
+# Por hostname
+ssh pi@raspberrypi.local
 
-# Imagem completa do SD
-sudo dd if=/dev/mmcblk0 of=backup.img bs=4M
+# Por IP (descubra com find_raspberry.sh)
+ssh pi@10.0.10.XXX
+
+# Senha padrão
+raspberry
 ```
 
-### Atualização
+## Troubleshooting
+
+### Raspberry Pi não aparece na rede
+
+1. **Verifique o LED verde** - Deve piscar durante boot
+2. **Aguarde mais tempo** - Primeiro boot demora mais
+3. **Verifique WiFi** - Nome e senha corretos?
+4. **Use cabo Ethernet** - Para teste inicial
+
+### Erro de verificação ao gravar
+
+- Normal no macOS com verificação em 99%
+- Se a gravação completou, pode ignorar
+- Teste o cartão no Raspberry Pi
+
+### LED verde fixo (não pisca)
+
+1. **SD Card mal inserido** - Reinsira firmemente
+2. **Imagem corrompida** - Regrave o SD Card
+3. **SD Card incompatível** - Use outro cartão
+
+### Sem LED aceso
+
+1. **Cabo USB errado** - Use a porta PWR (canto)
+2. **Fonte fraca** - Mínimo 5V/1A, ideal 5V/2.5A
+3. **Cabo defeituoso** - Teste outro cabo
+
+## Configuração Pós-Boot
+
+Após conectar via SSH:
+
 ```bash
-cd ~/AutoCore
-git pull
-ac-restart
+# Atualizar sistema
+sudo apt update && sudo apt upgrade -y
+
+# Instalar dependências do AutoCore
+sudo apt install -y python3-pip mosquitto mosquitto-clients git
+
+# Expandir filesystem (se necessário)
+sudo raspi-config --expand-rootfs
+
+# Configurar hostname personalizado
+sudo hostnamectl set-hostname autocore-gateway
+
+# Reiniciar
+sudo reboot
 ```
 
-## 📚 Documentação
+## Versões Testadas
 
-- **[SETUP_GUIDE.md](docs/SETUP_GUIDE.md)** - Guia completo de instalação
-- **[QUICK_START.md](docs/QUICK_START.md)** - Começar em 5 minutos
-- **[IMAGER_CONFIG.md](docs/IMAGER_CONFIG.md)** - Config do Raspberry Pi Imager
-- **[RASPBERRY_PI_CONFIG.md](../RASPBERRY_PI_CONFIG.md)** - Configurações privadas (não commitado)
+- **Recomendada**: Raspberry Pi OS (64-bit) Desktop - 2024-07-04
+- **Alternativa**: Raspberry Pi OS Lite (32-bit) - 2024-07-04
+- **Evitar**: Versões 2025 (podem ser experimentais)
 
-## 🔒 Segurança
+## Notas de Segurança
 
-- Firewall (ufw) configurado
-- Fail2ban para proteção SSH
-- MQTT sem autenticação (desenvolvimento)
-- Backup automático diário
+1. **Mude a senha padrão** após primeiro login
+2. **Configure firewall** se exposto à internet
+3. **Desabilite serviços** desnecessários
+4. **Mantenha atualizado** com apt update/upgrade
 
-## 🆘 Suporte
+## Suporte
 
-### Problemas Comuns
-1. **Não conecta SSH** - Verificar WiFi/IP
-2. **Serviços não iniciam** - Verificar logs com `ac-logs`
-3. **Pouca memória** - Ativar swap
-4. **Temperatura alta** - Adicionar dissipador
-
-### Logs
-```bash
-# Sistema
-sudo journalctl -xe
-
-# AutoCore
-ac-logs
-
-# MQTT
-mosquitto_sub -h localhost -t '#' -v
-```
-
-## 📝 Notas
-
-- **NÃO commitar** arquivos .img ou .xz (muito grandes)
-- Manter backup do SD Card
-- Testar em ambiente isolado antes de produção
-- Monitorar temperatura em uso contínuo
-
----
-
-**Última Atualização:** Janeiro 2025
-**Maintainer:** Lee Chardes
-**Licença:** MIT
+- Documentação oficial: https://www.raspberrypi.com/documentation/
+- AutoCore docs: /docs/gateway/
+- Issues: https://github.com/leechardes/autocore/issues

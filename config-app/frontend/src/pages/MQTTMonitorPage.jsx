@@ -13,10 +13,11 @@ import {
   Activity, Wifi, WifiOff, Send, Filter, Trash2, Download, 
   Play, Pause, Search, Copy, CheckCircle2, XCircle, 
   ArrowUpCircle, ArrowDownCircle, Clock, Radio, Power, PowerOff,
-  ToggleLeft, ToggleRight, Settings, Cpu, RefreshCw
+  ToggleLeft, ToggleRight, Settings, Cpu, RefreshCw, HelpCircle
 } from 'lucide-react';
 import { toast } from 'sonner';
 import api from '@/lib/api';
+import HelpButtonTest from '@/components/HelpButtonTest';
 
 const MQTTMonitorPage = () => {
   const [connected, setConnected] = useState(false);
@@ -619,8 +620,17 @@ ${payload}
             Monitor em tempo real das mensagens MQTT do sistema
           </p>
         </div>
-        
         <div className="flex items-center gap-2">
+          <Button 
+            variant="outline"
+            size="sm"
+            onClick={() => alert('Ajuda do Monitor MQTT\n\n• Use os filtros para encontrar mensagens específicas\n• Pause para parar a rolagem automática\n• Clique em uma mensagem para ver detalhes\n• Use o simulador de relés para testar comandos\n• Exporte logs importantes com o botão Download')}
+            className="gap-2"
+          >
+            <HelpCircle className="h-4 w-4" />
+            Ajuda
+          </Button>
+          
           <Badge variant={connected ? "success" : "destructive"} className="gap-1">
             {connected ? <Wifi className="h-3 w-3" /> : <WifiOff className="h-3 w-3" />}
             {connected ? 'Conectado' : 'Desconectado'}

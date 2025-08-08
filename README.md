@@ -18,6 +18,12 @@ O AutoCore é um sistema modular de automação veicular que permite controlar e
 
 ## ✨ Principais Funcionalidades
 
+### Sistema de Ajuda Integrado
+- Documentação contextual em cada página
+- Guias rápidos e completos
+- Atalhos do sistema documentados
+- Interface clara sem emojis desnecessários
+
 ### Controle de Relés
 - 16/32 canais por placa
 - Tipos: Toggle, Momentâneo (com heartbeat), Pulse, Temporizado
@@ -32,6 +38,10 @@ O AutoCore é um sistema modular de automação veicular que permite controlar e
 - Sequências programáveis de ações
 - Triggers: Manual, Agendado, Condicional
 - Preservação de estado anterior
+- **Sistema de segurança aprimorado**:
+  - Controle de permissões por canal (`allow_in_macro`)
+  - Canais momentâneos automaticamente excluídos
+  - Proteção especial para equipamentos críticos
 
 ## 🚀 Quick Start
 

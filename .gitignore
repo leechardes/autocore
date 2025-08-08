@@ -125,6 +125,12 @@ raspberry-pi/images/*.zip
 *.img.xz
 *.iso
 
+# Raspberry Pi Sensitive Files
+raspberry-pi/.credentials.md
+raspberry-pi/userconf.txt
+raspberry-pi/wpa_supplicant.conf
+raspberry-pi/ssh
+
 # Keep these
 !.gitkeep
 !requirements.txt
