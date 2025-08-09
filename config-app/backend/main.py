@@ -17,6 +17,11 @@ from fastapi.responses import JSONResponse
 from pydantic import BaseModel, Field
 from datetime import datetime
 import asyncio
+import os
+from dotenv import load_dotenv
+
+# Carregar variáveis de ambiente
+load_dotenv()
 
 # Import repositories do database
 from shared.repositories import devices, relays, telemetry, events, config
@@ -1352,11 +1357,17 @@ app.include_router(macros.router)
 
 if __name__ == "__main__":
     import uvicorn
+    
+    # Configurações do ambiente
+    host = os.getenv("CONFIG_APP_HOST", "0.0.0.0")
+    port = int(os.getenv("CONFIG_APP_PORT", "8081"))
+    reload = os.getenv("ENV", "development") == "development"
+    
     uvicorn.run(
         "main:app",
-        host="0.0.0.0",
-        port=8000,
-        reload=True,
+        host=host,
+        port=port,
+        reload=reload,
         log_level="info",
         # Configurações para WebSocket
         ws_max_size=16777216,  # 16MB max message size

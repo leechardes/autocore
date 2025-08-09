@@ -30,7 +30,7 @@ const ConfigSettingsPage = () => {
   // Configurações
   const [settings, setSettings] = useState({
     // API
-    apiUrl: 'http://localhost:8000',
+    apiUrl: import.meta.env.VITE_API_URL || 'http://localhost:5000',
     apiTimeout: 30000,
     
     // MQTT
@@ -261,7 +261,7 @@ const ConfigSettingsPage = () => {
                   id="apiUrl"
                   value={settings.apiUrl}
                   onChange={(e) => updateSetting('apiUrl', e.target.value)}
-                  placeholder="http://localhost:8000"
+                  placeholder={import.meta.env.VITE_API_URL || "http://localhost:5000"}
                 />
               </div>
               

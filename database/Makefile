@@ -1,12 +1,21 @@
 # AutoCore Database - Makefile
 # Comandos simplificados para gerenciamento do banco de dados
 
+# Carregar variáveis do .env se existir
+ifneq (,$(wildcard .env))
+    include .env
+    export
+endif
+
 # Variáveis
 PYTHON = python3
 VENV = .venv
 VENV_PYTHON = $(VENV)/bin/python
 PIP = $(VENV)/bin/pip
 DB_FILE = autocore.db
+
+# Configurações (com valores padrão se não estiverem no .env)
+DATABASE_PATH ?= autocore.db
 
 # Cores para output
 RED = \033[0;31m

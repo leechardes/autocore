@@ -3,11 +3,19 @@
 
 .PHONY: help venv install dev test lint clean start stop status logs backup
 
+# Carregar variáveis do .env se existir
+ifneq (,$(wildcard .env))
+    include .env
+    export
+endif
+
 # Variáveis
 VENV_PATH := .venv
 PYTHON := $(VENV_PATH)/bin/python
 PIP := $(VENV_PATH)/bin/pip
 ACTIVATE := source $(VENV_PATH)/bin/activate
+
+# O Gateway não tem servidor HTTP, apenas cliente MQTT
 
 # Cores para output
 GREEN := \033[0;32m

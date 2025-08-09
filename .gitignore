@@ -72,6 +72,17 @@ event_logs/
 config-app/backend/.env
 config-app/frontend/.env
 
+# Credentials files
+.credentials
+deploy/.credentials
+*.credentials
+
+# Deploy temp files
+deploy/.last_raspberry_ip
+.last_raspberry_ip
+deploy/.keys_*.txt
+.keys_*.txt
+
 # Temporary files
 *.tmp
 *.temp

@@ -162,7 +162,9 @@ const MQTTMonitorPage = () => {
     
     // Usar a mesma porta do frontend para evitar CORS
     const host = window.location.hostname;
-    const wsUrl = `ws://${host}:8000/ws/mqtt`;
+    // Usar variável de ambiente ou fallback para produção
+    const wsPort = import.meta.env.VITE_API_PORT || '5000';
+    const wsUrl = `ws://${host}:${wsPort}/ws/mqtt`;
     console.log('Conectando WebSocket:', wsUrl);
     
     try {
@@ -258,7 +260,8 @@ const MQTTMonitorPage = () => {
     
     ws.current.onerror = (error) => {
       console.error('WebSocket erro:', error);
-      toast.error('Erro na conexão WebSocket - Verifique se o backend está rodando na porta 8000');
+      const port = import.meta.env.VITE_API_PORT || '5000';
+      toast.error(`Erro na conexão WebSocket - Verifique se o backend está rodando na porta ${port}`);
       setConnected(false);
     };
     
@@ -317,7 +320,8 @@ const MQTTMonitorPage = () => {
   const clearMessages = async () => {
     // Limpar no backend também
     try {
-      const response = await fetch('http://localhost:8000/api/mqtt/clear', {
+      const apiPort = import.meta.env.VITE_API_PORT || '5000';
+      const response = await fetch(`http://${window.location.hostname}:${apiPort}/api/mqtt/clear`, {
         method: 'POST'
       });
       if (response.ok) {

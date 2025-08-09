@@ -1,11 +1,21 @@
 # Config-App Frontend - Makefile
 # React + Vite + shadcn/ui
 
+# Carregar variáveis do .env se existir
+ifneq (,$(wildcard .env))
+    include .env
+    export
+endif
+
 # Variáveis
 NODE = node
 NPM = npm
 VITE = npx vite
 SHADCN = npx shadcn@latest
+
+# Configurações (com valores padrão se não estiverem no .env)
+PORT := $(or $(VITE_PORT),8080)
+HOST := $(or $(VITE_HOST),localhost)
 
 # Diretórios
 DIST_DIR = dist
@@ -51,7 +61,8 @@ install: check-node ## Instala todas as dependências
 	@echo ""
 	@echo "$(GREEN)📝 Configurando ambiente...$(NC)"
 	@if [ ! -f .env ]; then \
-		echo "VITE_API_BASE_URL=http://localhost:8000" > .env; \
+		echo "VITE_PORT=8080" > .env; \
+		echo "VITE_API_BASE_URL=http://localhost:8081" >> .env; \
 		echo "✅ Arquivo .env criado"; \
 	else \
 		echo "ℹ️  Arquivo .env já existe"; \
@@ -67,13 +78,42 @@ install-dev: install ## Instala dependências + ferramentas de dev
 # EXECUÇÃO
 # ═══════════════════════════════════════════════════════
 
-.PHONY: dev
-dev: ## Executa em modo desenvolvimento (com HMR)
+.PHONY: start
+start: ## Inicia em modo desenvolvimento (com HMR)
 	@echo "$(GREEN)🚀 Iniciando servidor de desenvolvimento...$(NC)"
-	@echo "📡 Aplicação disponível em: http://localhost:3000"
+	@echo "📡 Aplicação disponível em: http://$(HOST):$(PORT)"
 	@echo "🔄 Hot Module Reload habilitado"
 	@echo ""
 	@$(NPM) run dev
+
+.PHONY: start-bg
+start-bg: ## Inicia em background
+	@echo "$(GREEN)🚀 Iniciando frontend em background...$(NC)"
+	@nohup $(NPM) run dev > frontend.log 2>&1 &
+	@echo "✅ Frontend rodando em background"
+	@echo "📝 Logs em: frontend.log"
+
+.PHONY: stop
+stop: ## Para o frontend em background
+	@echo "$(RED)⏹️  Parando frontend...$(NC)"
+	@pkill -f "vite" || echo "Frontend não estava rodando"
+
+.PHONY: restart
+restart: stop start ## Reinicia o frontend
+
+.PHONY: logs
+logs: ## Mostra logs do frontend
+	@tail -f frontend.log 2>/dev/null || echo "Nenhum log disponível"
+
+.PHONY: status
+status: ## Verifica status do frontend
+	@ps aux | grep -v grep | grep "vite" > /dev/null && \
+		echo "$(GREEN)✅ Frontend está rodando$(NC)" || \
+		echo "$(RED)❌ Frontend não está rodando$(NC)"
+
+# Aliases para compatibilidade
+.PHONY: dev
+dev: start ## Alias para start
 
 .PHONY: build
 build: ## Build para produção

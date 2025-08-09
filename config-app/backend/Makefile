@@ -8,10 +8,16 @@ VENV_PYTHON = $(VENV)/bin/python
 PIP = $(VENV)/bin/pip
 UVICORN = $(VENV)/bin/uvicorn
 
-# Configurações da API
-HOST = 0.0.0.0
-PORT = 8000
-WORKERS = 1
+# Carregar variáveis do .env se existir
+ifneq (,$(wildcard .env))
+    include .env
+    export
+endif
+
+# Configurações da API (com valores padrão se não estiverem no .env)
+HOST ?= 0.0.0.0
+PORT := $(or $(CONFIG_APP_PORT),8081)
+WORKERS ?= 1
 
 # Cores para output
 RED = \033[0;31m
@@ -69,18 +75,50 @@ install-dev: install ## Instala dependências + ferramentas de dev
 # EXECUÇÃO
 # ═══════════════════════════════════════════════════════
 
-.PHONY: run
-run: ## Executa API em modo desenvolvimento (com reload)
+.PHONY: start
+start: ## Inicia API em modo desenvolvimento (com reload)
 	@echo "$(GREEN)🚀 Iniciando API em modo desenvolvimento...$(NC)"
 	@echo "📡 API disponível em: http://$(HOST):$(PORT)"
 	@echo "📚 Documentação em: http://$(HOST):$(PORT)/docs"
 	@echo ""
 	@$(VENV_PYTHON) main.py
 
-.PHONY: run-prod
-run-prod: ## Executa API em modo produção (sem reload)
+.PHONY: start-bg
+start-bg: ## Inicia API em background
+	@echo "$(GREEN)🚀 Iniciando API em background...$(NC)"
+	@nohup $(VENV_PYTHON) main.py > backend.log 2>&1 &
+	@echo "✅ API rodando em background (PID: $$!)"
+	@echo "📝 Logs em: backend.log"
+
+.PHONY: stop
+stop: ## Para a API em background
+	@echo "$(RED)⏹️  Parando API...$(NC)"
+	@pkill -f "python.*main.py" || echo "API não estava rodando"
+
+.PHONY: restart
+restart: stop start ## Reinicia a API
+
+.PHONY: start-prod
+start-prod: ## Inicia API em modo produção (sem reload)
 	@echo "$(GREEN)🚀 Iniciando API em modo produção...$(NC)"
 	@$(UVICORN) main:app --host $(HOST) --port $(PORT) --workers $(WORKERS)
+
+.PHONY: logs
+logs: ## Mostra logs da API
+	@tail -f backend.log 2>/dev/null || echo "Nenhum log disponível"
+
+.PHONY: status
+status: ## Verifica status da API
+	@ps aux | grep -v grep | grep "python.*main.py" > /dev/null && \
+		echo "$(GREEN)✅ API está rodando$(NC)" || \
+		echo "$(RED)❌ API não está rodando$(NC)"
+
+# Aliases para compatibilidade
+.PHONY: run
+run: start ## Alias para start
+
+.PHONY: run-prod
+run-prod: start-prod ## Alias para start-prod
 
 .PHONY: run-debug
 run-debug: ## Executa API com debug habilitado
@@ -219,7 +257,7 @@ deploy-systemd: ## Gera arquivo systemd service
 	@echo "User=pi" >> config-app-backend.service
 	@echo "WorkingDirectory=$$(pwd)" >> config-app-backend.service
 	@echo "Environment=\"PATH=$$(pwd)/$(VENV)/bin\"" >> config-app-backend.service
-	@echo "ExecStart=$$(pwd)/$(VENV)/bin/uvicorn main:app --host 0.0.0.0 --port 8000" >> config-app-backend.service
+	@echo "ExecStart=$$(pwd)/$(VENV)/bin/uvicorn main:app --host 0.0.0.0 --port $(PORT)" >> config-app-backend.service
 	@echo "Restart=on-failure" >> config-app-backend.service
 	@echo "" >> config-app-backend.service
 	@echo "[Install]" >> config-app-backend.service

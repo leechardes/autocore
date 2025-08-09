@@ -5,11 +5,16 @@ Conecta ao broker MQTT e retransmite mensagens via WebSocket
 import asyncio
 import json
 import logging
+import os
 from typing import Dict, List, Set, Any, Optional
 from datetime import datetime
 from dataclasses import dataclass, asdict
 import paho.mqtt.client as mqtt
 from fastapi import WebSocket
+from dotenv import load_dotenv
+
+# Carregar variáveis de ambiente
+load_dotenv()
 
 logger = logging.getLogger(__name__)
 
@@ -30,10 +35,22 @@ class MQTTMessage:
 class MQTTMonitor:
     """Monitor MQTT com streaming via WebSocket"""
     
-    def __init__(self, broker: str = "localhost", port: int = 1883):
-        self.broker = broker
-        self.port = port
+    def __init__(self, broker: str = None, port: int = None):
+        # Usar valores do ambiente ou defaults
+        self.broker = broker or os.getenv("MQTT_BROKER", "localhost")
+        self.port = port or int(os.getenv("MQTT_PORT", "1883"))
+        self.username = os.getenv("MQTT_USERNAME")
+        self.password = os.getenv("MQTT_PASSWORD")
+        
         self.client = mqtt.Client(client_id="autocore-config-monitor")
+        
+        # Configurar autenticação se houver credenciais
+        if self.username and self.password:
+            self.client.username_pw_set(self.username, self.password)
+            logger.info(f"🔐 MQTT configurado com autenticação para usuário: {self.username}")
+        else:
+            logger.warning("⚠️ MQTT sem autenticação - configure MQTT_USERNAME e MQTT_PASSWORD no .env")
+        
         self.connected = False
         self.websockets: Set[WebSocket] = set()
         self.message_history: List[MQTTMessage] = []
@@ -72,12 +89,44 @@ class MQTTMonitor:
             # Notificar WebSockets será feito quando solicitado
             logger.info("📡 Monitor MQTT pronto para receber mensagens")
         else:
-            logger.error(f"❌ Falha na conexão MQTT: {rc}")
+            # Mesmos códigos de erro
+            error_codes = {
+                1: "Protocolo incorreto",
+                2: "ID de cliente inválido", 
+                3: "Servidor indisponível",
+                4: "Credenciais inválidas",
+                5: "Não autorizado",
+                7: "Conexão recusada - não autorizado"
+            }
+            error_msg = error_codes.get(rc, f"Erro desconhecido ({rc})")
+            logger.error(f"❌ Falha na conexão MQTT: {error_msg}")
             
     def _on_disconnect(self, client, userdata, rc):
         """Callback de desconexão MQTT"""
         self.connected = False
-        logger.warning(f"⚠️ Monitor MQTT desconectado: {rc}")
+        
+        # Códigos de erro MQTT
+        error_codes = {
+            0: "Desconexão normal",
+            1: "Protocolo incorreto",
+            2: "ID de cliente inválido",
+            3: "Servidor indisponível",
+            4: "Credenciais inválidas",
+            5: "Não autorizado",
+            7: "Conexão recusada - não autorizado"
+        }
+        
+        error_msg = error_codes.get(rc, f"Erro desconhecido ({rc})")
+        
+        if rc == 7 or rc == 4 or rc == 5:
+            # Erro de autenticação - parar reconexão automática
+            logger.error(f"❌ Monitor MQTT - Erro de autenticação: {error_msg}")
+            logger.warning("⚠️ Verifique MQTT_USERNAME e MQTT_PASSWORD no .env")
+            logger.warning("⚠️ Ou verifique se o Mosquitto está configurado para aceitar essas credenciais")
+            # Parar o loop para evitar reconexão infinita
+            client.loop_stop()
+        elif rc != 0:
+            logger.warning(f"⚠️ Monitor MQTT desconectado: {error_msg}")
         
     def _on_message(self, client, userdata, message):
         """Callback de mensagem MQTT recebida"""

@@ -40,7 +40,7 @@ fi
 
 SERVICE=$1
 ACTION=$2
-BASE_DIR="/home/pi/autocore"
+BASE_DIR="/opt/autocore"
 
 # Função para deploy de um serviço
 deploy_service() {

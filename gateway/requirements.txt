@@ -1,8 +1,8 @@
 # MQTT Client
 paho-mqtt>=1.6.1
 
-# Database (já compartilhado)
-# SQLAlchemy>=1.4.0  # Vem do database/requirements.txt
+# Database (necessário para usar shared/repositories)
+SQLAlchemy>=1.4.0
 
 # Async utilities
 asyncio-mqtt>=0.11.0

@@ -221,7 +221,7 @@ const HelpModal = ({ currentPage = 'dashboard' }) => {
       sections: [
         {
           title: 'Sistema',
-          content: 'Endereço do broker MQTT. Porta da API (padrão 8000). Modo de operação (produção/desenvolvimento).'
+          content: 'Endereço do broker MQTT. Porta da API (padrão 5000). Modo de operação (produção/desenvolvimento).'
         },
         {
           title: 'Backup',

@@ -4,17 +4,19 @@ After=network.target autocore-gateway.service
 
 [Service]
 Type=simple
-User=pi
-Group=pi
-WorkingDirectory=/home/pi/autocore/config-app/backend
+User=autocore
+Group=autocore
+WorkingDirectory=/opt/autocore/config-app/backend
 
 # Ambiente virtual isolado
-Environment="PATH=/home/pi/autocore/config-app/backend/.venv/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
-Environment="PYTHONPATH=/home/pi/autocore/database"
-Environment="PORT=8000"
+Environment="PATH=/opt/autocore/config-app/backend/.venv/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
+Environment="PYTHONPATH=/opt/autocore/database"
+
+# Carregar variáveis de ambiente
+EnvironmentFile=/opt/autocore/.env
 
 # Comando com venv específico
-ExecStart=/home/pi/autocore/config-app/backend/.venv/bin/uvicorn main:app --host 0.0.0.0 --port 8000 --workers 1
+ExecStart=/opt/autocore/config-app/backend/.venv/bin/uvicorn main:app --host 0.0.0.0 --port 8081 --workers 1
 
 # Restart policy
 Restart=always
@@ -24,9 +26,9 @@ RestartSec=10
 StandardOutput=journal
 StandardError=journal
 
-# Limites para Pi Zero
-MemoryLimit=150M
-CPUQuota=50%
+# Limites de recursos (ajustar conforme necessário)
+# MemoryLimit=256M
+# CPUQuota=75%
 
 [Install]
 WantedBy=multi-user.target

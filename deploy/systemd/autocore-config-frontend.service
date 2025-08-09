@@ -1,0 +1,36 @@
+[Unit]
+Description=AutoCore Config Frontend - React App
+After=network.target autocore-config-app.service
+Wants=autocore-config-app.service
+
+[Service]
+Type=simple
+User=autocore
+Group=autocore
+WorkingDirectory=/opt/autocore/config-app/frontend
+
+# Ambiente
+Environment="PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
+Environment="NODE_ENV=production"
+Environment="PORT=8080"
+
+# Carregar variáveis de ambiente
+EnvironmentFile=/opt/autocore/.env
+
+# Comando para rodar o frontend
+ExecStart=/usr/bin/npm run dev -- --host 0.0.0.0 --port 8080
+
+# Restart policy
+Restart=always
+RestartSec=10
+
+# Logs
+StandardOutput=journal
+StandardError=journal
+
+# Limites de recursos (ajustar conforme necessário)
+# MemoryLimit=256M
+# CPUQuota=75%
+
+[Install]
+WantedBy=multi-user.target

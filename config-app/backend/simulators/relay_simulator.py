@@ -161,8 +161,13 @@ class RelayBoardSimulator:
                 retain=True
             )
             
-            # Notificar WebSocket clients (async)
-            asyncio.create_task(self.notify_websockets({"type": "state_update", "states": self.channel_states}))
+            # Notificar WebSocket clients se houver loop rodando
+            try:
+                loop = asyncio.get_running_loop()
+                loop.create_task(self.notify_websockets({"type": "state_update", "states": self.channel_states}))
+            except RuntimeError:
+                # Não há loop assíncrono rodando, ignorar notificação WebSocket
+                pass
             
         except Exception as e:
             logger.error(f"Erro publicando estados: {e}")
