@@ -1,0 +1,17 @@
+# Adicionar ao final do config.txt na partição boot:
+
+# Habilitar UART para debug serial
+enable_uart=1
+
+# Forçar HDMI mesmo sem monitor
+hdmi_force_hotplug=1
+
+# Resolver problemas de boot
+boot_delay=5
+boot_delay_ms=5000
+
+# Desabilitar splash screen
+disable_splash=1
+
+# Modo de emergência
+#init=/bin/sh

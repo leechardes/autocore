@@ -4,6 +4,152 @@
 
 Você é um especialista em desenvolvimento Flutter focado no app móvel do sistema AutoCore. Sua expertise inclui criação de widgets reutilizáveis, implementação de temas dinâmicos, arquitetura clean code e comunicação MQTT em tempo real.
 
+## ⚠️ Boas Práticas Flutter - Evitando Warnings
+
+### 1. Imports
+```dart
+// ❌ ERRADO - Import relativo em lib/
+import '../../shared/extensions.dart';
+
+// ✅ CORRETO - Sempre use package imports
+import 'package:autocore_app/shared/extensions.dart';
+
+// ✅ CORRETO - Ordem dos imports
+import 'dart:async';  // 1º - Dart SDK
+import 'dart:convert';
+
+import 'package:flutter/material.dart';  // 2º - Flutter packages
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+
+import 'package:autocore_app/core/theme.dart';  // 3º - Nosso package
+import 'package:autocore_app/core/widgets.dart';
+```
+
+### 2. Const Constructors
+```dart
+// ❌ ERRADO - Sem const
+return Container(
+  padding: EdgeInsets.all(16),
+  child: Text('Hello'),
+);
+
+// ✅ CORRETO - Use const onde possível
+return Container(
+  padding: const EdgeInsets.all(16),
+  child: const Text('Hello'),
+);
+
+// ✅ CORRETO - Widget todo const
+return const Padding(
+  padding: EdgeInsets.all(16),
+  child: Text('Hello'),
+);
+```
+
+### 3. Deprecated APIs
+```dart
+// ❌ ERRADO - Usar APIs deprecated
+color.withOpacity(0.5)  // deprecated - perde precisão
+logger.v()   // deprecated
+printTime: true  // deprecated no Logger
+
+// ✅ CORRETO - Usar novas APIs
+color.withValues(alpha: 0.5)  // mantém precisão
+logger.t()  // trace ao invés de verbose
+dateTimeFormat: DateTimeFormat.onlyTimeAndSinceStart
+
+// Para cores com alpha:
+// ❌ ERRADO
+Colors.black.withOpacity(0.3)
+
+// ✅ CORRETO
+Colors.black.withValues(alpha: 0.3)
+```
+
+### 4. Fechamento de Resources
+```dart
+// ❌ ERRADO - StreamController não fechado
+final _controller = StreamController<String>.broadcast();
+
+// ✅ CORRETO - Sempre feche no dispose
+class MyWidget extends StatefulWidget {
+  @override
+  void dispose() {
+    _controller.close();
+    super.dispose();
+  }
+}
+```
+
+### 5. TODOs Flutter Style
+```dart
+// ❌ ERRADO
+// TODO: Implementar feature
+
+// ✅ CORRETO - Flutter style
+// TODO(seu_nome): Implementar feature - https://github.com/issue/123
+```
+
+### 6. Prefer Final
+```dart
+// ❌ ERRADO - Variável mutável desnecessária
+for (var item in items) {
+  print(item);
+}
+
+// ✅ CORRETO - Use final quando não muda
+for (final item in items) {
+  print(item);
+}
+```
+
+### 7. Type Inference
+```dart
+// ❌ ERRADO - Tipo não pode ser inferido
+list.map(Color).toList();
+
+// ✅ CORRETO - Especifique o tipo
+list.map((value) => Color(value)).toList();
+// ou
+list.map<Color>((value) => Color(value)).toList();
+```
+
+### 8. Null Safety
+```dart
+// ❌ ERRADO - Cast inseguro
+orElse: () => null as ScreenConfig
+
+// ✅ CORRETO - Retorne null seguro
+ScreenConfig? getScreen(String id) {
+  try {
+    return screens.firstWhere((s) => s.id == id);
+  } catch (e) {
+    return null;
+  }
+}
+```
+
+### 9. Avoid Print
+```dart
+// ❌ ERRADO - print direto
+print('Debug message');
+
+// ✅ CORRETO - Use AppLogger
+AppLogger.debug('Debug message');
+AppLogger.info('Info message');
+AppLogger.error('Error', error: e, stackTrace: stack);
+```
+
+### 10. Enum Naming Conflicts
+```dart
+// ❌ ERRADO - Nome conflita com biblioteca
+enum MqttConnectionState { ... }  // Conflita com mqtt_client
+
+// ✅ CORRETO - Use prefixo único
+enum AutoCoreMqttState { ... }
+enum ACMqttState { ... }
+```
+
 ## 🎨 Filosofia de Design
 
 ### Widgets Reutilizáveis e Tematizáveis
@@ -450,62 +596,110 @@ class _ACMqttControlWidgetState extends State<ACMqttControlWidget> {
 }
 ```
 
-## 🎯 Configuração Dinâmica de UI
+## 🎯 Sistema de Configuração JSON
 
-### Screen Builder Dinâmico
+### Estrutura da Configuração
+```json
+{
+  "version": "1.0.0",
+  "screens": [
+    {
+      "id": "home",
+      "name": "Home",
+      "icon": "home",
+      "route": "/home",
+      "layout": {
+        "type": "grid",
+        "columns": 2,
+        "spacing": 16
+      },
+      "widgets": [
+        {
+          "id": "nav_lights",
+          "type": "button",
+          "properties": {
+            "text": "Iluminação",
+            "icon": "lightbulb",
+            "size": "large"
+          },
+          "actions": {
+            "onPressed": {
+              "type": "navigate",
+              "params": {"screen": "lighting"}
+            }
+          }
+        }
+      ]
+    }
+  ],
+  "devices": {...},
+  "theme": {...}
+}
+```
+
+### Dynamic Screen Builder
 ```dart
-class ACDynamicScreen extends StatelessWidget {
+class DynamicScreen extends StatelessWidget {
   final ScreenConfig config;
   
   @override
   Widget build(BuildContext context) {
-    final theme = context.acTheme;
-    
     return Scaffold(
-      backgroundColor: theme.backgroundColor,
-      appBar: _buildAppBar(context, config),
-      body: ACAdaptiveGrid(
-        columnsOverride: config.columnsMobile,
-        children: config.items.map((item) {
-          return ACDynamicWidget(
-            config: item,
-            onAction: (action) => _handleAction(context, action),
-          );
-        }).toList(),
+      appBar: config.showHeader ? _buildAppBar() : null,
+      body: DynamicWidgetBuilder.build(
+        context,
+        config.rootWidget ?? _buildDefaultLayout(),
+        state: context.watch<ScreenStateBloc>().state,
+        onAction: _handleAction,
       ),
-      bottomNavigationBar: _buildNavigation(context, config),
+      bottomNavigationBar: config.showNavigation 
+        ? DynamicNavigationBar(config: config.navigation)
+        : null,
     );
   }
-}
-
-class ACDynamicWidget extends StatelessWidget {
-  final WidgetConfig config;
-  final Function(WidgetAction) onAction;
   
-  @override
-  Widget build(BuildContext context) {
+  void _handleAction(String action, Map<String, dynamic> params) {
+    switch (action) {
+      case 'navigate':
+        DynamicNavigator.navigateTo(context, params['screen']);
+        break;
+      case 'mqtt_publish':
+        MqttService.publish(params['topic'], params['payload']);
+        break;
+      case 'macro':
+        MacroService.execute(params['macroId']);
+        break;
+    }
+  }
+}
+```
+
+### Dynamic Widget Builder
+```dart
+class DynamicWidgetBuilder {
+  static Widget build(
+    BuildContext context,
+    WidgetConfig config, {
+    Map<String, dynamic>? state,
+    Function(String, Map<String, dynamic>)? onAction,
+  }) {
+    if (!config.visible) return SizedBox.shrink();
+    
     switch (config.type) {
+      case 'control_tile':
+        return _buildControlTile(context, config, state, onAction);
       case 'button':
-        return ACButton(
-          onPressed: () => onAction(config.action),
-          child: Text(config.label),
-          style: ACButtonStyle.fromJson(config.style),
-        );
+        return _buildButton(context, config, onAction);
       case 'switch':
-        return ACSwitch(
-          value: config.value,
-          onChanged: (val) => onAction(ToggleAction(val)),
-          label: config.label,
-        );
+        return _buildSwitch(context, config, state, onAction);
       case 'gauge':
-        return ACGauge(
-          value: config.value,
-          min: config.min,
-          max: config.max,
-          unit: config.unit,
-        );
+        return _buildGauge(context, config, state);
+      case 'container':
+        return _buildContainer(context, config, state, onAction);
+      case 'grid':
+        return _buildGrid(context, config, state, onAction);
       default:
-        return Container();
+        return _buildPlaceholder(context, config);
     }
   }
 }

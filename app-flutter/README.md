@@ -2,7 +2,7 @@
 
 ## 📱 Visão Geral
 
-Aplicativo móvel de controle veicular desenvolvido em Flutter, parte do sistema AutoCore. Interface principal para controle de todos os componentes do veículo via smartphone.
+Aplicativo móvel de controle veicular desenvolvido em Flutter com **interface 100% dinâmica configurada via JSON**. Não há telas hardcoded - toda a interface é construída dinamicamente a partir de arquivos de configuração, permitindo total customização sem necessidade de recompilação.
 
 ## 🎨 Design System
 

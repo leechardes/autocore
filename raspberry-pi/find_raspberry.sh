@@ -11,7 +11,7 @@ if ping -c 1 raspberrypi.local > /dev/null 2>&1; then
     echo "IP: $IP"
     echo ""
     echo "Para conectar:"
-    echo "  ssh pi@raspberrypi.local"
+    echo "  ssh leechardes@raspberrypi.local"
     echo "  ou"
     echo "  ssh pi@$IP"
     exit 0
