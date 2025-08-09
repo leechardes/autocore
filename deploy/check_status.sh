@@ -26,14 +26,26 @@ echo ""
 # Verificar portas
 echo "🔌 Portas Abertas:"
 echo "------------------"
-netstat -tln 2>/dev/null | grep -E ':(1883|3000|5000)' | while read line; do
-    port=$(echo $line | awk '{print $4}' | rev | cut -d: -f1 | rev)
-    case $port in
-        1883) echo "✅ Porta $port: MQTT Broker" ;;
-        3000) echo "✅ Porta $port: Config App Frontend" ;;
-        5000) echo "✅ Porta $port: Config App Backend" ;;
-    esac
-done
+if command -v netstat >/dev/null 2>&1; then
+    netstat -tln 2>/dev/null | grep -E ':(1883|8080|8081)' | while read line; do
+        port=$(echo $line | awk '{print $4}' | rev | cut -d: -f1 | rev)
+        case $port in
+            1883) echo "✅ Porta $port: MQTT Broker" ;;
+            8080) echo "✅ Porta $port: Config App Frontend" ;;
+            8081) echo "✅ Porta $port: Config App Backend" ;;
+        esac
+    done || true
+else
+    # Usar ss se netstat não estiver disponível
+    ss -tln 2>/dev/null | grep -E ':(1883|8080|8081)' | while read line; do
+        port=$(echo $line | awk '{print $4}' | rev | cut -d: -f1 | rev)
+        case $port in
+            1883) echo "✅ Porta $port: MQTT Broker" ;;
+            8080) echo "✅ Porta $port: Config App Frontend" ;;
+            8081) echo "✅ Porta $port: Config App Backend" ;;
+        esac
+    done || true
+fi
 echo ""
 
 # Verificar conectividade
@@ -41,22 +53,38 @@ echo "🌐 Teste de Conectividade:"
 echo "--------------------------"
 
 # MQTT
-timeout 1 mosquitto_sub -h localhost -u autocore -P autocore123 -t test -C 1 2>/dev/null && echo "✅ MQTT: Conectado" || echo "❌ MQTT: Falha"
+if command -v mosquitto_sub >/dev/null 2>&1; then
+    if [ -f /opt/autocore/.env ]; then
+        source /opt/autocore/.env 2>/dev/null
+    fi
+    MQTT_PASS=${MQTT_PASSWORD:-autocore123}
+    timeout 1 mosquitto_sub -h localhost -u autocore -P "$MQTT_PASS" -t test -C 1 >/dev/null 2>&1 && echo "✅ MQTT: Conectado" || echo "❌ MQTT: Falha na conexão"
+else
+    echo "⚠️ MQTT: mosquitto_sub não instalado"
+fi
 
 # Backend API
-response=$(curl -s -o /dev/null -w "%{http_code}" http://localhost:5000/health 2>/dev/null)
-if [ "$response" = "200" ]; then
-    echo "✅ Backend API: Respondendo (HTTP $response)"
+if command -v curl >/dev/null 2>&1; then
+    response=$(curl -s -o /dev/null -w "%{http_code}" --max-time 2 http://localhost:8081/health 2>/dev/null || echo "000")
+    if [ "$response" = "200" ]; then
+        echo "✅ Backend API: Respondendo (HTTP $response)"
+    else
+        echo "❌ Backend API: Não respondendo (HTTP $response)"
+    fi
 else
-    echo "❌ Backend API: Não respondendo"
+    echo "⚠️ Backend API: curl não instalado"
 fi
 
 # Frontend
-response=$(curl -s -o /dev/null -w "%{http_code}" http://localhost:3000 2>/dev/null)
-if [ "$response" = "200" ] || [ "$response" = "304" ]; then
-    echo "✅ Frontend: Respondendo (HTTP $response)"
+if command -v curl >/dev/null 2>&1; then
+    response=$(curl -s -o /dev/null -w "%{http_code}" --max-time 2 http://localhost:8080 2>/dev/null || echo "000")
+    if [ "$response" = "200" ] || [ "$response" = "304" ]; then
+        echo "✅ Frontend: Respondendo (HTTP $response)"
+    else
+        echo "❌ Frontend: Não respondendo (HTTP $response)"
+    fi
 else
-    echo "❌ Frontend: Não respondendo"
+    echo "⚠️ Frontend: curl não instalado"
 fi
 echo ""
 
@@ -72,31 +100,35 @@ echo ""
 # Verificar logs de erro recentes
 echo "⚠️ Erros Recentes (últimas 2 horas):"
 echo "------------------------------------"
-ERROR_COUNT=$(sudo journalctl -p err --since "2 hours ago" 2>/dev/null | wc -l)
-if [ $ERROR_COUNT -gt 0 ]; then
-    echo "Encontrados $ERROR_COUNT erros. Últimos 5:"
-    sudo journalctl -p err --since "2 hours ago" --no-pager | tail -5
+if command -v journalctl >/dev/null 2>&1; then
+    ERROR_COUNT=$(sudo journalctl -p err --since "2 hours ago" 2>/dev/null | wc -l || echo "0")
+    if [ $ERROR_COUNT -gt 0 ]; then
+        echo "Encontrados $ERROR_COUNT erros. Últimos 5:"
+        sudo journalctl -p err --since "2 hours ago" --no-pager 2>/dev/null | tail -5 || true
+    else
+        echo "✅ Nenhum erro nas últimas 2 horas"
+    fi
 else
-    echo "✅ Nenhum erro nas últimas 2 horas"
+    echo "⚠️ journalctl não disponível"
 fi
 echo ""
 
 # Verificar processos Python
 echo "🐍 Processos Python AutoCore:"
 echo "-----------------------------"
-ps aux | grep -E "(autocore|gateway|config-app)" | grep python | grep -v grep | while read line; do
+ps aux 2>/dev/null | grep -E "(autocore|gateway|config-app)" | grep python | grep -v grep | while read line; do
     pid=$(echo $line | awk '{print $2}')
     cmd=$(echo $line | awk '{for(i=11;i<=NF;i++) printf "%s ", $i; print ""}')
     echo "PID $pid: $cmd"
-done
+done || echo "Nenhum processo Python AutoCore encontrado"
 echo ""
 
 # URLs de acesso
 echo "🌐 URLs de Acesso:"
 echo "------------------"
-IP=$(hostname -I | awk '{print $1}')
-echo "📱 Config App: http://$IP:3000"
-echo "🔌 Backend API: http://$IP:5000"
+IP=$(hostname -I 2>/dev/null | awk '{print $1}' || echo "localhost")
+echo "📱 Frontend: http://$IP:8080"
+echo "🔌 Backend API: http://$IP:8081"
 echo "🦟 MQTT Broker: $IP:1883"
 echo ""
 
