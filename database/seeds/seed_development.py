@@ -1,12 +1,12 @@
 #!/usr/bin/env python3
 """
-Seeds de desenvolvimento para AutoCore usando SQLAlchemy ORM
-Data: 07 de agosto de 2025
-Objetivo: Dados realistas para desenvolvimento e testes
+Seed de desenvolvimento para AutoCore
+Baseado no backup real do sistema em produção
+Data: 09 de agosto de 2025
 """
 import sys
 from pathlib import Path
-from datetime import datetime, timedelta
+from datetime import datetime
 import json
 
 # Adiciona path para importar models
@@ -15,9 +15,8 @@ sys.path.append(str(Path(__file__).parent.parent))
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 from src.models.models import (
-    Base, Device, RelayBoard, RelayChannel, 
-    TelemetryData, EventLog, Screen, ScreenItem,
-    Theme, CANSignal, Macro, User
+    Base, User, Device, RelayBoard, RelayChannel,
+    Screen, ScreenItem, Theme, CANSignal, Macro, EventLog
 )
 
 DATABASE_URL = f"sqlite:///{Path(__file__).parent.parent}/autocore.db"
@@ -28,18 +27,17 @@ def clear_database(session):
     """Limpa dados existentes na ordem correta"""
     print("🗑️  Limpando dados existentes...")
     
-    # Ordem de deleção respeitando foreign keys
+    # Ordem de limpeza respeitando foreign keys
+    session.query(EventLog).delete()
     session.query(ScreenItem).delete()
     session.query(Screen).delete()
     session.query(RelayChannel).delete()
     session.query(RelayBoard).delete()
-    session.query(TelemetryData).delete()
-    session.query(EventLog).delete()
+    session.query(Macro).delete()
     session.query(Device).delete()
     session.query(User).delete()
     session.query(Theme).delete()
     session.query(CANSignal).delete()
-    session.query(Macro).delete()
     session.commit()
     print("✓ Dados anteriores removidos")
 
@@ -51,7 +49,7 @@ def seed_users(session):
         User(
             id=1,
             username='admin',
-            password_hash='$2b$12$LQi3c8zc8Jc8zc8Jc8zc8u',  # Hash fictício
+            password_hash='$2b$12$LQi3c8zc8Jc8zc8Jc8zc8u',
             full_name='Administrador',
             email='admin@autocore.local',
             role='admin',
@@ -86,7 +84,7 @@ def seed_users(session):
 
 def seed_devices(session):
     """Cria dispositivos ESP32"""
-    print("\n📱 Criando dispositivos...")
+    print("\n🔌 Criando dispositivos...")
     
     devices = [
         Device(
@@ -95,19 +93,27 @@ def seed_devices(session):
             name='Central de Relés',
             type='esp32_relay',
             mac_address='AA:BB:CC:DD:EE:01',
-            ip_address='192.168.1.101',
+            ip_address='192.168.1.200',
             firmware_version='v1.0.0',
             hardware_version='rev2',
             status='online',
-            last_seen=datetime.now(),
+            last_seen=datetime.fromisoformat('2025-08-08 05:11:57.775189'),
             configuration_json=json.dumps({
-                "relay_count": 16,
-                "mqtt_topic": "autocore/relay/001"
+                "relay_count": "16",
+                "mqtt_topic": "autocore/relay/001",
+                "location": "painel",
+                "device_type": "esp32_relay",
+                "mac_address": "AA:BB:CC:DD:EE:01",
+                "board_model": "16ch_standard",
+                "voltage": "12V",
+                "max_current": "10"
             }),
             capabilities_json=json.dumps({
                 "relay_control": True,
-                "status_report": True,
-                "ota_update": True
+                "status_report": False,
+                "ota_update": True,
+                "timer_control": True,
+                "interlock": False
             }),
             is_active=True
         ),
@@ -121,12 +127,23 @@ def seed_devices(session):
             firmware_version='v1.0.0',
             hardware_version='rev1',
             status='online',
-            last_seen=datetime.now(),
+            last_seen=datetime.fromisoformat('2025-08-08 05:07:28.093457'),
             configuration_json=json.dumps({
-                "screen_size": "7inch",
-                "resolution": "800x480",
+                "screen_size": "2.8inch",
+                "resolution": "320x240",
                 "touch": True,
-                "mqtt_topic": "autocore/display/001"
+                "mqtt_topic": "autocore/display/001",
+                "location": "painel",
+                "device_type": "esp32_display",
+                "mac_address": "AA:BB:CC:DD:EE:02",
+                "touch_enabled": True,
+                "brightness_control": True,
+                "_capabilities": {
+                    "touch_input": True,
+                    "screen_render": True,
+                    "brightness_control": True,
+                    "multi_page": True
+                }
             }),
             capabilities_json=json.dumps({
                 "touch_input": True,
@@ -145,7 +162,7 @@ def seed_devices(session):
             firmware_version='v1.0.0',
             hardware_version='rev1',
             status='online',
-            last_seen=datetime.now(),
+            last_seen=datetime.fromisoformat('2025-08-07 14:23:32.940336'),
             configuration_json=json.dumps({
                 "button_count": 12,
                 "led_count": 12,
@@ -156,7 +173,7 @@ def seed_devices(session):
                 "led_output": True,
                 "encoder_input": True
             }),
-            is_active=True
+            is_active=False
         ),
         Device(
             id=4,
@@ -168,15 +185,28 @@ def seed_devices(session):
             firmware_version='v1.0.0',
             hardware_version='rev1',
             status='online',
-            last_seen=datetime.now(),
+            last_seen=datetime.fromisoformat('2025-08-08 05:07:36.210316'),
             configuration_json=json.dumps({
-                "can_speed": 500000,
-                "mqtt_topic": "autocore/can/001"
+                "can_speed": "250000",
+                "mqtt_topic": "autocore/can/001",
+                "location": "painel",
+                "device_type": "esp32_can",
+                "mac_address": "AA:BB:CC:DD:EE:04",
+                "ecu_type": "fueltech",
+                "_capabilities": {
+                    "can_read": False,
+                    "can_write": False,
+                    "obd2": False
+                },
+                "termination_resistor": False,
+                "filter_ids": "0x200"
             }),
             capabilities_json=json.dumps({
                 "can_read": True,
                 "can_write": True,
-                "obd2": True
+                "obd2": True,
+                "can_filter": True,
+                "can_bridge": True
             }),
             is_active=True
         ),
@@ -190,7 +220,7 @@ def seed_devices(session):
             firmware_version='v1.0.0',
             hardware_version='pi-zero-2w',
             status='online',
-            last_seen=datetime.now(),
+            last_seen=datetime.fromisoformat('2025-08-07 14:23:32.940379'),
             configuration_json=json.dumps({
                 "mqtt_broker": "localhost",
                 "mqtt_port": 1883
@@ -200,7 +230,29 @@ def seed_devices(session):
                 "database": True,
                 "api": True
             }),
-            is_active=True
+            is_active=False
+        ),
+        Device(
+            id=6,
+            uuid='esp32-1754594129629',
+            name='Teste',
+            type='esp32_relay',
+            mac_address='AA:BB:CC:DD:EE:09',
+            ip_address='192.168.1.105',
+            firmware_version='V1.0.0',
+            hardware_version='rev2',
+            status='online',
+            last_seen=datetime.fromisoformat('2025-08-07 16:18:20.940414'),
+            configuration_json=json.dumps({
+                "relay_count": 16,
+                "mqtt_topic": "autocore/relay/001"
+            }),
+            capabilities_json=json.dumps({
+                "relay_control": True,
+                "status_report": True,
+                "ota_update": True
+            }),
+            is_active=False
         )
     ]
     
@@ -208,85 +260,329 @@ def seed_devices(session):
     session.commit()
     print(f"✓ {len(devices)} dispositivos criados")
 
-def seed_relay_boards_and_channels(session):
-    """Cria placas e canais de relé"""
-    print("\n⚡ Criando relés...")
+def seed_relay_boards(session):
+    """Cria placas de relé"""
+    print("\n⚡ Criando placas de relé...")
     
-    # Placa principal
-    board = RelayBoard(
-        id=1,
-        device_id=1,
-        name='Placa Principal',
-        total_channels=16,
-        board_model='RELAY16CH-12V',
-        location='Painel Central',
-        is_active=True
-    )
-    session.add(board)
+    boards = [
+        RelayBoard(
+            id=1,
+            device_id=1,
+            total_channels=16,
+            board_model='RELAY16CH-12V',
+            is_active=True
+        ),
+        RelayBoard(
+            id=2,
+            device_id=6,
+            total_channels=16,
+            board_model='ESP32_16CH',
+            is_active=False
+        )
+    ]
+    
+    session.add_all(boards)
     session.commit()
+    print(f"✓ {len(boards)} placas de relé criadas")
+
+def seed_relay_channels(session):
+    """Cria canais de relé"""
+    print("\n🔌 Criando canais de relé...")
     
-    # Canais
     channels = [
-        # Iluminação
+        # Placa 1 - Principal
         RelayChannel(id=1, board_id=1, channel_number=1, name='Farol Alto', description='Farol alto principal', 
-                    function_type='toggle', default_state=False, current_state=False, icon='light-high', 
-                    color='#FFFF00', protection_mode='none', max_activation_time=None),
-        RelayChannel(id=2, board_id=1, channel_number=2, name='Farol Baixo', description='Farol baixo principal', 
-                    function_type='toggle', default_state=False, current_state=False, icon='light-low', 
-                    color='#FFFFAA', protection_mode='none', max_activation_time=None),
-        RelayChannel(id=3, board_id=1, channel_number=3, name='Milha', description='Farol de milha', 
-                    function_type='toggle', default_state=False, current_state=False, icon='light-fog', 
-                    color='#FFFF88', protection_mode='none', max_activation_time=None),
-        RelayChannel(id=4, board_id=1, channel_number=4, name='Strobo', description='Luzes de emergência', 
-                    function_type='toggle', default_state=False, current_state=False, icon='light-emergency', 
-                    color='#FF0000', protection_mode='confirm', max_activation_time=300),
+                    function_type='momentary', icon='light-high', color='#FF6B35', 
+                    protection_mode='none', is_active=True, allow_in_macro=False),
+        RelayChannel(id=2, board_id=1, channel_number=2, name='Farol Baixo', description='Farol baixo principal',
+                    function_type='pulse', icon='light-low', color='#FFFFAA', 
+                    protection_mode='none', is_active=True, allow_in_macro=True),
+        RelayChannel(id=3, board_id=1, channel_number=3, name='Milha', description='Farol de milha',
+                    function_type='toggle', icon='light-fog', color='#FFFF88', 
+                    protection_mode='none', is_active=True, allow_in_macro=True),
+        RelayChannel(id=4, board_id=1, channel_number=4, name='Strobo', description='Luzes de emergência',
+                    function_type='momentary', icon='light-emergency', color='#FF0000', 
+                    protection_mode='confirm', max_activation_time=300, is_active=True, allow_in_macro=False),
+        RelayChannel(id=5, board_id=1, channel_number=5, name='Guincho', description='Guincho elétrico',
+                    function_type='pulse', icon='winch', color='#FFA500', 
+                    protection_mode='password', max_activation_time=60, is_active=True, allow_in_macro=False),
+        RelayChannel(id=6, board_id=1, channel_number=6, name='Compressor', description='Compressor de ar',
+                    function_type='toggle', icon='air-compressor', color='#00AAFF', 
+                    protection_mode='confirm', max_activation_time=600, is_active=True, allow_in_macro=True),
+        RelayChannel(id=7, board_id=1, channel_number=7, name='Inversor', description='Inversor 110V/220V',
+                    function_type='momentary', icon='power-inverter', color='#00FF00', 
+                    protection_mode='none', is_active=True, allow_in_macro=False),
+        RelayChannel(id=8, board_id=1, channel_number=8, name='Rádio VHF', description='Rádio comunicação',
+                    function_type='pulse', icon='radio', color='#8888FF', 
+                    protection_mode='none', is_active=True, allow_in_macro=True),
+        RelayChannel(id=9, board_id=1, channel_number=9, name='Bomba Combustível', description='Bomba de combustível auxiliar',
+                    function_type='toggle', icon='fuel-pump', color='#AA5500', 
+                    protection_mode='password', is_active=True, allow_in_macro=True),
+        RelayChannel(id=10, board_id=1, channel_number=10, name='Ventoinha Extra', description='Ventoinha adicional radiador',
+                    function_type='momentary', icon='fan', color='#00FFFF', 
+                    protection_mode='none', is_active=True, allow_in_macro=False),
+        RelayChannel(id=11, board_id=1, channel_number=11, name='Trava Diferencial', description='Bloqueio do diferencial',
+                    function_type='pulse', icon='diff-lock', color='#FF8800', 
+                    protection_mode='confirm', is_active=True, allow_in_macro=True),
+        RelayChannel(id=12, board_id=1, channel_number=12, name='Câmera Ré', description='Sistema de câmera de ré',
+                    function_type='toggle', icon='camera', color='#AA00FF', 
+                    protection_mode='none', is_active=True, allow_in_macro=True),
+        RelayChannel(id=13, board_id=1, channel_number=13, name='Aux 1', description='Auxiliar 1',
+                    function_type='momentary', icon='aux', color='#888888', 
+                    protection_mode='none', is_active=True, allow_in_macro=False),
+        RelayChannel(id=14, board_id=1, channel_number=14, name='Aux 2', description='Auxiliar 2',
+                    function_type='pulse', icon='aux', color='#888888', 
+                    protection_mode='none', is_active=True, allow_in_macro=True),
+        RelayChannel(id=15, board_id=1, channel_number=15, name='Aux 3', description='Auxiliar 3',
+                    function_type='toggle', icon='aux', color='#888888', 
+                    protection_mode='none', is_active=True, allow_in_macro=True),
+        RelayChannel(id=16, board_id=1, channel_number=16, name='Aux 4', description='Auxiliar 4',
+                    function_type='toggle', icon='aux', color='#888888', 
+                    protection_mode='none', is_active=True, allow_in_macro=True),
         
-        # Acessórios
-        RelayChannel(id=5, board_id=1, channel_number=5, name='Guincho', description='Guincho elétrico', 
-                    function_type='momentary', default_state=False, current_state=False, icon='winch', 
-                    color='#FFA500', protection_mode='password', max_activation_time=60),
-        RelayChannel(id=6, board_id=1, channel_number=6, name='Compressor', description='Compressor de ar', 
-                    function_type='toggle', default_state=False, current_state=False, icon='air-compressor', 
-                    color='#00AAFF', protection_mode='confirm', max_activation_time=600),
-        RelayChannel(id=7, board_id=1, channel_number=7, name='Inversor', description='Inversor 110V/220V', 
-                    function_type='toggle', default_state=False, current_state=False, icon='power-inverter', 
-                    color='#00FF00', protection_mode='none', max_activation_time=None),
-        RelayChannel(id=8, board_id=1, channel_number=8, name='Rádio VHF', description='Rádio comunicação', 
-                    function_type='toggle', default_state=False, current_state=False, icon='radio', 
-                    color='#8888FF', protection_mode='none', max_activation_time=None),
-        
-        # Sistemas
-        RelayChannel(id=9, board_id=1, channel_number=9, name='Bomba Combustível', description='Bomba de combustível auxiliar', 
-                    function_type='toggle', default_state=False, current_state=False, icon='fuel-pump', 
-                    color='#AA5500', protection_mode='password', max_activation_time=None),
-        RelayChannel(id=10, board_id=1, channel_number=10, name='Ventoinha Extra', description='Ventoinha adicional radiador', 
-                    function_type='toggle', default_state=False, current_state=False, icon='fan', 
-                    color='#00FFFF', protection_mode='none', max_activation_time=None),
-        RelayChannel(id=11, board_id=1, channel_number=11, name='Trava Diferencial', description='Bloqueio do diferencial', 
-                    function_type='toggle', default_state=False, current_state=False, icon='diff-lock', 
-                    color='#FF8800', protection_mode='confirm', max_activation_time=None),
-        RelayChannel(id=12, board_id=1, channel_number=12, name='Câmera Ré', description='Sistema de câmera de ré', 
-                    function_type='toggle', default_state=False, current_state=False, icon='camera', 
-                    color='#AA00FF', protection_mode='none', max_activation_time=None),
-        
-        # Reserva
-        RelayChannel(id=13, board_id=1, channel_number=13, name='Aux 1', description='Auxiliar 1', 
-                    function_type='toggle', default_state=False, current_state=False, icon='aux', 
-                    color='#888888', protection_mode='none', max_activation_time=None),
-        RelayChannel(id=14, board_id=1, channel_number=14, name='Aux 2', description='Auxiliar 2', 
-                    function_type='toggle', default_state=False, current_state=False, icon='aux', 
-                    color='#888888', protection_mode='none', max_activation_time=None),
-        RelayChannel(id=15, board_id=1, channel_number=15, name='Aux 3', description='Auxiliar 3', 
-                    function_type='toggle', default_state=False, current_state=False, icon='aux', 
-                    color='#888888', protection_mode='none', max_activation_time=None),
-        RelayChannel(id=16, board_id=1, channel_number=16, name='Aux 4', description='Auxiliar 4', 
-                    function_type='toggle', default_state=False, current_state=False, icon='aux', 
-                    color='#888888', protection_mode='none', max_activation_time=None),
+        # Placa 2 - Teste (inativa)
+        RelayChannel(id=17, board_id=2, channel_number=1, name='Canal 1', function_type='toggle',
+                    icon='aux', color='#888888', protection_mode='none', is_active=False, allow_in_macro=True),
+        RelayChannel(id=18, board_id=2, channel_number=2, name='Canal 2', function_type='toggle',
+                    icon='aux', color='#888888', protection_mode='none', is_active=False, allow_in_macro=True),
+        RelayChannel(id=19, board_id=2, channel_number=3, name='Canal 3', function_type='toggle',
+                    icon='aux', color='#888888', protection_mode='none', is_active=False, allow_in_macro=True),
+        RelayChannel(id=20, board_id=2, channel_number=4, name='Canal 4', function_type='toggle',
+                    icon='aux', color='#888888', protection_mode='none', is_active=False, allow_in_macro=True),
+        RelayChannel(id=21, board_id=2, channel_number=5, name='Canal 5', function_type='toggle',
+                    icon='aux', color='#888888', protection_mode='none', is_active=False, allow_in_macro=True),
+        RelayChannel(id=22, board_id=2, channel_number=6, name='Canal 6', function_type='toggle',
+                    icon='aux', color='#888888', protection_mode='none', is_active=False, allow_in_macro=True),
+        RelayChannel(id=23, board_id=2, channel_number=7, name='Canal 7', function_type='toggle',
+                    icon='aux', color='#888888', protection_mode='none', is_active=False, allow_in_macro=True),
+        RelayChannel(id=24, board_id=2, channel_number=8, name='Canal 8', function_type='toggle',
+                    icon='aux', color='#888888', protection_mode='none', is_active=False, allow_in_macro=True),
+        RelayChannel(id=25, board_id=2, channel_number=9, name='Canal 9', function_type='toggle',
+                    icon='aux', color='#888888', protection_mode='none', is_active=False, allow_in_macro=True),
+        RelayChannel(id=26, board_id=2, channel_number=10, name='Canal 10', function_type='toggle',
+                    icon='aux', color='#888888', protection_mode='none', is_active=False, allow_in_macro=True),
+        RelayChannel(id=27, board_id=2, channel_number=11, name='Canal 11', function_type='toggle',
+                    icon='aux', color='#888888', protection_mode='none', is_active=False, allow_in_macro=True),
+        RelayChannel(id=28, board_id=2, channel_number=12, name='Canal 12', function_type='toggle',
+                    icon='aux', color='#888888', protection_mode='none', is_active=False, allow_in_macro=True),
+        RelayChannel(id=29, board_id=2, channel_number=13, name='Canal 13', function_type='toggle',
+                    icon='aux', color='#888888', protection_mode='none', is_active=False, allow_in_macro=True),
+        RelayChannel(id=30, board_id=2, channel_number=14, name='Canal 14', function_type='toggle',
+                    icon='aux', color='#888888', protection_mode='none', is_active=False, allow_in_macro=True),
+        RelayChannel(id=31, board_id=2, channel_number=15, name='Canal 15', function_type='toggle',
+                    icon='aux', color='#888888', protection_mode='none', is_active=False, allow_in_macro=True),
+        RelayChannel(id=32, board_id=2, channel_number=16, name='Canal 16', function_type='toggle',
+                    icon='aux', color='#888888', protection_mode='none', is_active=False, allow_in_macro=True)
     ]
     
     session.add_all(channels)
     session.commit()
-    print(f"✓ 1 placa e {len(channels)} canais criados")
+    print(f"✓ {len(channels)} canais de relé criados")
+
+def seed_screens(session):
+    """Cria telas do sistema"""
+    print("\n📱 Criando telas...")
+    
+    screens = [
+        Screen(
+            id=1,
+            name='home',
+            title='Início',
+            icon='home',
+            screen_type='dashboard',
+            position=1,
+            columns_mobile=2,
+            columns_display_small=3,
+            columns_display_large=4,
+            columns_web=6,
+            is_visible=True,
+            show_on_mobile=True,
+            show_on_display_small=True,
+            show_on_display_large=True,
+            show_on_web=True,
+            show_on_controls=False
+        ),
+        Screen(
+            id=2,
+            name='lights',
+            title='Iluminação',
+            icon='lightbulb',
+            screen_type='control',
+            position=2,
+            columns_mobile=2,
+            columns_display_small=3,
+            columns_display_large=4,
+            columns_web=4,
+            is_visible=True,
+            show_on_mobile=True,
+            show_on_display_small=True,
+            show_on_display_large=True,
+            show_on_web=True,
+            show_on_controls=True
+        ),
+        Screen(
+            id=3,
+            name='accessories',
+            title='Acessórios',
+            icon='tools',
+            screen_type='control',
+            position=3,
+            columns_mobile=2,
+            columns_display_small=3,
+            columns_display_large=4,
+            columns_web=4,
+            is_visible=True,
+            show_on_mobile=True,
+            show_on_display_small=True,
+            show_on_display_large=True,
+            show_on_web=True,
+            show_on_controls=True
+        ),
+        Screen(
+            id=4,
+            name='systems',
+            title='Sistemas',
+            icon='settings',
+            screen_type='control',
+            position=4,
+            columns_mobile=2,
+            columns_display_small=3,
+            columns_display_large=4,
+            columns_web=4,
+            is_visible=True,
+            required_permission='operator',
+            show_on_mobile=True,
+            show_on_display_small=True,
+            show_on_display_large=True,
+            show_on_web=True,
+            show_on_controls=False
+        ),
+        Screen(
+            id=5,
+            name='diagnostics',
+            title='Diagnóstico',
+            icon='chart',
+            screen_type='dashboard',
+            position=5,
+            columns_mobile=1,
+            columns_display_small=2,
+            columns_display_large=3,
+            columns_web=4,
+            is_visible=True,
+            required_permission='admin',
+            show_on_mobile=True,
+            show_on_display_small=True,
+            show_on_display_large=True,
+            show_on_web=True,
+            show_on_controls=False
+        )
+    ]
+    
+    session.add_all(screens)
+    session.commit()
+    print(f"✓ {len(screens)} telas criadas")
+
+def seed_screen_items(session):
+    """Cria itens das telas"""
+    print("\n📊 Criando itens de tela...")
+    
+    items = [
+        # Dashboard Home
+        ScreenItem(
+            id=1, screen_id=1, item_type='display', name='speed', label='Velocidade',
+            icon='speedometer', position=1, size_mobile='large', size_display_small='large',
+            size_display_large='large', size_web='normal', data_source='can',
+            data_path='speed', data_format='number', data_unit='km/h', is_active=True
+        ),
+        ScreenItem(
+            id=2, screen_id=1, item_type='display', name='rpm', label='RPM',
+            icon='tachometer', position=2, size_mobile='large', size_display_small='large',
+            size_display_large='large', size_web='normal', data_source='can',
+            data_path='rpm', data_format='number', data_unit='rpm', is_active=True
+        ),
+        ScreenItem(
+            id=3, screen_id=1, item_type='display', name='temp', label='Temperatura',
+            icon='thermometer', position=3, size_mobile='normal', size_display_small='normal',
+            size_display_large='normal', size_web='normal', data_source='can',
+            data_path='coolant_temp', data_format='number', data_unit='°C', is_active=True
+        ),
+        ScreenItem(
+            id=4, screen_id=1, item_type='display', name='fuel', label='Combustível',
+            icon='fuel', position=4, size_mobile='normal', size_display_small='normal',
+            size_display_large='normal', size_web='normal', data_source='can',
+            data_path='fuel_level', data_format='percentage', data_unit='%', is_active=True
+        ),
+        
+        # Tela Iluminação
+        ScreenItem(
+            id=5, screen_id=2, item_type='button', name='btn_farol_alto', label='Farol Alto',
+            icon='light-high', position=1, size_mobile='large', size_display_small='normal',
+            size_display_large='normal', size_web='normal', action_type='relay',
+            action_payload='{}', is_active=True, relay_board_id=1, relay_channel_id=1
+        ),
+        ScreenItem(
+            id=6, screen_id=2, item_type='button', name='btn_farol_baixo', label='Farol Baixo',
+            icon='light-low', position=2, size_mobile='normal', size_display_small='normal',
+            size_display_large='normal', size_web='normal', action_type='relay',
+            action_payload='{"toggle":1}', is_active=True, relay_board_id=1, relay_channel_id=2
+        ),
+        ScreenItem(
+            id=7, screen_id=2, item_type='button', name='btn_milha', label='Milha',
+            icon='light-fog', position=3, size_mobile='normal', size_display_small='normal',
+            size_display_large='normal', size_web='normal', action_type='relay',
+            action_payload='{}', is_active=True, relay_board_id=1, relay_channel_id=3
+        ),
+        ScreenItem(
+            id=8, screen_id=2, item_type='switch', name='btn_strobo', label='Strobo',
+            icon='light-emergency', position=4, size_mobile='large', size_display_small='normal',
+            size_display_large='normal', size_web='normal', action_type='relay',
+            action_payload='{"toggle":1}', is_active=True, relay_board_id=1, relay_channel_id=4
+        ),
+        
+        # Tela Acessórios
+        ScreenItem(
+            id=9, screen_id=3, item_type='button', name='btn_guincho', label='Guincho',
+            icon='winch', position=1, size_mobile='large', size_display_small='large',
+            size_display_large='normal', size_web='normal', action_type='relay',
+            action_payload='{"momentary":1}', is_active=True, relay_board_id=1, relay_channel_id=5
+        ),
+        ScreenItem(
+            id=10, screen_id=3, item_type='button', name='btn_compressor', label='Compressor',
+            icon='air-compressor', position=2, size_mobile='large', size_display_small='normal',
+            size_display_large='normal', size_web='normal', action_type='relay',
+            action_payload='{"toggle":1}', is_active=True, relay_board_id=1, relay_channel_id=6
+        ),
+        ScreenItem(
+            id=11, screen_id=3, item_type='button', name='btn_inversor', label='Inversor 110V',
+            icon='power-inverter', position=3, size_mobile='large', size_display_small='normal',
+            size_display_large='normal', size_web='normal', action_type='relay',
+            action_payload='{"toggle":1}', is_active=True, relay_board_id=1, relay_channel_id=7
+        ),
+        ScreenItem(
+            id=12, screen_id=3, item_type='button', name='btn_radio', label='Rádio VHF',
+            icon='radio', position=4, size_mobile='large', size_display_small='normal',
+            size_display_large='normal', size_web='normal', action_type='relay',
+            action_payload='{"toggle":1}', is_active=True, relay_board_id=1, relay_channel_id=8
+        ),
+        
+        # Botões extras
+        ScreenItem(
+            id=13, screen_id=2, item_type='button', name='test_new_relay', label='Teste Novo Relé',
+            icon='power', position=15, size_mobile='normal', size_display_small='normal',
+            size_display_large='normal', size_web='normal', action_type='relay',
+            action_payload='{"toggle": true}', is_active=True, relay_board_id=1, relay_channel_id=10
+        ),
+        ScreenItem(
+            id=14, screen_id=3, item_type='button', name='bt_aux', label='Auxiliar',
+            icon='circle', position=5, size_mobile='small', size_display_small='normal',
+            size_display_large='normal', size_web='normal', action_type='relay_toggle',
+            action_payload='{"toggle":true}', is_active=True, relay_board_id=1, relay_channel_id=13
+        )
+    ]
+    
+    session.add_all(items)
+    session.commit()
+    print(f"✓ {len(items)} itens de tela criados")
 
 def seed_themes(session):
     """Cria temas do sistema"""
@@ -339,115 +635,81 @@ def seed_themes(session):
     session.commit()
     print(f"✓ {len(themes)} temas criados")
 
-def seed_screens_and_items(session):
-    """Cria telas e itens de interface"""
-    print("\n📱 Criando telas e itens...")
-    
-    # Telas
-    screens = [
-        Screen(id=1, name='home', title='Início', icon='home', screen_type='dashboard', parent_id=None, 
-               position=1, columns_mobile=2, columns_display_small=3, columns_display_large=4, columns_web=6, 
-               is_visible=True, required_permission=None, show_on_mobile=True, show_on_display_small=True, 
-               show_on_display_large=True, show_on_web=True, show_on_controls=False),
-        Screen(id=2, name='lights', title='Iluminação', icon='lightbulb', screen_type='control', parent_id=None, 
-               position=2, columns_mobile=2, columns_display_small=3, columns_display_large=4, columns_web=4, 
-               is_visible=True, required_permission=None, show_on_mobile=True, show_on_display_small=True, 
-               show_on_display_large=True, show_on_web=True, show_on_controls=True),
-        Screen(id=3, name='accessories', title='Acessórios', icon='tools', screen_type='control', parent_id=None, 
-               position=3, columns_mobile=2, columns_display_small=3, columns_display_large=4, columns_web=4, 
-               is_visible=True, required_permission=None, show_on_mobile=True, show_on_display_small=True, 
-               show_on_display_large=True, show_on_web=True, show_on_controls=True),
-        Screen(id=4, name='systems', title='Sistemas', icon='settings', screen_type='control', parent_id=None, 
-               position=4, columns_mobile=2, columns_display_small=3, columns_display_large=4, columns_web=4, 
-               is_visible=True, required_permission='operator', show_on_mobile=True, show_on_display_small=True, 
-               show_on_display_large=True, show_on_web=True, show_on_controls=False),
-        Screen(id=5, name='diagnostics', title='Diagnóstico', icon='chart', screen_type='dashboard', parent_id=None, 
-               position=5, columns_mobile=1, columns_display_small=2, columns_display_large=3, columns_web=4, 
-               is_visible=True, required_permission='admin', show_on_mobile=True, show_on_display_small=True, 
-               show_on_display_large=True, show_on_web=True, show_on_controls=False)
-    ]
-    
-    session.add_all(screens)
-    session.commit()
-    
-    # Itens das telas
-    items = [
-        # Tela Home
-        ScreenItem(id=1, screen_id=1, item_type='display', name='speed', label='Velocidade', icon='speedometer', 
-                  position=1, size_mobile='large', size_display_small='large', size_display_large='large', size_web='normal', 
-                  action_type=None, action_target=None, action_payload=None, data_source='can', data_path='speed', 
-                  data_format='number', data_unit='km/h'),
-        ScreenItem(id=2, screen_id=1, item_type='display', name='rpm', label='RPM', icon='tachometer', 
-                  position=2, size_mobile='large', size_display_small='large', size_display_large='large', size_web='normal', 
-                  action_type=None, action_target=None, action_payload=None, data_source='can', data_path='rpm', 
-                  data_format='number', data_unit='rpm'),
-        ScreenItem(id=3, screen_id=1, item_type='display', name='temp', label='Temperatura', icon='thermometer', 
-                  position=3, size_mobile='normal', size_display_small='normal', size_display_large='normal', size_web='normal', 
-                  action_type=None, action_target=None, action_payload=None, data_source='can', data_path='coolant_temp', 
-                  data_format='number', data_unit='°C'),
-        ScreenItem(id=4, screen_id=1, item_type='display', name='fuel', label='Combustível', icon='fuel', 
-                  position=4, size_mobile='normal', size_display_small='normal', size_display_large='normal', size_web='normal', 
-                  action_type=None, action_target=None, action_payload=None, data_source='can', data_path='fuel_level', 
-                  data_format='percentage', data_unit='%'),
-        
-        # Tela Iluminação
-        ScreenItem(id=5, screen_id=2, item_type='button', name='btn_farol_alto', label='Farol Alto', icon='light-high', 
-                  position=1, size_mobile='large', size_display_small='normal', size_display_large='normal', size_web='normal', 
-                  action_type='relay', action_target='1', action_payload='{"toggle": true}', 
-                  data_source=None, data_path=None, data_format=None, data_unit=None),
-        ScreenItem(id=6, screen_id=2, item_type='button', name='btn_farol_baixo', label='Farol Baixo', icon='light-low', 
-                  position=2, size_mobile='large', size_display_small='normal', size_display_large='normal', size_web='normal', 
-                  action_type='relay', action_target='2', action_payload='{"toggle": true}', 
-                  data_source=None, data_path=None, data_format=None, data_unit=None),
-        ScreenItem(id=7, screen_id=2, item_type='button', name='btn_milha', label='Milha', icon='light-fog', 
-                  position=3, size_mobile='large', size_display_small='normal', size_display_large='normal', size_web='normal', 
-                  action_type='relay', action_target='3', action_payload='{"toggle": true}', 
-                  data_source=None, data_path=None, data_format=None, data_unit=None),
-        ScreenItem(id=8, screen_id=2, item_type='button', name='btn_strobo', label='Strobo', icon='light-emergency', 
-                  position=4, size_mobile='large', size_display_small='normal', size_display_large='normal', size_web='normal', 
-                  action_type='relay', action_target='4', action_payload='{"toggle": true}', 
-                  data_source=None, data_path=None, data_format=None, data_unit=None),
-        
-        # Tela Acessórios
-        ScreenItem(id=9, screen_id=3, item_type='button', name='btn_guincho', label='Guincho', icon='winch', 
-                  position=1, size_mobile='large', size_display_small='large', size_display_large='normal', size_web='normal', 
-                  action_type='relay', action_target='5', action_payload='{"momentary": true}', 
-                  data_source=None, data_path=None, data_format=None, data_unit=None),
-        ScreenItem(id=10, screen_id=3, item_type='button', name='btn_compressor', label='Compressor', icon='air-compressor', 
-                  position=2, size_mobile='large', size_display_small='normal', size_display_large='normal', size_web='normal', 
-                  action_type='relay', action_target='6', action_payload='{"toggle": true}', 
-                  data_source=None, data_path=None, data_format=None, data_unit=None),
-        ScreenItem(id=11, screen_id=3, item_type='button', name='btn_inversor', label='Inversor 110V', icon='power-inverter', 
-                  position=3, size_mobile='large', size_display_small='normal', size_display_large='normal', size_web='normal', 
-                  action_type='relay', action_target='7', action_payload='{"toggle": true}', 
-                  data_source=None, data_path=None, data_format=None, data_unit=None),
-        ScreenItem(id=12, screen_id=3, item_type='button', name='btn_radio', label='Rádio VHF', icon='radio', 
-                  position=4, size_mobile='large', size_display_small='normal', size_display_large='normal', size_web='normal', 
-                  action_type='relay', action_target='8', action_payload='{"toggle": true}', 
-                  data_source=None, data_path=None, data_format=None, data_unit=None)
-    ]
-    
-    session.add_all(items)
-    session.commit()
-    print(f"✓ {len(screens)} telas e {len(items)} itens criados")
-
 def seed_can_signals(session):
-    """Cria sinais CAN"""
+    """Cria sinais CAN FuelTech"""
     print("\n🚗 Criando sinais CAN...")
     
     signals = [
-        CANSignal(id=1, signal_name='speed', can_id='0x3E8', start_bit=0, length_bits=16, 
-                 byte_order='big_endian', data_type='unsigned', scale_factor=0.1, offset=0, 
-                 unit='km/h', min_value=0, max_value=300, description='Velocidade do veículo', category='motion'),
-        CANSignal(id=2, signal_name='rpm', can_id='0x3E9', start_bit=0, length_bits=16, 
-                 byte_order='big_endian', data_type='unsigned', scale_factor=1, offset=0, 
-                 unit='rpm', min_value=0, max_value=8000, description='Rotação do motor', category='engine'),
-        CANSignal(id=3, signal_name='coolant_temp', can_id='0x3EA', start_bit=0, length_bits=8, 
-                 byte_order='big_endian', data_type='signed', scale_factor=1, offset=-40, 
-                 unit='°C', min_value=-40, max_value=150, description='Temperatura do líquido de arrefecimento', category='engine'),
-        CANSignal(id=4, signal_name='fuel_level', can_id='0x3EB', start_bit=0, length_bits=8, 
-                 byte_order='big_endian', data_type='unsigned', scale_factor=0.392, offset=0, 
-                 unit='%', min_value=0, max_value=100, description='Nível de combustível', category='fuel')
+        CANSignal(
+            id=1, signal_name='RPM', can_id='0x100', start_bit=0, length_bits=16,
+            scale_factor=1.0, offset=0.0, unit='RPM', min_value=0.0, max_value=8000.0,
+            description='Rotação do motor', category='motor', is_active=True
+        ),
+        CANSignal(
+            id=2, signal_name='TPS', can_id='0x100', start_bit=16, length_bits=8,
+            scale_factor=0.392, offset=0.0, unit='%', min_value=0.0, max_value=100.0,
+            description='Posição do acelerador', category='motor', is_active=True
+        ),
+        CANSignal(
+            id=3, signal_name='MAP', can_id='0x200', start_bit=0, length_bits=16,
+            scale_factor=1.0, offset=0.0, unit='kPa', min_value=0.0, max_value=250.0,
+            description='Pressão do coletor', category='motor', is_active=True
+        ),
+        CANSignal(
+            id=4, signal_name='IAT', can_id='0x200', start_bit=16, length_bits=8,
+            scale_factor=1.0, offset=-40.0, unit='°C', min_value=-40.0, max_value=120.0,
+            description='Temperatura do ar', category='motor', is_active=True
+        ),
+        CANSignal(
+            id=5, signal_name='ECT', can_id='0x300', start_bit=0, length_bits=8,
+            scale_factor=1.0, offset=-40.0, unit='°C', min_value=-40.0, max_value=120.0,
+            description='Temperatura do motor', category='motor', is_active=True
+        ),
+        CANSignal(
+            id=6, signal_name='FuelPressure', can_id='0x400', start_bit=0, length_bits=16,
+            scale_factor=1.0, offset=0.0, unit='kPa', min_value=0.0, max_value=600.0,
+            description='Pressão de combustível', category='combustivel', is_active=True
+        ),
+        CANSignal(
+            id=7, signal_name='Ethanol', can_id='0x400', start_bit=16, length_bits=8,
+            scale_factor=0.392, offset=0.0, unit='%', min_value=0.0, max_value=100.0,
+            description='Percentual de etanol', category='combustivel', is_active=True
+        ),
+        CANSignal(
+            id=8, signal_name='FuelLevel', can_id='0x400', start_bit=24, length_bits=8,
+            scale_factor=0.392, offset=0.0, unit='%', min_value=0.0, max_value=100.0,
+            description='Nível de combustível', category='combustivel', is_active=True
+        ),
+        CANSignal(
+            id=9, signal_name='Battery', can_id='0x500', start_bit=0, length_bits=8,
+            scale_factor=0.1, offset=0.0, unit='V', min_value=10.0, max_value=16.0,
+            description='Tensão da bateria', category='eletrico', is_active=True
+        ),
+        CANSignal(
+            id=10, signal_name='Lambda', can_id='0x300', start_bit=8, length_bits=16,
+            scale_factor=0.001, offset=0.0, unit='λ', min_value=0.7, max_value=1.3,
+            description='Fator lambda', category='eletrico', is_active=True
+        ),
+        CANSignal(
+            id=11, signal_name='OilPressure', can_id='0x500', start_bit=8, length_bits=8,
+            scale_factor=0.039, offset=0.0, unit='bar', min_value=0.0, max_value=10.0,
+            description='Pressão do óleo', category='pressoes', is_active=True
+        ),
+        CANSignal(
+            id=12, signal_name='BoostPressure', can_id='0x500', start_bit=16, length_bits=16,
+            scale_factor=0.001, offset=-1.0, unit='bar', min_value=-1.0, max_value=3.0,
+            description='Pressão do turbo', category='pressoes', is_active=True
+        ),
+        CANSignal(
+            id=13, signal_name='Speed', can_id='0x600', start_bit=0, length_bits=16,
+            scale_factor=1.0, offset=0.0, unit='km/h', min_value=0.0, max_value=300.0,
+            description='Velocidade do veículo', category='velocidade', is_active=True
+        ),
+        CANSignal(
+            id=14, signal_name='Gear', can_id='0x600', start_bit=16, length_bits=8,
+            scale_factor=1.0, offset=0.0, unit='', min_value=0.0, max_value=6.0,
+            description='Marcha atual', category='velocidade', is_active=True
+        )
     ]
     
     session.add_all(signals)
@@ -455,7 +717,7 @@ def seed_can_signals(session):
     print(f"✓ {len(signals)} sinais CAN criados")
 
 def seed_macros(session):
-    """Cria macros/automações"""
+    """Cria macros de automação"""
     print("\n⚙️  Criando macros...")
     
     macros = [
@@ -464,41 +726,189 @@ def seed_macros(session):
             name='Modo Trilha',
             description='Ativa configurações para trilha',
             trigger_type='manual',
-            trigger_config='{}',
+            trigger_config=json.dumps({
+                "preserve_state": True,
+                "requires_heartbeat": False
+            }),
             action_sequence=json.dumps([
-                {"type": "relay", "target": "3", "action": "on"},
-                {"type": "relay", "target": "10", "action": "on"}
+                {"type": "save_state", "scope": "all"},
+                {"type": "relay", "target": 3, "action": "on", "label": "Farol de milha"},
+                {"type": "relay", "target": 10, "action": "on", "label": "Barra LED"},
+                {"type": "relay", "target": 15, "action": "on", "label": "Luz traseira"},
+                {"type": "mqtt", "topic": "autocore/modes/trail", "payload": {"active": True}},
+                {"type": "log", "message": "Modo Trilha ativado"}
             ]),
-            condition_logic=None,
             is_active=True,
-            execution_count=0
+            execution_count=1
         ),
         Macro(
             id=2,
             name='Emergência',
             description='Ativa luzes de emergência',
             trigger_type='manual',
-            trigger_config='{}',
+            trigger_config=json.dumps({
+                "preserve_state": True,
+                "requires_heartbeat": True
+            }),
             action_sequence=json.dumps([
-                {"type": "relay", "target": "4", "action": "on"},
-                {"type": "relay", "target": "1", "action": "flash"}
+                {"type": "save_state", "scope": "all"},
+                {"type": "parallel", "actions": [
+                    {"type": "relay", "target": [4, 5], "action": "on", "label": "Luzes de emergência"},
+                    {"type": "mqtt", "topic": "autocore/alerts/emergency", "payload": {"active": True}}
+                ]},
+                {"type": "loop", "count": -1, "actions": [
+                    {"type": "relay", "target": [1, 2], "action": "on", "label": "Pisca alerta"},
+                    {"type": "delay", "ms": 500},
+                    {"type": "relay", "target": [1, 2], "action": "off"},
+                    {"type": "delay", "ms": 500}
+                ]}
             ]),
-            condition_logic=None,
             is_active=True,
-            execution_count=0
+            execution_count=4
         ),
         Macro(
             id=3,
             name='Desligar Tudo',
             description='Desliga todos os acessórios',
             trigger_type='manual',
-            trigger_config='{}',
+            trigger_config=json.dumps({
+                "preserve_state": False,
+                "requires_heartbeat": False
+            }),
             action_sequence=json.dumps([
-                {"type": "relay", "target": "all", "action": "off"}
+                {"type": "relay", "target": "all", "action": "off"},
+                {"type": "mqtt", "topic": "autocore/system/shutdown", "payload": {"timestamp": "2025-08-08T12:03:19.854361"}},
+                {"type": "log", "message": "Sistema desligado - Todos os acessórios OFF"}
             ]),
-            condition_logic=None,
+            is_active=True,
+            execution_count=13
+        ),
+        Macro(
+            id=4,
+            name='Show de Luz',
+            description='Sequência de luzes para demonstração e entretenimento',
+            trigger_type='manual',
+            trigger_config=json.dumps({
+                "preserve_state": True,
+                "requires_heartbeat": False,
+                "total_duration_ms": 25000
+            }),
+            action_sequence=json.dumps([
+                {"type": "save_state", "targets": [1, 2, 3, 4, 5, 6, 7, 8], "label": "Salvar estado original"},
+                {"type": "log", "message": "Iniciando Show de Luz 🎆"},
+                {"type": "loop", "count": 3, "label": "Onda de luz", "actions": [
+                    {"type": "relay", "target": [1, 2], "action": "on"},
+                    {"type": "delay", "ms": 200},
+                    {"type": "relay", "target": [3, 4], "action": "on"},
+                    {"type": "relay", "target": [1, 2], "action": "off"},
+                    {"type": "delay", "ms": 200},
+                    {"type": "relay", "target": [5, 6], "action": "on"},
+                    {"type": "relay", "target": [3, 4], "action": "off"},
+                    {"type": "delay", "ms": 200},
+                    {"type": "relay", "target": [7, 8], "action": "on"},
+                    {"type": "relay", "target": [5, 6], "action": "off"},
+                    {"type": "delay", "ms": 200},
+                    {"type": "relay", "target": [7, 8], "action": "off"},
+                    {"type": "delay", "ms": 200}
+                ]},
+                {"type": "loop", "count": 5, "label": "Alternado pares/ímpares", "actions": [
+                    {"type": "relay", "target": [1, 3, 5, 7], "action": "on"},
+                    {"type": "relay", "target": [2, 4, 6, 8], "action": "off"},
+                    {"type": "delay", "ms": 300},
+                    {"type": "relay", "target": [1, 3, 5, 7], "action": "off"},
+                    {"type": "relay", "target": [2, 4, 6, 8], "action": "on"},
+                    {"type": "delay", "ms": 300}
+                ]},
+                {"type": "loop", "count": 3, "label": "Flash total", "actions": [
+                    {"type": "relay", "target": "all", "action": "on"},
+                    {"type": "delay", "ms": 500},
+                    {"type": "relay", "target": "all", "action": "off"},
+                    {"type": "delay", "ms": 500}
+                ]},
+                {"type": "loop", "count": 2, "label": "Crescente", "actions": [
+                    {"type": "relay", "target": 1, "action": "on"},
+                    {"type": "delay", "ms": 100},
+                    {"type": "relay", "target": 2, "action": "on"},
+                    {"type": "delay", "ms": 100},
+                    {"type": "relay", "target": 3, "action": "on"},
+                    {"type": "delay", "ms": 100},
+                    {"type": "relay", "target": 4, "action": "on"},
+                    {"type": "delay", "ms": 100},
+                    {"type": "relay", "target": 5, "action": "on"},
+                    {"type": "delay", "ms": 100},
+                    {"type": "relay", "target": 6, "action": "on"},
+                    {"type": "delay", "ms": 100},
+                    {"type": "relay", "target": 7, "action": "on"},
+                    {"type": "delay", "ms": 100},
+                    {"type": "relay", "target": 8, "action": "on"},
+                    {"type": "delay", "ms": 500},
+                    {"type": "relay", "target": "all", "action": "off"},
+                    {"type": "delay", "ms": 300}
+                ]},
+                {"type": "log", "message": "Show de Luz finalizado ✨"},
+                {"type": "restore_state", "targets": [1, 2, 3, 4, 5, 6, 7, 8], "label": "Restaurar estado original"}
+            ]),
             is_active=True,
             execution_count=0
+        ),
+        Macro(
+            id=5,
+            name='Modo Estacionamento',
+            description='Ativa luzes de posição e interna temporariamente',
+            trigger_type='manual',
+            trigger_config=json.dumps({
+                "preserve_state": True,
+                "requires_heartbeat": False
+            }),
+            action_sequence=json.dumps([
+                {"type": "save_state", "scope": "all"},
+                {"type": "relay", "target": 2, "action": "on", "label": "Luzes de posição", "board_id": 1},
+                {"type": "relay", "target": 12, "action": "on", "label": "Luz interna", "board_id": 1},
+                {"type": "delay", "ms": 30000},
+                {"type": "relay", "target": 12, "action": "off", "label": "Desliga luz interna", "board_id": 1},
+                {"type": "mqtt", "topic": "autocore/modes/parking", "payload": {"active": True}}
+            ]),
+            is_active=True,
+            execution_count=14
+        ),
+        Macro(
+            id=6,
+            name='Sequência Teste',
+            description='Testa todas as funcionalidades de macros',
+            trigger_type='manual',
+            trigger_config=json.dumps({
+                "preserve_state": True,
+                "requires_heartbeat": False
+            }),
+            action_sequence=json.dumps([
+                {"type": "save_state", "targets": [1, 2, 3]},
+                {"type": "relay", "target": 1, "action": "on", "label": "Liga Relé 1"},
+                {"type": "delay", "ms": 500},
+                {"type": "loop", "count": 3, "actions": [
+                    {"type": "relay", "target": 2, "action": "toggle"},
+                    {"type": "delay", "ms": 200}
+                ]},
+                {"type": "restore_state", "targets": [1, 2, 3]}
+            ]),
+            is_active=True,
+            execution_count=0
+        ),
+        Macro(
+            id=7,
+            name='Teste Editor',
+            description='Macro criada com editor visual',
+            trigger_type='manual',
+            trigger_config=json.dumps({
+                "preserve_state": False,
+                "requires_heartbeat": False
+            }),
+            action_sequence=json.dumps([
+                {"type": "relay", "target": 1, "action": "on", "label": "Liga Relé 1"},
+                {"type": "delay", "ms": 500},
+                {"type": "relay", "target": 1, "action": "off", "label": "Desliga Relé 1"}
+            ]),
+            is_active=True,
+            execution_count=1
         )
     ]
     
@@ -506,35 +916,31 @@ def seed_macros(session):
     session.commit()
     print(f"✓ {len(macros)} macros criadas")
 
-def seed_sample_telemetry(session):
-    """Cria dados de telemetria de exemplo"""
-    print("\n📊 Criando telemetria de exemplo...")
+def seed_initial_events(session):
+    """Cria eventos iniciais do sistema"""
+    print("\n📝 Criando eventos iniciais...")
     
-    now = datetime.now()
-    telemetry = [
-        TelemetryData(device_id=1, data_type='status', data_key='uptime', data_value='3600', unit='seconds', timestamp=now - timedelta(hours=1)),
-        TelemetryData(device_id=1, data_type='status', data_key='relay_states', data_value='0000000000000000', unit='binary', timestamp=now - timedelta(minutes=30)),
-        TelemetryData(device_id=2, data_type='status', data_key='brightness', data_value='80', unit='%', timestamp=now - timedelta(minutes=15)),
-        TelemetryData(device_id=4, data_type='can', data_key='speed', data_value='65.5', unit='km/h', timestamp=now - timedelta(minutes=10)),
-        TelemetryData(device_id=4, data_type='can', data_key='rpm', data_value='2500', unit='rpm', timestamp=now - timedelta(minutes=5)),
-        TelemetryData(device_id=4, data_type='can', data_key='coolant_temp', data_value='92', unit='°C', timestamp=now - timedelta(minutes=2)),
-        TelemetryData(device_id=4, data_type='can', data_key='fuel_level', data_value='75', unit='%', timestamp=now)
-    ]
-    
-    session.add_all(telemetry)
-    session.commit()
-    print(f"✓ {len(telemetry)} registros de telemetria criados")
-
-def seed_sample_events(session):
-    """Cria eventos de exemplo"""
-    print("\n📝 Criando eventos de exemplo...")
-    
-    now = datetime.now()
     events = [
-        EventLog(event_type='system', source='database', target=None, action='seed_applied', user_id=1, status='success', timestamp=now - timedelta(hours=2)),
-        EventLog(event_type='device', source='gateway', target='esp32-relay-001', action='connected', user_id=None, status='success', timestamp=now - timedelta(hours=1)),
-        EventLog(event_type='user', source='config-app', target=None, action='login', user_id=1, status='success', timestamp=now - timedelta(minutes=30)),
-        EventLog(event_type='relay', source='esp32-relay-001', target='channel_1', action='toggle_on', user_id=2, status='success', timestamp=now - timedelta(minutes=10))
+        EventLog(
+            event_type='system',
+            source='database',
+            target=None,
+            action='seed_applied',
+            user_id=1,
+            status='success',
+            timestamp=datetime.now(),
+            metadata={'version': '1.0.0', 'seed': 'development'}
+        ),
+        EventLog(
+            event_type='system',
+            source='database',
+            target=None,
+            action='initialization',
+            user_id=1,
+            status='success',
+            timestamp=datetime.now(),
+            metadata={'message': 'Sistema inicializado com seed de desenvolvimento'}
+        )
     ]
     
     session.add_all(events)
@@ -542,9 +948,9 @@ def seed_sample_events(session):
     print(f"✓ {len(events)} eventos criados")
 
 def main():
-    """Executa o seed completo"""
+    """Executa o seed de desenvolvimento"""
     print("\n" + "=" * 50)
-    print("🌱 SEED DE DESENVOLVIMENTO - AUTOCORE")
+    print("🌱 SEED DESENVOLVIMENTO - AUTOCORE")
     print("=" * 50)
     
     session = Session()
@@ -556,17 +962,35 @@ def main():
         # Aplicar seeds na ordem correta
         seed_users(session)
         seed_devices(session)
-        seed_relay_boards_and_channels(session)
+        seed_relay_boards(session)
+        seed_relay_channels(session)
+        seed_screens(session)
+        seed_screen_items(session)
         seed_themes(session)
-        seed_screens_and_items(session)
         seed_can_signals(session)
         seed_macros(session)
-        seed_sample_telemetry(session)
-        seed_sample_events(session)
+        seed_initial_events(session)
         
         print("\n" + "=" * 50)
-        print("✅ SEED APLICADO COM SUCESSO!")
+        print("✅ SEED DE DESENVOLVIMENTO APLICADO COM SUCESSO!")
         print("=" * 50)
+        
+        print("\n📊 Resumo dos dados carregados:")
+        print("   • 3 Usuários (admin, lee, operador)")
+        print("   • 6 Dispositivos ESP32")
+        print("   • 2 Placas de relé (32 canais total)")
+        print("   • 5 Telas configuradas")
+        print("   • 14 Itens de tela")
+        print("   • 2 Temas (Dark Offroad e Light)")
+        print("   • 14 Sinais CAN FuelTech")
+        print("   • 7 Macros de automação")
+        print("   • 2 Eventos de sistema")
+        
+        print("\n💡 Observações:")
+        print("   • Todos os dados foram importados do backup real")
+        print("   • Senhas dos usuários mantidas do backup")
+        print("   • Dispositivos com configurações originais")
+        print("   • Macros prontas para uso")
         
     except Exception as e:
         session.rollback()

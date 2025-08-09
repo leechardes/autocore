@@ -52,6 +52,12 @@ const MQTTMonitorPage = () => {
   const [togglingChannel, setTogglingChannel] = useState(null);
   const [heartbeatIntervals, setHeartbeatIntervals] = useState({});
   
+  // Ref para manter selectedBoard acessível no WebSocket
+  const selectedBoardRef = useRef(null);
+  useEffect(() => {
+    selectedBoardRef.current = selectedBoard;
+  }, [selectedBoard]);
+  
   // Quick templates
   const templates = {
     deviceAnnounce: {
@@ -123,6 +129,28 @@ const MQTTMonitorPage = () => {
     }
   }, [messages, isPaused]);
   
+  // Limpeza automática de mensagens antigas para evitar problemas de memória
+  useEffect(() => {
+    const cleanupInterval = setInterval(() => {
+      setMessages(prev => {
+        if (prev.length > 500) {
+          console.log('Limpando mensagens antigas, mantendo últimas 500');
+          return prev.slice(-500);
+        }
+        return prev;
+      });
+      
+      setFilteredMessages(prev => {
+        if (prev.length > 500) {
+          return prev.slice(-500);
+        }
+        return prev;
+      });
+    }, 60000); // Limpar apenas a cada 60 segundos
+    
+    return () => clearInterval(cleanupInterval);
+  }, []);
+  
   useEffect(() => {
     // Aplicar filtros
     let filtered = [...messages];
@@ -193,8 +221,23 @@ const MQTTMonitorPage = () => {
       try {
         const data = JSON.parse(event.data);
         
-        // Debug - ver mensagem recebida
-        console.log('WebSocket message received:', data);
+        // Debug - ver mensagem recebida (comentar em produção)
+        // console.log('WebSocket message received:', data);
+        
+        // Debug detalhado para mensagens MQTT (remover depois que estiver funcionando)
+        // if (data.type === 'mqtt_message' && data.data) {
+        //   const msgData = data.data;
+        //   console.log('📨 MENSAGEM MQTT RECEBIDA:', {
+        //     topic: msgData.topic,
+        //     message_type: msgData.message_type,
+        //     payload: msgData.payload
+        //   });
+        //   
+        //   // Verificar se é relacionado a relés
+        //   if (msgData.topic && (msgData.topic.includes('relay') || msgData.message_type === 'relay_state')) {
+        //     console.log('🔍 É MENSAGEM DE RELÉ!');
+        //   }
+        // }
         
         if (data.type === 'mqtt_status') {
           setConnected(data.data.status === 'connected');
@@ -212,15 +255,34 @@ const MQTTMonitorPage = () => {
             qos: msg.qos !== undefined ? msg.qos : 0
           };
           
-          setMessages(prev => [...prev.slice(-500), processedMsg]); // Manter últimas 500 mensagens
+          setMessages(prev => {
+            // Manter últimas 500 mensagens para não sobrecarregar o DOM
+            const newMessages = [...prev.slice(-499), processedMsg]; // Manter máximo 500
+            return newMessages;
+          });
           
           // Atualizar stats
-          setStats(prev => ({
-            total: prev.total + 1,
-            received: processedMsg.direction === 'received' ? prev.received + 1 : prev.received,
-            sent: processedMsg.direction === 'sent' ? prev.sent + 1 : prev.sent,
-            devices: processedMsg.device_uuid ? new Set([...prev.devices, processedMsg.device_uuid]) : prev.devices
-          }));
+          setStats(prev => {
+            const newDevices = new Set(prev.devices);
+            if (processedMsg.device_uuid) {
+              newDevices.add(processedMsg.device_uuid);
+            }
+            
+            // Limitar número de dispositivos para evitar crescimento infinito
+            if (newDevices.size > 20) {
+              newDevices.clear();
+              if (processedMsg.device_uuid) {
+                newDevices.add(processedMsg.device_uuid);
+              }
+            }
+            
+            return {
+              total: prev.total + 1,
+              received: processedMsg.direction === 'received' ? prev.received + 1 : prev.received,
+              sent: processedMsg.direction === 'sent' ? prev.sent + 1 : prev.sent,
+              devices: newDevices
+            };
+          });
           
           // Atualizar estado dos canais se for mensagem de estado de relé
           if (processedMsg.message_type === 'relay_state' && processedMsg.topic.includes('/relays/state')) {
@@ -229,7 +291,9 @@ const MQTTMonitorPage = () => {
                 ? JSON.parse(processedMsg.payload) 
                 : processedMsg.payload;
               
-              if (payloadData.channels && payloadData.board_id === selectedBoard) {
+              const currentSelectedBoard = selectedBoardRef.current;
+              
+              if (payloadData.channels && payloadData.board_id === currentSelectedBoard) {
                 // Atualizar estado dos canais com base na mensagem MQTT
                 setBoardChannels(prevChannels => 
                   prevChannels.map(channel => ({
@@ -237,7 +301,7 @@ const MQTTMonitorPage = () => {
                     simulated_state: payloadData.channels[channel.channel_number.toString()] || false
                   }))
                 );
-                console.log('Estado dos canais atualizado via MQTT:', payloadData.channels);
+                console.log('✅ Estado dos canais atualizado via MQTT para board:', currentSelectedBoard);
               }
             } catch (e) {
               console.error('Erro atualizando estado dos canais:', e);
@@ -645,10 +709,12 @@ ${payload}
             {stats.total} mensagens
           </Badge>
           
-          <Badge variant="outline" className="gap-1">
-            <Radio className="h-3 w-3" />
-            {uniqueDevices.length} dispositivos
-          </Badge>
+          {uniqueDevices.length > 0 && (
+            <Badge variant="outline" className="gap-1">
+              <Radio className="h-3 w-3" />
+              {uniqueDevices.length} ESP32
+            </Badge>
+          )}
         </div>
       </div>
       

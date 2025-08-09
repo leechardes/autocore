@@ -1,8 +1,21 @@
-# AutoCore - App Flutter
+# 📱 AutoCore Flutter - Interface de Execução
 
-## 📱 Visão Geral
+## ⚠️ ESCOPO: Execução com Segurança Crítica
 
-Aplicativo móvel de controle veicular desenvolvido em Flutter com **interface 100% dinâmica configurada via JSON**. Não há telas hardcoded - toda a interface é construída dinamicamente a partir de arquivos de configuração, permitindo total customização sem necessidade de recompilação.
+Interface móvel para **controle e execução** de comandos veiculares. Carrega configurações do backend e permite apenas **visualização e execução** de comandos.
+
+### 🎯 O que o App FAZ:
+- ✅ **EXECUTA** macros e comandos via HTTP/MQTT
+- ✅ **VISUALIZA** estados em tempo real
+- ✅ **HEARTBEAT** obrigatório para botões momentâneos
+- ✅ **CACHEIA** configurações para uso offline
+
+### ❌ O que o App NÃO FAZ:
+- ❌ **NÃO** configura dispositivos, telas ou macros
+- ❌ **NÃO** possui editores ou CRUD
+- ❌ **NÃO** gerencia usuários
+
+> **Toda configuração é feita via AutoCore Config-App web**
 
 ## 🎨 Design System
 
@@ -126,62 +139,78 @@ dependencies:
 └─────────────────────────────────────┘
 ```
 
-## 🎯 Funcionalidades Principais
+## 🔒 Sistema de Segurança - Heartbeat
 
-### 1. Dashboard
-- Visualização do status do veículo
-- Indicador de bateria em tempo real
-- Grid de categorias de controle
-- Ações rápidas configuráveis
+### Botões Momentâneos (CRÍTICO)
+Botões como **buzina**, **guincho**, **partida** e **lampejo** DEVEM usar heartbeat:
 
-### 2. Controle de Iluminação
-- Faróis (alto/baixo)
-- LEDs auxiliares
-- Luzes de neblina
-- Strobo e emergência
-
-### 3. Controle do Guincho
-- Operação momentânea (recolher/soltar)
-- Indicador de status
-- Proteção com confirmação
-
-### 4. Controle de Tração
-- Modos: 4x2, 4x4 High, 4x4 Low
-- Bloqueio de diferenciais
-- Seleção exclusiva
-
-### 5. Controles Auxiliares
-- Buzina (momentâneo)
-- Tomada 12V
-- Compressor de ar
-- Rádio VHF
-- Climatizador
-- Som externo
-
-## 🔄 Comunicação MQTT
-
-### Tópicos Principais
 ```dart
-// Publicação
-autocore/devices/{deviceId}/command
-autocore/relays/{relayId}/set
-
-// Assinatura
-autocore/devices/+/status
-autocore/relays/+/state
-autocore/can/data
-autocore/config/update
+// Heartbeat a cada 500ms enquanto pressionado
+HeartbeatService.startMomentary(deviceId, channel); // onPressed
+HeartbeatService.stopMomentary(deviceId, channel);  // onReleased
 ```
 
-### Exemplo de Payload
-```json
-{
-  "device_id": "app_mobile_001",
-  "command": "relay_toggle",
-  "target": "relay_1",
-  "value": true,
-  "timestamp": "2024-01-01T12:00:00Z"
-}
+**Parâmetros de Segurança:**
+- **Intervalo**: 500ms entre heartbeats
+- **Timeout**: 1s sem heartbeat = desligamento automático
+- **Auto-release**: Ao minimizar app ou perder foco
+- **Safety shutoff**: ESP32 desliga relé automaticamente
+
+## 🎯 Funcionalidades Principais
+
+### 1. Dashboard Principal
+- **Vehicle Info** (opcional): Status, tração, bateria
+- **4 Botões de Navegação**: Screens dinâmicas do backend
+- **Quick Actions**: Macros configuradas (Camping, Emergência, etc)
+- **Botão de Emergência**: FAB vermelho para parada total
+
+### 2. Screens Dinâmicas
+Cada screen pode ter:
+- **Switches**: Liga/desliga (Farol Alto, Diferencial)
+- **Tiles**: Botões de ação (Neblina, Strobo)
+- **Momentâneos**: Com heartbeat (Buzina, Guincho)
+- **Seleção de Modos**: Exclusivos (4x2, 4x4 High, 4x4 Low)
+
+### 3. Execução de Comandos
+- **Macros**: `POST /api/macros/{id}/execute`
+- **Botões**: Via MQTT ou HTTP
+- **Momentâneos**: Via MQTT com heartbeat
+- **Feedback**: Háptico e visual
+
+## 🔄 Comunicação
+
+### Carregamento de Configuração
+```dart
+GET /api/config
+// Retorna screens, items, macros
+```
+
+### Execução de Macros
+```dart
+POST /api/macros/{id}/execute
+```
+
+### Heartbeat (Momentâneos)
+```dart
+// Comando inicial
+mqtt.publish('autocore/devices/{uuid}/relays/set', {
+  "channel": 5,
+  "state": true,
+  "momentary": true
+});
+
+// Heartbeat a cada 500ms
+mqtt.publish('autocore/devices/{uuid}/relays/heartbeat', {
+  "channel": 5,
+  "sequence": 1
+});
+```
+
+### Estados via MQTT
+```dart
+// Subscribe para receber estados
+autocore/telemetry/+/status
+autocore/telemetry/+/safety  // Safety shutoff events
 ```
 
 ## 🎨 Componentes Reutilizáveis
@@ -218,15 +247,30 @@ StatusIndicator(
 )
 ```
 
-## 📱 Telas Implementadas
+## 📱 Estrutura de Telas
 
-1. **SplashScreen** - Tela inicial com logo
-2. **DashboardScreen** - Painel principal
-3. **LightingScreen** - Controles de iluminação
-4. **WinchScreen** - Controle do guincho
-5. **TractionScreen** - Modos de tração
-6. **AuxiliaryScreen** - Controles auxiliares
-7. **SettingsScreen** - Configurações
+### Tela Principal (Dashboard)
+```dart
+DynamicDashboard(
+  vehicleInfo: VehicleInfo(),      // Opcional
+  navigationButtons: [...]         // 4 screens dinâmicas
+  quickActions: [...]              // Macros horizontais
+  emergencyButton: true            // FAB vermelho
+)
+```
+
+### Screens Dinâmicas
+```dart
+DynamicScreen(
+  config: screenConfig,           // Do backend
+  items: [
+    SwitchControl(),              // Liga/desliga
+    ControlTile(),                // Botões de ação
+    MomentaryButton(),            // Com heartbeat!
+    ModeSelector()                // Seleção exclusiva
+  ]
+)
+```
 
 ## 🧪 Testes
 
@@ -255,9 +299,9 @@ flutter build ios --release
 flutter build ipa
 ```
 
-## 📝 Configuração Dinâmica
+## 📝 Interface Dinâmica
 
-O app lê configurações do servidor via MQTT:
+O app carrega configurações do backend para exibir:
 ```json
 {
   "screens": [
@@ -268,18 +312,27 @@ O app lê configurações do servidor via MQTT:
       "items": [...]
     }
   ],
-  "theme": {
-    "primary_color": "#007AFF",
-    "secondary_color": "#32D74B"
-  }
+  "macros": [
+    {
+      "id": 1,
+      "name": "Modo Trilha",
+      "description": "Ativa configuração para off-road"
+    }
+  ]
 }
 ```
 
 ## 🔐 Segurança
 
+### Crítico - Heartbeat
+- **Obrigatório** para botões momentâneos
+- **Auto-release** ao perder foco
+- **Safety shutoff** automático no ESP32
+- **Notificação** de eventos de segurança
+
+### Geral
 - Autenticação via PIN/Biometria
 - Confirmação para ações críticas
-- Timeout de sessão configurável
 - Comunicação MQTT com TLS
 
 ## 📊 Monitoramento
@@ -302,4 +355,6 @@ Proprietário - AutoCore © 2024
 
 ---
 
-**AutoCore** - Interface móvel inteligente para controle veicular
+**AutoCore Flutter** - Interface móvel de execução para controle veicular
+
+> **IMPORTANTE**: Interface de execução com segurança crítica. Sistema de heartbeat obrigatório para botões momentâneos. Toda configuração via Config-App web.

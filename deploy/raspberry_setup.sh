@@ -328,8 +328,19 @@ echo "🔍 Gerando relatório de instalação..."
     timeout 2 mosquitto_sub -h localhost -u autocore -P autocore123 -t test -C 1 2>/dev/null && echo "🦟 MQTT: ✅ Conectado" || echo "🦟 MQTT: ❌ Falha na conexão"
     
     # Testar APIs
-    curl -s -o /dev/null -w "🔌 Backend API (porta 5000): %{http_code}\n" http://localhost:5000/health 2>/dev/null || echo "🔌 Backend API: ❌ Não respondendo"
-    curl -s -o /dev/null -w "📱 Frontend (porta 3000): %{http_code}\n" http://localhost:3000 2>/dev/null || echo "📱 Frontend: ❌ Não respondendo"
+    response=$(curl -s -o /dev/null -w "%{http_code}" --max-time 2 http://localhost:8081/health 2>/dev/null || echo "000")
+    if [ "$response" = "200" ]; then
+        echo "🔌 Backend API (porta 8081): ✅ OK"
+    else
+        echo "🔌 Backend API (porta 8081): ❌ Não respondendo (código: $response)"
+    fi
+    
+    response=$(curl -s -o /dev/null -w "%{http_code}" --max-time 2 http://localhost:8080 2>/dev/null || echo "000")
+    if [ "$response" = "200" ] || [ "$response" = "304" ]; then
+        echo "📱 Frontend (porta 8080): ✅ OK"
+    else
+        echo "📱 Frontend (porta 8080): ❌ Não respondendo (código: $response)"
+    fi
     
     echo ""
     echo "=========================================="
@@ -340,14 +351,14 @@ echo "🔍 Gerando relatório de instalação..."
     ip -br addr show | grep UP
     echo ""
     echo "🔗 Portas abertas:"
-    sudo netstat -tlnp | grep -E ':(1883|3000|5000)' | awk '{print "  "$4" - "$7}'
+    sudo netstat -tlnp 2>/dev/null | grep -E ':(1883|8080|8081)' | awk '{print "  "$4" - "$7}' || echo "  Erro ao listar portas"
     echo ""
     echo "=========================================="
     echo "     LOGS DE ERROS RECENTES"
     echo "=========================================="
     echo ""
     echo "⚠️ Últimos erros do sistema (se houver):"
-    sudo journalctl -p err -n 10 --no-pager | head -20
+    sudo journalctl -p err -n 10 --no-pager 2>/dev/null | head -20 2>/dev/null || echo "Nenhum erro encontrado"
     echo ""
     echo "=========================================="
     echo "     INFORMAÇÕES DO SISTEMA"

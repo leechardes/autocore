@@ -57,10 +57,17 @@ def init_db(reset, seeds, verbose):
     
     # Aplicar seeds usando ORM
     if seeds:
-        click.echo("\n🌱 Aplicando seeds de desenvolvimento com ORM...")
+        click.echo("\n🌱 Aplicando seeds com ORM...")
         try:
-            # Importar e executar seed ORM
-            from seeds.seed_development import main as seed_main
+            # Detectar ambiente - usar seed específico para Raspberry Pi
+            import platform
+            if 'raspberry' in platform.node().lower() or 'pi' in platform.node().lower():
+                click.echo("🍓 Detectado Raspberry Pi - usando seed mínimo")
+                from seeds.seed_raspberry_pi import main as seed_main
+            else:
+                click.echo("💻 Ambiente de desenvolvimento - usando seed completo")
+                from seeds.seed_development import main as seed_main
+            
             seed_main()
             click.echo(click.style("✓ Seeds aplicados com sucesso", fg='green'))
         except Exception as e:

@@ -3,6 +3,10 @@
 # Script avançado para descobrir automaticamente o IP do Raspberry Pi na rede
 # Usa múltiplos métodos: mDNS, ARP scan, nmap, SSH probe e mais
 
+# Diretório do projeto
+PROJECT_DIR="$(dirname "$(dirname "$(realpath "$0")")")"
+IP_FILE="${PROJECT_DIR}/deploy/.last_raspberry_ip"
+
 # Cores para output
 RED='\033[0;31m'
 GREEN='\033[0;32m'
@@ -77,8 +81,8 @@ echo -e "   Redes a verificar: ${YELLOW}$LOCAL_NETWORKS${NC}"
 echo ""
 
 # Método 0: Verificar IP conhecido primeiro
-if [ -f .last_raspberry_ip ]; then
-    LAST_IP=$(cat .last_raspberry_ip)
+if [ -f "$IP_FILE" ]; then
+    LAST_IP=$(cat "$IP_FILE")
     echo -e "${BLUE}📡 Método 0: Verificando último IP conhecido ($LAST_IP)...${NC}"
     if verify_autocore "$LAST_IP"; then
         echo -e "   ${GREEN}✅ AutoCore encontrado no IP conhecido!${NC}"
@@ -241,8 +245,8 @@ if [ ${#UNIQUE_IPS[@]} -eq 0 ]; then
     
     # Se usuário não digitou nada, usar IP padrão conhecido
     if [ -z "$RASPBERRY_IP" ]; then
-        if [ -f .last_raspberry_ip ]; then
-            RASPBERRY_IP=$(cat .last_raspberry_ip)
+        if [ -f "$IP_FILE" ]; then
+            RASPBERRY_IP=$(cat "$IP_FILE")
             echo -e "${YELLOW}⚡ Usando último IP conhecido: $RASPBERRY_IP${NC}"
         else
             RASPBERRY_IP="10.0.10.119"
@@ -303,8 +307,8 @@ if ping -c 2 -W 3 $RASPBERRY_IP &> /dev/null; then
     echo ""
     
     # Salvar IP descoberto
-    echo "$RASPBERRY_IP" > .last_raspberry_ip
-    echo -e "${GREEN}💾 IP salvo em .last_raspberry_ip${NC}"
+    echo "$RASPBERRY_IP" > "$IP_FILE"
+    echo -e "${GREEN}💾 IP salvo${NC}"
     
     # Exportar variável
     export RASPBERRY_IP

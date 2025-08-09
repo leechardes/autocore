@@ -2,24 +2,294 @@
 
 ## 🎯 Visão Geral
 
-Este documento detalha a integração completa entre o app Flutter e o backend do AutoCore, incluindo mapeamento de modelos, comunicação MQTT, sincronização de dados e cache offline. A arquitetura garante operação robusta tanto online quanto offline.
+Este documento detalha a integração entre o app Flutter **execution-only** e o backend do AutoCore, incluindo mapeamento de modelos (read-only), comunicação MQTT para execução e estados, sistema de heartbeat para botões momentâneos, e cache offline. O app Flutter **NÃO** faz configuração ou edição - apenas executa comandos e recebe estados.
 
-### Arquitetura de Comunicação
+### Arquitetura de Comunicação (Execution-Only)
 
 ```
-┌─────────────────┐    MQTT     ┌─────────────────┐    HTTP/WS    ┌─────────────────┐
+┌─────────────────┐    MQTT     ┌─────────────────┐    HTTP GET   ┌─────────────────┐
 │                 │ ◄─────────► │                 │ ◄───────────► │                 │
-│  Flutter App    │             │  MQTT Broker    │               │  Backend API    │
-│                 │             │  (Mosquitto)    │               │  (FastAPI)      │
+│  Flutter App    │  Heartbeat  │  MQTT Broker    │               │  Backend API    │
+│ (Execution Only)│   500ms     │  (Mosquitto)    │               │  (FastAPI)      │
 └─────────────────┘             └─────────────────┘               └─────────────────┘
          │                               │                                 │
          │                               │                                 │
          ▼                               ▼                                 ▼
 ┌─────────────────┐             ┌─────────────────┐               ┌─────────────────┐
-│  Local Storage  │             │  Message Queue  │               │   Database      │
-│  (Hive/SQLite)  │             │   (Redis)       │               │  (SQLite)       │
+│  Local Cache    │             │  Message Queue  │               │   Database      │
+│  (Read-Only)    │             │   (Redis)       │               │  (Read-Only)    │
 └─────────────────┘             └─────────────────┘               └─────────────────┘
 ```
+
+**Responsabilidades do Flutter App**:
+- ✅ **EXECUTA** comandos via MQTT (relés, macros)
+- ✅ **RECEBE** estados via MQTT (read-only)
+- ✅ **ENVIA** heartbeats para botões momentâneos
+- ✅ **CACHEIA** configurações para offline
+- ❌ **NÃO** cria, edita ou deleta configurações
+- ❌ **NÃO** faz CRUD operations
+
+---
+
+## 🎯 SISTEMA DE HEARTBEAT PARA BOTÕES MOMENTÂNEOS
+
+### Conceito e Importância
+
+Botões momentâneos (buzina, guincho, lampejo) devem permanecer ativos apenas enquanto pressionados. O sistema de heartbeat garante segurança, desligando automaticamente em caso de:
+- Perda de conexão de rede
+- Travamento do aplicativo  
+- Fechamento inesperado do app
+- Falha no cliente MQTT
+
+### Implementação no Flutter
+
+```dart
+class HeartbeatService {
+  static const Duration HEARTBEAT_INTERVAL = Duration(milliseconds: 500);
+  static const int TIMEOUT_MS = 1000; // ESP32 desliga após 1s sem heartbeat
+  
+  final Map<int, Timer?> _activeHeartbeats = {};
+  final MqttService _mqtt;
+  String? _deviceUuid;
+  
+  HeartbeatService(this._mqtt);
+  
+  /// Inicia heartbeat para botão momentâneo
+  void startHeartbeat(int channel, String deviceUuid) {
+    _deviceUuid = deviceUuid;
+    
+    // Envia comando inicial de ON
+    _mqtt.publish(
+      'autocore/devices/$deviceUuid/relays/set',
+      jsonEncode({
+        'channel': channel,
+        'state': true,
+        'function_type': 'momentary',
+        'momentary': true,
+        'timestamp': DateTime.now().toIso8601String(),
+      }),
+    );
+    
+    // Inicia timer de heartbeat
+    int sequence = 0;
+    _activeHeartbeats[channel] = Timer.periodic(
+      HEARTBEAT_INTERVAL,
+      (_) {
+        sequence++;
+        _mqtt.publish(
+          'autocore/devices/$deviceUuid/relays/heartbeat',
+          jsonEncode({
+            'channel': channel,
+            'sequence': sequence,
+            'timestamp': DateTime.now().toIso8601String(),
+          }),
+        );
+        AppLogger.debug('Heartbeat sent: ch$channel seq$sequence');
+      },
+    );
+    
+    AppLogger.info('Heartbeat started for channel $channel');
+  }
+  
+  /// Para heartbeat e envia comando OFF
+  void stopHeartbeat(int channel) {
+    // Cancela timer
+    _activeHeartbeats[channel]?.cancel();
+    _activeHeartbeats.remove(channel);
+    
+    // Envia comando OFF
+    if (_deviceUuid != null) {
+      _mqtt.publish(
+        'autocore/devices/$_deviceUuid/relays/set',
+        jsonEncode({
+          'channel': channel,
+          'state': false,
+          'function_type': 'momentary',
+          'timestamp': DateTime.now().toIso8601String(),
+        }),
+      );
+    }
+    
+    AppLogger.info('Heartbeat stopped for channel $channel');
+  }
+  
+  /// Para todos os heartbeats (cleanup)
+  void stopAll() {
+    for (final channel in _activeHeartbeats.keys.toList()) {
+      stopHeartbeat(channel);
+    }
+  }
+  
+  /// Verifica se heartbeat está ativo
+  bool isActive(int channel) => _activeHeartbeats.containsKey(channel);
+}
+```
+
+### Widget de Botão Momentâneo
+
+```dart
+class MomentaryButton extends StatefulWidget {
+  final int channel;
+  final String deviceUuid;
+  final String label;
+  final IconData icon;
+  final VoidCallback? onStateChanged;
+  
+  const MomentaryButton({
+    Key? key,
+    required this.channel,
+    required this.deviceUuid,
+    required this.label,
+    required this.icon,
+    this.onStateChanged,
+  }) : super(key: key);
+  
+  @override
+  State<MomentaryButton> createState() => _MomentaryButtonState();
+}
+
+class _MomentaryButtonState extends State<MomentaryButton> {
+  final HeartbeatService _heartbeat = GetIt.I<HeartbeatService>();
+  bool _isPressed = false;
+  
+  void _onPressStart() {
+    setState(() => _isPressed = true);
+    _heartbeat.startHeartbeat(widget.channel, widget.deviceUuid);
+    HapticFeedback.lightImpact();
+    widget.onStateChanged?.call();
+  }
+  
+  void _onPressEnd() {
+    setState(() => _isPressed = false);
+    _heartbeat.stopHeartbeat(widget.channel);
+    HapticFeedback.lightImpact();
+    widget.onStateChanged?.call();
+  }
+  
+  @override
+  Widget build(BuildContext context) {
+    final theme = context.acTheme;
+    
+    return GestureDetector(
+      // Mouse events (desktop)
+      onTapDown: (_) => _onPressStart(),
+      onTapUp: (_) => _onPressEnd(),
+      onTapCancel: () => _onPressEnd(),
+      
+      // Touch events (mobile)
+      onLongPressStart: (_) => _onPressStart(),
+      onLongPressEnd: (_) => _onPressEnd(),
+      
+      child: AnimatedContainer(
+        duration: Duration(milliseconds: 100),
+        decoration: BoxDecoration(
+          color: _isPressed 
+            ? theme.successColor
+            : theme.surfaceColor,
+          borderRadius: BorderRadius.circular(theme.borderRadiusMedium),
+          boxShadow: _isPressed
+            ? theme.depressedShadow
+            : theme.elevatedShadow,
+        ),
+        padding: EdgeInsets.all(theme.spacingMd),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(
+              widget.icon,
+              color: _isPressed ? Colors.white : theme.textPrimary,
+              size: 32,
+            ),
+            SizedBox(height: theme.spacingXs),
+            Text(
+              widget.label,
+              style: TextStyle(
+                color: _isPressed ? Colors.white : theme.textPrimary,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+            if (_isPressed) ...[
+              SizedBox(height: theme.spacingXs),
+              Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Container(
+                    width: 8,
+                    height: 8,
+                    decoration: BoxDecoration(
+                      color: Colors.red,
+                      shape: BoxShape.circle,
+                    ),
+                  ),
+                  SizedBox(width: 4),
+                  Text(
+                    'ATIVO',
+                    style: TextStyle(
+                      color: Colors.white,
+                      fontSize: 10,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                ],
+              ),
+            ],
+          ],
+        ),
+      ),
+    );
+  }
+  
+  @override
+  void dispose() {
+    // Garante que heartbeat seja parado se widget for destruído
+    if (_isPressed) {
+      _heartbeat.stopHeartbeat(widget.channel);
+    }
+    super.dispose();
+  }
+}
+```
+
+### Tópicos MQTT para Heartbeat
+
+```
+# Comando inicial/final
+autocore/devices/{uuid}/relays/set
+{
+  "channel": 1,
+  "state": true/false,
+  "function_type": "momentary",
+  "momentary": true,
+  "timestamp": "2025-01-09T10:30:00Z"
+}
+
+# Heartbeat contínuo (cada 500ms)
+autocore/devices/{uuid}/relays/heartbeat
+{
+  "channel": 1,
+  "sequence": 42,
+  "timestamp": "2025-01-09T10:30:00.500Z"
+}
+
+# Evento de safety shutoff (do ESP32)
+autocore/telemetry/{uuid}/safety
+{
+  "event": "safety_shutoff",
+  "channel": 1,
+  "reason": "heartbeat_timeout",
+  "timeout_ms": 1000,
+  "last_heartbeat": "2025-01-09T10:30:00.500Z"
+}
+```
+
+### Parâmetros de Segurança
+
+| Parâmetro | Valor | Descrição |
+|-----------|-------|-----------|
+| `HEARTBEAT_INTERVAL` | 500ms | Frequência de envio do heartbeat |
+| `HEARTBEAT_TIMEOUT` | 1000ms | Tempo máximo sem heartbeat antes do ESP32 desligar |
+| `RETRY_COUNT` | 3 | Tentativas antes de considerar falha |
+| `HAPTIC_FEEDBACK` | true | Vibração ao pressionar/soltar |
 
 ---
 
@@ -114,27 +384,8 @@ class DeviceModel with _$DeviceModel {
     );
   }
   
-  Map<String, dynamic> toBackend() {
-    return {
-      'id': id,
-      'uuid': uuid,
-      'name': name,
-      'type': type.value,
-      'mac_address': macAddress,
-      'ip_address': ipAddress,
-      'firmware_version': firmwareVersion,
-      'hardware_version': hardwareVersion,
-      'status': status.value,
-      'last_seen': lastSeen?.toIso8601String(),
-      'configuration_json': configuration != null 
-          ? jsonEncode(configuration) 
-          : null,
-      'capabilities_json': capabilities != null 
-          ? jsonEncode(capabilities) 
-          : null,
-      'is_active': isActive,
-    };
-  }
+  // toBackend() removido - Flutter app é read-only
+  // Toda configuração é feita no Config-App web
 }
 
 enum DeviceType {
@@ -1208,51 +1459,12 @@ class BaseRepositoryImpl<T, ID> implements BaseRepository<T, ID> {
     }
   }
   
-  @override
-  Future<T> create(T item) async {
-    try {
-      final response = await _apiClient.post(
-        '/api/$_entityName',
-        data: _toJson(item),
-      );
-      
-      final createdItem = _fromJson(response.data);
-      
-      // Atualizar cache
-      await cacheItem(createdItem);
-      
-      return createdItem;
-    } catch (e) {
-      // Se offline, marcar para sync posterior
-      await _markForSync('create', item);
-      throw OfflineException('Item será criado quando conexão for restaurada');
-    }
-  }
+  // CREATE removido - Flutter app é read-only
+  // UPDATE removido - Flutter app é read-only  
+  // DELETE removido - Flutter app é read-only
+  // Toda configuração é feita no Config-App web
   
-  @override
-  Future<T> update(T item) async {
-    try {
-      final response = await _apiClient.put(
-        '/api/$_entityName/${_getId(item)}',
-        data: _toJson(item),
-      );
-      
-      final updatedItem = _fromJson(response.data);
-      
-      // Atualizar cache
-      await cacheItem(updatedItem);
-      
-      return updatedItem;
-    } catch (e) {
-      // Se offline, marcar para sync posterior
-      await _markForSync('update', item);
-      
-      // Atualizar cache local
-      await cacheItem(item);
-      
-      return item;
-    }
-  }
+  // Apenas operações de LEITURA e EXECUÇÃO são permitidas
   
   Future<void> _markForSync(String operation, T item) async {
     final pendingOps = await _localStorage.getList('pending_operations') ?? [];

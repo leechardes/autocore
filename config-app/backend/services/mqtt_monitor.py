@@ -185,7 +185,10 @@ class MQTTMonitor:
         
         parts = topic.split('/')
         if len(parts) >= 2 and parts[0] == 'autocore':
+            # Só considerar device_uuid se for realmente um dispositivo ESP32
             if parts[1] == 'devices' and len(parts) >= 4:
+                # Formato: autocore/devices/{uuid}/...
+                # Este é um dispositivo real (ESP32)
                 device_uuid = parts[2]
                 # Tratar casos especiais de relés
                 if parts[3] == 'relays':
@@ -201,11 +204,11 @@ class MQTTMonitor:
                     message_type = parts[3]
             elif parts[1] == 'relay' and len(parts) >= 4:
                 # autocore/relay/{id}/command ou status
-                device_uuid = parts[2]  # ID do relé
+                # NÃO definir device_uuid para relés (não são dispositivos)
                 message_type = f'relay_{parts[3]}'  # relay_command ou relay_status
             elif parts[1] == 'macro' and len(parts) >= 4:
                 # autocore/macro/{id}/status
-                device_uuid = parts[2]  # ID da macro
+                # NÃO definir device_uuid para macros
                 message_type = 'macro_status'
             elif parts[1] == 'state':
                 # autocore/state/save ou restore
@@ -213,13 +216,14 @@ class MQTTMonitor:
             elif parts[1] == 'modes':
                 # autocore/modes/{mode}
                 message_type = 'mode_change'
-                device_uuid = parts[2] if len(parts) > 2 else None
+                # NÃO definir device_uuid para modos
             elif parts[1] == 'system':
                 # autocore/system/{command}
                 message_type = 'system_command'
-                device_uuid = parts[2] if len(parts) > 2 else None
+                # NÃO definir device_uuid para comandos do sistema
             elif parts[1] == 'discovery':
                 message_type = 'discovery'
+                # Discovery pode ter device_uuid real
                 if len(parts) > 2:
                     device_uuid = parts[2]
             elif parts[1] == 'gateway':
@@ -240,7 +244,9 @@ class MQTTMonitor:
         
         # Limitar tamanho do histórico
         if len(self.message_history) > self.max_history:
-            self.message_history = self.message_history[-self.max_history:]
+            # Manter apenas últimas 900 mensagens quando atingir 1000
+            self.message_history = self.message_history[-900:]
+            logger.debug(f"Histórico limpo, mantendo últimas 900 de {self.max_history}")
             
     async def _broadcast_message(self, message: MQTTMessage):
         """Envia mensagem para todos os WebSockets conectados"""
@@ -347,10 +353,18 @@ class MQTTMonitor:
         
         try:
             while websocket in self.websockets:
+                current_length = len(self.message_history)
+                
+                # Verificar se o histórico foi limpo (índice ficou maior que o tamanho)
+                if last_index > current_length:
+                    # Reset do índice - pegar apenas novas mensagens a partir de agora
+                    logger.debug(f"Histórico foi limpo, resetando índice de {last_index} para {current_length}")
+                    last_index = current_length
+                
                 # Verificar se há novas mensagens
-                if len(self.message_history) > last_index:
+                if current_length > last_index:
                     new_messages = self.message_history[last_index:]
-                    last_index = len(self.message_history)
+                    last_index = current_length
                     
                     # Enviar novas mensagens
                     for msg in new_messages:

@@ -165,6 +165,15 @@ async def root():
         "timestamp": datetime.now()
     }
 
+@app.get("/api/health", tags=["System"])
+async def health_check():
+    """Health check endpoint para teste de conexão"""
+    return {
+        "status": "healthy",
+        "service": "AutoCore Config API",
+        "timestamp": datetime.now().isoformat()
+    }
+
 @app.get("/api/status", response_model=StatusResponse, tags=["System"])
 async def get_status():
     """Retorna status do sistema"""

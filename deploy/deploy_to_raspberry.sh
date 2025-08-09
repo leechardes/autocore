@@ -12,6 +12,7 @@ NC='\033[0m'
 
 # Diretório do projeto
 PROJECT_DIR="$(dirname "$(dirname "$(realpath "$0")")")"
+IP_FILE="${PROJECT_DIR}/deploy/.last_raspberry_ip"
 
 echo -e "${BLUE}🚀 Deploy AutoCore para Raspberry Pi${NC}"
 echo "======================================"
@@ -40,8 +41,8 @@ fi
 
 # Se não tem IP ainda, descobrir ou perguntar
 if [ -z "$RASPBERRY_IP" ]; then
-    if [ -f ".last_raspberry_ip" ]; then
-        LAST_IP=$(cat .last_raspberry_ip)
+    if [ -f "$IP_FILE" ]; then
+        LAST_IP=$(cat "$IP_FILE")
         echo -e "${YELLOW}📍 Último IP conhecido: $LAST_IP${NC}"
         read -p "Usar este IP? (S/n): " USE_LAST
         if [ "$USE_LAST" != "n" ] && [ "$USE_LAST" != "N" ]; then
@@ -72,7 +73,7 @@ if [[ ! $RASPBERRY_IP =~ ^[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
 fi
 
 # Salvar IP para próxima vez
-echo "$RASPBERRY_IP" > .last_raspberry_ip
+echo "$RASPBERRY_IP" > "$IP_FILE"
 
 # Se não tem usuário ainda, perguntar
 if [ -z "$RASPBERRY_USER" ]; then

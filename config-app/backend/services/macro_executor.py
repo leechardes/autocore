@@ -102,6 +102,8 @@ class MacroExecutor:
                 await self._execute_mqtt_action(action)
             elif action_type == 'parallel':
                 await self._execute_parallel_actions(macro_id, action, test_mode)
+            elif action_type == 'log':
+                await self._execute_log_action(action)
             else:
                 logger.warning(f"Tipo de ação desconhecido: {action_type}")
     
@@ -192,6 +194,21 @@ class MacroExecutor:
         
         logger.info(f"Enviando MQTT: {topic} -> {payload}")
         self.mqtt_client.publish(topic, payload, qos=qos)
+    
+    async def _execute_log_action(self, action: Dict):
+        """Executa ação de log - apenas registra no logger"""
+        message = action.get('message', 'Log action executada')
+        level = action.get('level', 'info').lower()
+        
+        # Registrar no logger apropriado
+        if level == 'debug':
+            logger.debug(f"[MACRO LOG] {message}")
+        elif level == 'warning' or level == 'warn':
+            logger.warning(f"[MACRO LOG] {message}")
+        elif level == 'error':
+            logger.error(f"[MACRO LOG] {message}")
+        else:
+            logger.info(f"[MACRO LOG] {message}")
     
     async def _execute_parallel_actions(self, macro_id: int, action: Dict, test_mode: bool = False):
         """Executa ações em paralelo"""
