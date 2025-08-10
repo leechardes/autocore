@@ -8,14 +8,23 @@ import logging
 import sys
 from pathlib import Path
 
+# Configurar logger primeiro
+logger = logging.getLogger(__name__)
+
 # Adiciona path para importar do database
-sys.path.append(str(Path(__file__).parent.parent.parent.parent.parent / "database"))
+try:
+    db_path = str(Path(__file__).parent.parent.parent.parent.parent / "database")
+    if db_path not in sys.path:
+        sys.path.append(db_path)
+    logger.info(f"Database path adicionado: {db_path}")
+except Exception as e:
+    logger.error(f"Erro configurando path do database: {e}")
+    print(f"Erro configurando path do database: {e}")  # Fallback para print
 
 from shared.repositories import devices, relays
 from simulators.relay_simulator import simulator_manager
 
 router = APIRouter(prefix="/api/simulators", tags=["simulators"])
-logger = logging.getLogger(__name__)
 
 # ============================================
 # RELAY SIMULATOR ENDPOINTS
@@ -30,40 +39,75 @@ async def list_relay_simulators():
 async def create_relay_simulator(board_id: int):
     """Cria um novo simulador de placa de relé"""
     try:
+        logger.info(f"=== Iniciando criação de simulador para board_id: {board_id} ===")
+        
         # Buscar dados da placa
-        with relays as repo:
-            boards = repo.get_boards()
-            board = next((b for b in boards if b.id == board_id), None)
-            
-            if not board:
-                raise HTTPException(status_code=404, detail="Placa não encontrada")
+        logger.info("Buscando dados da placa...")
+        try:
+            with relays as repo:
+                boards = repo.get_boards()
+                board = next((b for b in boards if b.id == board_id), None)
+                
+                if not board:
+                    logger.error(f"Placa não encontrada: {board_id}")
+                    raise HTTPException(status_code=404, detail="Placa não encontrada")
+                
+                logger.info(f"Placa encontrada: {board.id}, canais: {board.total_channels}")
+        except Exception as e:
+            logger.error(f"Erro ao buscar placa: {e}")
+            import traceback
+            logger.error(traceback.format_exc())
+            raise HTTPException(status_code=500, detail=f"Erro ao buscar placa: {str(e)}")
         
         # Buscar dados do dispositivo
-        with devices as repo:
-            device = repo.get_by_id(board.device_id)
-            if not device:
-                raise HTTPException(status_code=404, detail="Dispositivo não encontrado")
+        logger.info(f"Buscando dispositivo ID: {board.device_id}...")
+        try:
+            with devices as repo:
+                device = repo.get_by_id(board.device_id)
+                if not device:
+                    logger.error(f"Dispositivo não encontrado: {board.device_id}")
+                    raise HTTPException(status_code=404, detail="Dispositivo não encontrado")
+                
+                logger.info(f"Dispositivo encontrado: {device.name} (UUID: {device.uuid})")
+        except Exception as e:
+            logger.error(f"Erro ao buscar dispositivo: {e}")
+            import traceback
+            logger.error(traceback.format_exc())
+            raise HTTPException(status_code=500, detail=f"Erro ao buscar dispositivo: {str(e)}")
         
         # Criar simulador
-        simulator = await simulator_manager.create_simulator(
-            board_id=board.id,
-            device_uuid=device.uuid,
-            total_channels=board.total_channels
-        )
-        
-        if simulator:
-            return {
-                "message": "Simulador criado com sucesso",
-                "board_id": board.id,
-                "device_uuid": device.uuid,
-                "status": simulator.get_status()
-            }
-        else:
-            raise HTTPException(status_code=500, detail="Erro criando simulador")
+        logger.info(f"Criando simulador...")
+        try:
+            simulator = await simulator_manager.create_simulator(
+                board_id=board.id,
+                device_uuid=device.uuid,
+                total_channels=board.total_channels
+            )
             
+            if simulator:
+                logger.info(f"✅ Simulador criado com sucesso!")
+                return {
+                    "message": "Simulador criado com sucesso",
+                    "board_id": board.id,
+                    "device_uuid": device.uuid,
+                    "status": simulator.get_status()
+                }
+            else:
+                logger.error("Simulador retornou None - possivelmente falha na conexão MQTT")
+                raise HTTPException(status_code=500, detail="Erro criando simulador - verifique se o MQTT está rodando")
+        except Exception as e:
+            logger.error(f"Erro ao criar simulador: {e}")
+            import traceback
+            logger.error(traceback.format_exc())
+            raise HTTPException(status_code=500, detail=f"Erro ao criar simulador: {str(e)}")
+            
+    except HTTPException:
+        raise
     except Exception as e:
-        logger.error(f"Erro criando simulador: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
+        logger.error(f"Erro inesperado criando simulador: {e}")
+        import traceback
+        logger.error(traceback.format_exc())
+        raise HTTPException(status_code=500, detail=f"Erro inesperado: {str(e)}")
 
 @router.delete("/relay/{board_id}")
 async def remove_relay_simulator(board_id: int):

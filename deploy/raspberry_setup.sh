@@ -12,8 +12,38 @@ export PIP_RETRIES=5
 export PIP_DISABLE_PIP_VERSION_CHECK=1
 export PYTHONUNBUFFERED=1
 
+# Variáveis de tempo
+SETUP_START_TIME=$(date +%s)
+declare -A PROCESS_TIMES
+declare -A PROCESS_STATUS
+
+# Função para registrar tempo de processo
+start_timer() {
+    local process_name="$1"
+    echo "  ⏱️  Iniciando: $process_name"
+    PROCESS_TIMES["${process_name}_start"]=$(date +%s)
+}
+
+end_timer() {
+    local process_name="$1"
+    local status="${2:-success}"
+    local start_time=${PROCESS_TIMES["${process_name}_start"]}
+    local end_time=$(date +%s)
+    local duration=$((end_time - start_time))
+    PROCESS_TIMES["${process_name}_duration"]=$duration
+    PROCESS_STATUS["${process_name}"]=$status
+    
+    if [ "$status" = "success" ]; then
+        echo "  ✅ Concluído em ${duration}s"
+    else
+        echo "  ⚠️ Finalizado com avisos em ${duration}s"
+    fi
+}
+
 echo "🔧 AutoCore - Setup do Raspberry Pi"
 echo "======================================"
+echo "⏰ Início: $(date '+%Y-%m-%d %H:%M:%S')"
+echo ""
 
 # Verificar se está rodando no Raspberry Pi
 if [ ! -d "${AUTOCORE_DIR}" ]; then
@@ -26,6 +56,7 @@ cd ${AUTOCORE_DIR}
 
 # 1. Atualizar Node.js se necessário
 echo "🔄 Verificando versão do Node.js..."
+start_timer "nodejs_check"
 NODE_VERSION=$(node -v 2>/dev/null | sed 's/v//' | cut -d. -f1)
 if [ -z "$NODE_VERSION" ] || [ "$NODE_VERSION" -lt 16 ]; then
     echo "  Node.js desatualizado ou não instalado. Instalando v18..."
@@ -66,14 +97,28 @@ password_file /etc/mosquitto/passwd
 EOF
 
 # Criar usuário MQTT
-# Pegar senha do arquivo de credenciais se existir
-if [ -f "${AUTOCORE_DIR}/deploy/.credentials" ]; then
+# Gerar senha aleatória para MQTT se não existir
+if [ -f "${AUTOCORE_DIR}/deploy/.credentials" ] && grep -q "MQTT_PASS=" "${AUTOCORE_DIR}/deploy/.credentials"; then
     source ${AUTOCORE_DIR}/deploy/.credentials
-    MQTT_PASSWORD="${MQTT_PASS:-kskLrz8uqg9K4WY8BsIUQYV6Cu07UDqr}"
+    MQTT_PASSWORD="${MQTT_PASS}"
+    echo "  📋 Usando senha MQTT existente das credenciais"
 else
-    MQTT_PASSWORD="kskLrz8uqg9K4WY8BsIUQYV6Cu07UDqr"
+    # Gerar nova senha aleatória
+    MQTT_PASSWORD=$(openssl rand -base64 32 | tr -d "=+/" | cut -c1-32)
+    echo "  🔐 Gerando nova senha MQTT aleatória"
+    
+    # Salvar nas credenciais
+    if [ -f "${AUTOCORE_DIR}/deploy/.credentials" ]; then
+        # Adicionar ou atualizar senha
+        grep -v "MQTT_PASS=" "${AUTOCORE_DIR}/deploy/.credentials" > /tmp/creds.tmp
+        mv /tmp/creds.tmp "${AUTOCORE_DIR}/deploy/.credentials"
+    fi
+    echo "MQTT_PASS=${MQTT_PASSWORD}" >> "${AUTOCORE_DIR}/deploy/.credentials"
+    chmod 600 "${AUTOCORE_DIR}/deploy/.credentials"
 fi
 
+# Configurar senha no Mosquitto
+echo "  🔧 Configurando senha no Mosquitto..."
 echo "autocore:${MQTT_PASSWORD}" > /tmp/mqtt_passwords.txt
 sudo mosquitto_passwd -U /tmp/mqtt_passwords.txt
 sudo mv /tmp/mqtt_passwords.txt /etc/mosquitto/passwd
@@ -83,6 +128,107 @@ sudo chmod 600 /etc/mosquitto/passwd
 # Reiniciar Mosquitto
 sudo systemctl restart mosquitto
 sudo systemctl enable mosquitto
+
+# Configurar .env para backend e gateway com a senha MQTT
+echo "  📝 Configurando arquivos .env..."
+
+# Obter IP do Raspberry Pi para CORS e acesso externo
+RASPBERRY_IP=$(hostname -I | awk '{print $1}')
+
+# Configurar .env do backend
+if [ -d "${AUTOCORE_DIR}/config-app/backend" ]; then
+    cat > ${AUTOCORE_DIR}/config-app/backend/.env << EOF
+# Config App Backend Configuration
+# Server
+CONFIG_APP_PORT=8081
+CONFIG_APP_HOST=0.0.0.0
+ENV=production
+
+# MQTT (conexão local - backend roda no mesmo servidor)
+MQTT_BROKER=localhost
+MQTT_PORT=1883
+MQTT_USERNAME=autocore
+MQTT_PASSWORD=${MQTT_PASSWORD}
+MQTT_HOST=localhost
+
+# Database
+DATABASE_PATH=../../database/autocore.db
+
+# Security
+SECRET_KEY=$(openssl rand -hex 32)
+JWT_SECRET_KEY=$(openssl rand -hex 32)
+JWT_ALGORITHM=HS256
+JWT_ACCESS_TOKEN_EXPIRES=3600
+
+# Logging
+LOG_LEVEL=INFO
+LOG_FILE=../../logs/config-app.log
+
+# CORS
+CORS_ORIGINS=http://localhost:3000,http://localhost:5000,http://${RASPBERRY_IP}:3000
+EOF
+    chmod 600 ${AUTOCORE_DIR}/config-app/backend/.env
+    echo "    ✅ Backend .env configurado"
+fi
+
+# Configurar .env do gateway
+if [ -d "${AUTOCORE_DIR}/gateway" ]; then
+    cat > ${AUTOCORE_DIR}/gateway/.env << EOF
+# AutoCore Gateway Configuration
+# MQTT (conexão local - gateway roda no mesmo servidor)
+MQTT_BROKER=localhost
+MQTT_PORT=1883
+MQTT_USERNAME=autocore
+MQTT_PASSWORD=${MQTT_PASSWORD}
+MQTT_HOST=localhost
+
+# Gateway
+GATEWAY_PORT=5001
+GATEWAY_HOST=0.0.0.0
+
+# Security
+SECRET_KEY=$(openssl rand -hex 32)
+
+# Database
+DATABASE_PATH=../database/autocore.db
+
+# Logging
+LOG_LEVEL=INFO
+LOG_FILE=../logs/gateway.log
+EOF
+    chmod 600 ${AUTOCORE_DIR}/gateway/.env
+    echo "    ✅ Gateway .env configurado"
+fi
+
+# Configurar .env do frontend
+if [ -d "${AUTOCORE_DIR}/config-app/frontend" ]; then
+    cat > ${AUTOCORE_DIR}/config-app/frontend/.env << EOF
+# Config App Frontend Configuration
+
+# Frontend port
+VITE_PORT=3000
+
+# Backend API - Usar IP dinâmico (o frontend detecta automaticamente)
+# Quando acessar de outro PC na rede, ele usará o IP correto
+VITE_API_URL=
+VITE_API_PORT=8081
+VITE_API_BASE_URL=
+VITE_WS_URL=
+
+# Environment
+VITE_ENV=production
+EOF
+    chmod 600 ${AUTOCORE_DIR}/config-app/frontend/.env
+    echo "    ✅ Frontend .env configurado (detecção automática de IP)"
+fi
+
+# Verificar conexão MQTT
+echo "  🔍 Verificando conexão MQTT..."
+if timeout 2 mosquitto_sub -h localhost -u autocore -P "${MQTT_PASSWORD}" -t test -C 1 >/dev/null 2>&1; then
+    echo "    ✅ MQTT funcionando com autenticação"
+else
+    echo "    ⚠️ MQTT não está respondendo corretamente"
+fi
 
 # 2. Setup Database
 echo "💾 Configurando Database..."
@@ -195,7 +341,57 @@ sudo chmod 644 /etc/systemd/system/autocore-*.service
 # Recarregar systemd
 sudo systemctl daemon-reload
 
-# 7. Iniciar serviços
+# 7. Configurar WiFi Access Point (opcional)
+echo ""
+echo "📡 Configurar Access Point WiFi?"
+echo "   Permite conectar dispositivos diretamente no AutoCore"
+echo "   SSID será: AutoCore_XXXXXXXXXXXX (baseado no MAC)"
+read -p "   Configurar AP? (s/N): " SETUP_AP
+
+if [ "$SETUP_AP" = "s" ] || [ "$SETUP_AP" = "S" ]; then
+    if [ -f "${AUTOCORE_DIR}/deploy/setup_wifi_ap.sh" ]; then
+        echo "  Configurando Access Point..."
+        sudo bash ${AUTOCORE_DIR}/deploy/setup_wifi_ap.sh
+    else
+        echo "  ⚠️ Script setup_wifi_ap.sh não encontrado"
+    fi
+fi
+
+# 7.2 Configurar Bluetooth
+echo ""
+echo "📱 Configurar Bluetooth para comunicação com app?"
+echo "   Permite controlar o AutoCore sem perder internet no celular"
+read -p "   Configurar Bluetooth? (S/n): " SETUP_BT
+
+if [ "$SETUP_BT" != "n" ] && [ "$SETUP_BT" != "N" ]; then
+    if [ -f "${AUTOCORE_DIR}/deploy/setup_bluetooth.sh" ]; then
+        echo "  Configurando Bluetooth..."
+        start_timer "bluetooth_setup"
+        sudo bash ${AUTOCORE_DIR}/deploy/setup_bluetooth.sh
+        end_timer "bluetooth_setup"
+    else
+        echo "  ⚠️ Script setup_bluetooth.sh não encontrado"
+    fi
+fi
+
+# 7.3 Configurar medição de tempo de boot
+echo ""
+echo "⏱️ Configurar medição de tempo de boot?"
+echo "   Registra quanto tempo o Pi leva para iniciar completamente"
+read -p "   Configurar timer de boot? (S/n): " SETUP_BOOT_TIMER
+
+if [ "$SETUP_BOOT_TIMER" != "n" ] && [ "$SETUP_BOOT_TIMER" != "N" ]; then
+    if [ -f "${AUTOCORE_DIR}/deploy/setup_boot_timer.sh" ]; then
+        echo "  Configurando timer de boot..."
+        start_timer "boot_timer_setup"
+        sudo bash ${AUTOCORE_DIR}/deploy/setup_boot_timer.sh
+        end_timer "boot_timer_setup"
+    else
+        echo "  ⚠️ Script setup_boot_timer.sh não encontrado"
+    fi
+fi
+
+# 8. Iniciar serviços
 echo "🚀 Iniciando serviços..."
 
 # Habilitar serviços
@@ -214,7 +410,10 @@ for service in autocore-gateway autocore-config-app autocore-config-frontend; do
     fi
 done
 
-# 8. Verificar status
+# 9. Verificar status e gerar resumo
+SETUP_END_TIME=$(date +%s)
+TOTAL_DURATION=$((SETUP_END_TIME - SETUP_START_TIME))
+
 echo ""
 echo "✅ Setup concluído!"
 echo ""
@@ -239,6 +438,50 @@ echo "📝 Comandos úteis:"
 echo "  - Ver logs: sudo journalctl -u autocore-gateway -f"
 echo "  - Reiniciar: sudo systemctl restart autocore-gateway"
 echo "  - Parar: sudo systemctl stop autocore-gateway"
+echo ""
+
+# Resumo de tempos de execução
+echo ""
+echo "⏱️ TEMPOS DE EXECUÇÃO"
+echo "========================"
+
+# Converter duração total para formato legível
+TOTAL_MINUTES=$((TOTAL_DURATION / 60))
+TOTAL_SECONDS=$((TOTAL_DURATION % 60))
+
+echo "Tempo total: ${TOTAL_MINUTES}m ${TOTAL_SECONDS}s"
+echo ""
+
+echo "Detalhamento por processo:"
+for process in "${!PROCESS_TIMES[@]}"; do
+    if [[ $process == *"_duration" ]]; then
+        process_name=${process%_duration}
+        duration=${PROCESS_TIMES[$process]}
+        status=${PROCESS_STATUS[$process_name]:-"success"}
+        
+        # Formatar tempo
+        if [ $duration -ge 60 ]; then
+            minutes=$((duration / 60))
+            seconds=$((duration % 60))
+            time_str="${minutes}m ${seconds}s"
+        else
+            time_str="${duration}s"
+        fi
+        
+        # Ícone baseado no status
+        if [ "$status" = "success" ]; then
+            icon="✅"
+        else
+            icon="⚠️"
+        fi
+        
+        printf "  %s %-30s %10s\n" "$icon" "$process_name:" "$time_str"
+    fi
+done | sort
+
+echo ""
+echo "========================"
+echo "⏰ Finalizado: $(date '+%Y-%m-%d %H:%M:%S')"
 echo ""
 
 # Gerar relatório de instalação

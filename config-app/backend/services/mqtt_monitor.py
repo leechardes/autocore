@@ -37,7 +37,7 @@ class MQTTMonitor:
     
     def __init__(self, broker: str = None, port: int = None):
         # Usar valores do ambiente ou defaults
-        self.broker = broker or os.getenv("MQTT_BROKER", "localhost")
+        self.broker = broker or os.getenv("MQTT_BROKER", os.getenv("MQTT_HOST", "localhost"))
         self.port = port or int(os.getenv("MQTT_PORT", "1883"))
         self.username = os.getenv("MQTT_USERNAME")
         self.password = os.getenv("MQTT_PASSWORD")

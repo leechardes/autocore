@@ -91,12 +91,37 @@ start-bg: ## Inicia API em background
 	@echo "📝 Logs em: backend.log"
 
 .PHONY: stop
-stop: ## Para a API em background
+stop: ## Para a API (detecta se é serviço systemd ou processo local)
 	@echo "$(RED)⏹️  Parando API...$(NC)"
-	@pkill -f "python.*main.py" || echo "API não estava rodando"
+	@if systemctl is-active --quiet autocore-config-app 2>/dev/null; then \
+		echo "$(YELLOW)📦 Detectado serviço systemd, parando...$(NC)"; \
+		sudo systemctl stop autocore-config-app; \
+		echo "$(GREEN)✅ Serviço systemd parado$(NC)"; \
+	elif pgrep -f "uvicorn.*main:app.*8081" > /dev/null; then \
+		echo "$(YELLOW)🔄 Parando processo local...$(NC)"; \
+		pkill -f "uvicorn.*main:app.*8081" || true; \
+		echo "$(GREEN)✅ Processo local parado$(NC)"; \
+	else \
+		echo "$(YELLOW)⚠️  API não estava rodando$(NC)"; \
+	fi
 
 .PHONY: restart
 restart: stop start ## Reinicia a API
+
+.PHONY: status
+status: ## Verifica status da API (systemd ou local)
+	@echo "$(BLUE)📊 Verificando status da API...$(NC)"
+	@if systemctl is-active --quiet autocore-config-app 2>/dev/null; then \
+		echo "$(GREEN)✅ Serviço systemd está ATIVO$(NC)"; \
+		systemctl status autocore-config-app --no-pager | head -10; \
+	elif pgrep -f "uvicorn.*main:app.*8081" > /dev/null; then \
+		echo "$(GREEN)✅ Processo local está RODANDO$(NC)"; \
+		ps aux | grep -E "uvicorn.*main:app.*8081" | grep -v grep; \
+	else \
+		echo "$(YELLOW)⚠️  API não está rodando$(NC)"; \
+		echo "Use 'make run' para iniciar em modo desenvolvimento"; \
+		echo "Ou 'sudo systemctl start autocore-config-app' para iniciar como serviço"; \
+	fi
 
 .PHONY: start-prod
 start-prod: ## Inicia API em modo produção (sem reload)

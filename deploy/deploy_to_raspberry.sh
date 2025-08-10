@@ -242,23 +242,15 @@ echo -e "${BLUE}🔧 Copiando arquivos systemd...${NC}"
 remote_exec "mkdir -p ${REMOTE_DIR}/deploy/systemd"
 remote_copy deploy/systemd/*.service ${REMOTE_DIR}/deploy/systemd/
 
-# Copiar credenciais se existir
-if [ -f "deploy/.credentials" ]; then
-    echo -e "${BLUE}🔐 Copiando credenciais...${NC}"
-    remote_copy deploy/.credentials ${REMOTE_DIR}/deploy/
-    remote_exec "chmod 600 ${REMOTE_DIR}/deploy/.credentials"
-fi
+# NÃO copiar credenciais - serão geradas localmente no Pi
+# As senhas devem ser únicas para cada instalação
 
 # Criar arquivo de configuração .env
 echo -e "${BLUE}📝 Criando arquivo .env...${NC}"
 
-# Pegar senha MQTT das credenciais ou usar padrão seguro
-if [ -f ".credentials" ]; then
-    source .credentials
-    MQTT_PASSWORD="${MQTT_PASS:-kskLrz8uqg9K4WY8BsIUQYV6Cu07UDqr}"
-else
-    MQTT_PASSWORD="kskLrz8uqg9K4WY8BsIUQYV6Cu07UDqr"
-fi
+# NÃO usar senha fixa - será gerada no raspberry_setup.sh
+# Deixar vazio para o setup gerar uma nova senha aleatória
+MQTT_PASSWORD=""
 
 # Verificar se já existe um .env no Raspberry com as chaves
 echo -e "${BLUE}🔑 Verificando chaves de segurança...${NC}"

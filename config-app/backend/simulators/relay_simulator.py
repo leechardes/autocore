@@ -78,27 +78,53 @@ class RelayBoardSimulator:
         except Exception as e:
             logger.error(f"Erro processando mensagem MQTT: {e}")
     
-    async def connect(self, mqtt_host: str = "localhost", mqtt_port: int = 1883):
+    async def connect(self, mqtt_host: str = "localhost", mqtt_port: int = 1883, username: str = None, password: str = None):
         """Conecta ao broker MQTT"""
+        logger.info(f"RelayBoardSimulator.connect chamado para {self.device_uuid}")
+        logger.info(f"  Host: {mqtt_host}, Port: {mqtt_port}")
+        
         try:
-            self.mqtt_client = mqtt.Client(client_id=f"relay_simulator_{self.device_uuid}")
+            logger.info("Criando cliente MQTT...")
+            client_id = f"relay_simulator_{self.device_uuid}"
+            self.mqtt_client = mqtt.Client(client_id=client_id)
+            logger.info(f"Cliente criado com ID: {client_id}")
+            
+            # Configurar autenticação se fornecida
+            if username and password:
+                self.mqtt_client.username_pw_set(username, password)
+                logger.info(f"Autenticação configurada para usuário: {username}")
+            
             self.mqtt_client.on_connect = self.on_connect
             self.mqtt_client.on_disconnect = self.on_disconnect
             self.mqtt_client.on_message = self.on_message
+            logger.info("Callbacks configurados")
             
             # Conectar ao broker
+            logger.info(f"Conectando ao broker MQTT em {mqtt_host}:{mqtt_port}...")
             self.mqtt_client.connect(mqtt_host, mqtt_port, 60)
+            logger.info("Comando connect executado")
             
             # Iniciar loop em thread separada
             self.mqtt_client.loop_start()
+            logger.info("Loop MQTT iniciado")
             
             # Aguardar conexão
+            logger.info("Aguardando conexão (1 segundo)...")
             await asyncio.sleep(1)
             
+            logger.info(f"Status de conexão: {self.is_connected}")
             return self.is_connected
             
+        except OSError as e:
+            logger.error(f"❌ Erro de rede conectando ao MQTT: {e}")
+            logger.error(f"   Verifique se o Mosquitto está instalado e rodando")
+            logger.error(f"   Comando para verificar: sudo systemctl status mosquitto")
+            self.is_connected = False
+            return False
         except Exception as e:
-            logger.error(f"Erro conectando simulador: {e}")
+            logger.error(f"❌ Erro inesperado conectando simulador: {e}")
+            import traceback
+            logger.error(traceback.format_exc())
             self.is_connected = False
             return False
     
@@ -449,27 +475,70 @@ class RelayBoardSimulator:
 class RelaySimulatorManager:
     """Gerencia múltiplos simuladores de placa de relé"""
     
-    def __init__(self, mqtt_host: str = "localhost", mqtt_port: int = 1883):
-        self.mqtt_host = mqtt_host
-        self.mqtt_port = mqtt_port
+    def __init__(self, mqtt_host: str = None, mqtt_port: int = None):
+        import os
+        from dotenv import load_dotenv
+        
+        # Carregar variáveis de ambiente
+        load_dotenv()
+        
+        # Usar valores do ambiente ou defaults
+        self.mqtt_host = mqtt_host or os.getenv("MQTT_BROKER", "localhost")
+        self.mqtt_port = mqtt_port or int(os.getenv("MQTT_PORT", "1883"))
+        self.mqtt_username = os.getenv("MQTT_USERNAME")
+        self.mqtt_password = os.getenv("MQTT_PASSWORD")
+        
         self.simulators: Dict[int, RelayBoardSimulator] = {}
         self.running = False
         
+        logger.info(f"RelaySimulatorManager configurado: {self.mqtt_host}:{self.mqtt_port}")
+        
     async def create_simulator(self, board_id: int, device_uuid: str, total_channels: int = 16) -> RelayBoardSimulator:
         """Cria um novo simulador"""
+        logger.info(f"RelaySimulatorManager.create_simulator chamado:")
+        logger.info(f"  board_id: {board_id}")
+        logger.info(f"  device_uuid: {device_uuid}")
+        logger.info(f"  total_channels: {total_channels}")
+        logger.info(f"  mqtt_host: {self.mqtt_host}")
+        logger.info(f"  mqtt_port: {self.mqtt_port}")
+        
         if board_id in self.simulators:
             logger.warning(f"Simulador já existe para board_id: {board_id}")
             return self.simulators[board_id]
         
-        simulator = RelayBoardSimulator(board_id, device_uuid, total_channels)
-        if await simulator.connect(self.mqtt_host, self.mqtt_port):
-            self.simulators[board_id] = simulator
+        try:
+            logger.info("Criando instância do RelayBoardSimulator...")
+            simulator = RelayBoardSimulator(board_id, device_uuid, total_channels)
+            logger.info("Instância criada com sucesso")
             
-            # Iniciar loop do simulador
-            asyncio.create_task(simulator.run())
+            logger.info(f"Tentando conectar ao MQTT em {self.mqtt_host}:{self.mqtt_port}...")
+            connected = await simulator.connect(
+                self.mqtt_host, 
+                self.mqtt_port,
+                self.mqtt_username,
+                self.mqtt_password
+            )
             
-            return simulator
-        return None
+            if connected:
+                logger.info("✅ Simulador conectado ao MQTT com sucesso!")
+                self.simulators[board_id] = simulator
+                
+                # Iniciar loop do simulador
+                logger.info("Iniciando loop do simulador...")
+                asyncio.create_task(simulator.run())
+                
+                logger.info(f"Simulador adicionado à lista. Total de simuladores: {len(self.simulators)}")
+                return simulator
+            else:
+                logger.error("❌ Falha ao conectar simulador ao MQTT")
+                logger.error(f"   Verifique se o Mosquitto está rodando no host {self.mqtt_host}:{self.mqtt_port}")
+                return None
+                
+        except Exception as e:
+            logger.error(f"❌ Erro criando simulador: {e}")
+            import traceback
+            logger.error(traceback.format_exc())
+            return None
     
     async def remove_simulator(self, board_id: int):
         """Remove um simulador"""
