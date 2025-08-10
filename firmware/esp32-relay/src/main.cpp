@@ -143,6 +143,13 @@ void loop() {
     // Processar estado atual
     handleSystemState();
     
+    // Atualizar controlador de relés sempre (independente do estado)
+    relayController.update();
+    watchdog.feedTask("relay_update");
+    
+    // Alimentar MQTT task mesmo quando não conectado
+    watchdog.feedTask("mqtt_loop");
+    
     // Operações contínuas quando o sistema está rodando
     if (currentState == RUNNING && systemInitialized) {
         handleRunningMode();
@@ -213,11 +220,8 @@ bool initializeSystem() {
         LOG_WARN("Falha ao montar SPIFFS - servidor web usará HTML inline");
     }
     
-    // 7. Inicializar servidor web
-    if (!webServer.begin(WEB_SERVER_PORT)) {
-        LOG_ERROR("Falha ao inicializar servidor web");
-        return false;
-    }
+    // 7. Servidor web será inicializado após WiFi estar pronto
+    // (movido para changeState)
     
     LOG_INFO("Todos os componentes inicializados com sucesso");
     return true;
@@ -247,6 +251,20 @@ void changeState(SystemState newState) {
                     String apName = String(AP_SSID_PREFIX) + configManager.getDeviceUUID().substring(12);
                     WiFi.softAP(apName.c_str(), AP_PASSWORD);
                     LOG_INFO("Access Point ativo: %s", apName.c_str());
+                    
+                    // Aguardar o AP estar pronto
+                    delay(100);
+                    
+                    // Aguardar um pouco mais para o AP estabilizar
+                    delay(500);
+                    
+                    // Agora inicializar servidor web
+                    if (!webServer.begin(WEB_SERVER_PORT)) {
+                        LOG_ERROR("Falha ao inicializar servidor web");
+                    } else {
+                        LOG_INFO("Servidor web iniciado na porta %d", WEB_SERVER_PORT);
+                        LOG_INFO("Teste acessando: http://192.168.4.1/test");
+                    }
                     LOG_INFO("IP: %s", WiFi.softAPIP().toString().c_str());
                 }
                 break;
@@ -312,6 +330,13 @@ void handleSystemState() {
                     if (WiFi.status() == WL_CONNECTED) {
                         LOG_INFO("WiFi conectado: %s", WiFi.localIP().toString().c_str());
                         
+                        // Inicializar servidor web agora que WiFi está pronto
+                        if (!webServer.begin(WEB_SERVER_PORT)) {
+                            LOG_ERROR("Falha ao inicializar servidor web");
+                        } else {
+                            LOG_INFO("Servidor web iniciado na porta %d", WEB_SERVER_PORT);
+                        }
+                        
                         // Tentar conectar MQTT se configurado
                         if (config.mqtt_broker.length() > 0) {
                             if (!mqttClient.begin(config.device_uuid, config.mqtt_broker, 
@@ -368,16 +393,12 @@ void handleConfigurationMode() {
     
     if (millis() - lastConfigStatus > 10000) {  // A cada 10 segundos
         LOG_INFO("Modo configuração ativo - aguardando configuração via web");
-        LOG_INFO("Acesse: http://%s", WiFi.softAPIP().toString().c_str());
+        LOG_INFO("Acesse: http://192.168.4.1");
         lastConfigStatus = millis();
     }
 }
 
 void handleRunningMode() {
-    // Atualizar controlador de relés
-    relayController.update();
-    watchdog.feedTask("relay_update");
-    
     // Loop MQTT
     if (mqttClient.isInitialized()) {
         mqttClient.loop();

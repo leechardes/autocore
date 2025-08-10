@@ -23,6 +23,12 @@ bool AutoCoreWebServer::begin(int port) {
         return true;
     }
     
+    // Verificar se WiFi está pronto
+    if (WiFi.getMode() == WIFI_MODE_NULL) {
+        LOG_ERROR_CTX("WebServer", "WiFi não inicializado - não pode iniciar servidor web");
+        return false;
+    }
+    
     // Montar SPIFFS se não estiver montado
     if (!spiffs_mounted) {
         mountSPIFFS();
@@ -35,16 +41,23 @@ bool AutoCoreWebServer::begin(int port) {
         return false;
     }
     
-    // Configurar rotas
-    setupCORS();
+    // Configurar rotas ANTES do CORS (importante!)
     setupRoutes();
+    setupCORS();
     
     // Iniciar servidor
     server->begin();
     running = true;
     
     LOG_INFO_CTX("WebServer", "Servidor web iniciado com sucesso");
-    LOG_INFO_CTX("WebServer", "Acesse: http://%s", WiFi.localIP().toString().c_str());
+    
+    // Mostrar IP correto baseado no modo WiFi
+    if (WiFi.getMode() == WIFI_AP || WiFi.getMode() == WIFI_AP_STA) {
+        LOG_INFO_CTX("WebServer", "Acesse via AP: http://%s", WiFi.softAPIP().toString().c_str());
+    }
+    if ((WiFi.getMode() == WIFI_STA || WiFi.getMode() == WIFI_AP_STA) && WiFi.status() == WL_CONNECTED) {
+        LOG_INFO_CTX("WebServer", "Acesse via WiFi: http://%s", WiFi.localIP().toString().c_str());
+    }
     
     return true;
 }
@@ -78,8 +91,15 @@ void AutoCoreWebServer::setupCORS() {
 void AutoCoreWebServer::setupRoutes() {
     LOG_DEBUG_CTX("WebServer", "Configurando rotas");
     
+    // Rota de teste super simples
+    server->on("/test", HTTP_GET, [](AsyncWebServerRequest *request) {
+        LOG_INFO_CTX("WebServer", "Requisição GET /test recebida");
+        request->send(200, "text/plain", "ESP32 Relay OK");
+    });
+    
     // Rota principal - página de configuração
     server->on("/", HTTP_GET, [this](AsyncWebServerRequest *request) {
+        LOG_INFO_CTX("WebServer", "Requisição GET / recebida");
         handleRoot(request);
     });
     
@@ -147,34 +167,129 @@ void AutoCoreWebServer::handleRoot(AsyncWebServerRequest *request) {
     } else {
         // HTML inline caso SPIFFS não esteja disponível
         String html = "<!DOCTYPE html><html><head>";
-        html += "<title>AutoCore ESP32 Relay - Configuração</title>";
+        html += "<meta charset='UTF-8'>";
+        html += "<title>AutoCore ESP32 Relay - Configuracao</title>";
         html += "<meta name='viewport' content='width=device-width, initial-scale=1'>";
-        html += "<style>body{font-family:Arial;margin:40px;background:#f5f5f5}";
-        html += ".container{max-width:500px;margin:0 auto;background:white;padding:30px;border-radius:8px;box-shadow:0 2px 10px rgba(0,0,0,0.1)}";
-        html += "h1{color:#333;text-align:center;margin-bottom:30px}";
-        html += ".form-group{margin-bottom:20px}";
+        html += "<style>body{font-family:Arial;margin:20px;background:#f5f5f5}";
+        html += ".container{max-width:500px;margin:0 auto;background:white;padding:20px;border-radius:8px;box-shadow:0 2px 10px rgba(0,0,0,0.1)}";
+        html += "h1{color:#333;text-align:center;margin-bottom:20px;font-size:24px}";
+        html += ".form-group{margin-bottom:15px}";
         html += "label{display:block;margin-bottom:5px;font-weight:bold;color:#555}";
-        html += "input{width:100%;padding:10px;border:1px solid #ddd;border-radius:4px;box-sizing:border-box}";
-        html += "button{background:#007bff;color:white;padding:12px 30px;border:none;border-radius:4px;cursor:pointer;width:100%;font-size:16px}";
+        html += "input,select{width:100%;padding:8px;border:1px solid #ddd;border-radius:4px;box-sizing:border-box}";
+        html += "button{background:#007bff;color:white;padding:10px 20px;border:none;border-radius:4px;cursor:pointer;width:100%;font-size:16px;margin-top:10px}";
         html += "button:hover{background:#0056b3}";
         html += ".status{padding:10px;margin:10px 0;border-radius:4px}";
+        html += ".info{background:#d1ecf1;color:#0c5460;border:1px solid #bee5eb}";
         html += ".success{background:#d4edda;color:#155724;border:1px solid #c3e6cb}";
         html += ".error{background:#f8d7da;color:#721c24;border:1px solid #f5c6cb}";
+        html += ".scan-btn{background:#28a745;margin-bottom:10px}";
+        html += ".scan-btn:hover{background:#218838}";
         html += "</style></head><body>";
         html += "<div class='container'>";
-        html += "<h1>🚗 AutoCore ESP32 Relay</h1>";
-        html += "<p>Configure seu dispositivo de relés para integrar com o sistema AutoCore.</p>";
-        html += "<div class='status error'>⚠️ Interface de configuração básica - SPIFFS não disponível</div>";
-        html += "<p><strong>UUID:</strong> " + configManager.getDeviceUUID() + "</p>";
-        html += "<p><strong>Status:</strong> ";
-        html += configManager.isConfigured() ? "Configurado" : "Aguardando Configuração";
-        html += "</p>";
-        html += "<p><a href='/api/config' target='_blank'>Ver Configuração (JSON)</a></p>";
-        html += "<p><a href='/api/status' target='_blank'>Ver Status (JSON)</a></p>";
-        html += "<p><a href='/api/logs' target='_blank'>Ver Logs (JSON)</a></p>";
+        html += "<h1>AutoCore ESP32 Relay</h1>";
+        html += "<div class='status info'>UUID: " + configManager.getDeviceUUID() + "</div>";
+        
+        // Formulário de configuração
+        html += "<form id='configForm'>";
+        html += "<h3>Configuracao WiFi</h3>";
+        html += "<div class='form-group'>";
+        html += "<label>Nome do Dispositivo:</label>";
+        html += "<input type='text' name='device_name' value='" + configManager.getConfig().device_name + "' required>";
+        html += "</div>";
+        
+        html += "<div class='form-group'>";
+        html += "<button type='button' class='scan-btn' onclick='scanWifi()'>Buscar Redes WiFi</button>";
+        html += "<label>Rede WiFi (SSID):</label>";
+        html += "<select name='wifi_ssid' id='wifiSelect'>";
+        html += "<option value=''>Selecione ou digite...</option>";
+        html += "</select>";
+        html += "<input type='text' name='wifi_ssid_manual' placeholder='Ou digite o SSID manualmente' style='margin-top:5px'>";
+        html += "</div>";
+        
+        html += "<div class='form-group'>";
+        html += "<label>Senha WiFi:</label>";
+        html += "<input type='password' name='wifi_password' placeholder='Deixe em branco para rede aberta'>";
+        html += "</div>";
+        
+        html += "<h3>Configuracao Backend</h3>";
+        html += "<div class='form-group'>";
+        html += "<label>IP do Backend:</label>";
+        html += "<input type='text' name='backend_ip' placeholder='Ex: 192.168.1.100' required>";
+        html += "</div>";
+        
+        html += "<div class='form-group'>";
+        html += "<label>Porta do Backend:</label>";
+        html += "<input type='number' name='backend_port' value='8000' required>";
+        html += "</div>";
+        
+        html += "<h3>Configuracao MQTT (Opcional)</h3>";
+        html += "<div class='form-group'>";
+        html += "<label>Broker MQTT:</label>";
+        html += "<input type='text' name='mqtt_broker' placeholder='Ex: 192.168.1.100'>";
+        html += "</div>";
+        
+        html += "<div class='form-group'>";
+        html += "<label>Porta MQTT:</label>";
+        html += "<input type='number' name='mqtt_port' value='1883'>";
+        html += "</div>";
+        
+        html += "<div class='form-group'>";
+        html += "<label>Usuario MQTT:</label>";
+        html += "<input type='text' name='mqtt_user' placeholder='Opcional'>";
+        html += "</div>";
+        
+        html += "<div class='form-group'>";
+        html += "<label>Senha MQTT:</label>";
+        html += "<input type='password' name='mqtt_password' placeholder='Opcional'>";
+        html += "</div>";
+        
+        html += "<button type='submit'>Salvar Configuracao</button>";
+        html += "</form>";
+        
+        html += "<div id='message'></div>";
+        
+        // JavaScript para interação
+        html += "<script>";
+        html += "function scanWifi(){";
+        html += "  document.getElementById('message').innerHTML='<div class=\"status info\">Buscando redes...</div>';";
+        html += "  fetch('/api/wifi/scan').then(r=>r.json()).then(data=>{";
+        html += "    var select=document.getElementById('wifiSelect');";
+        html += "    select.innerHTML='<option value=\"\">Selecione...</option>';";
+        html += "    data.networks.forEach(net=>{";
+        html += "      select.innerHTML+='<option value=\"'+net.ssid+'\">'+net.ssid+' ('+net.rssi+'dBm)</option>';";
+        html += "    });";
+        html += "    document.getElementById('message').innerHTML='<div class=\"status success\">'+data.networks.length+' redes encontradas</div>';";
+        html += "  }).catch(e=>{";
+        html += "    document.getElementById('message').innerHTML='<div class=\"status error\">Erro ao buscar redes</div>';";
+        html += "  });";
+        html += "}";
+        
+        html += "document.getElementById('configForm').onsubmit=function(e){";
+        html += "  e.preventDefault();";
+        html += "  var formData=new FormData(e.target);";
+        html += "  var data={};";
+        html += "  formData.forEach((v,k)=>data[k]=v);";
+        html += "  if(data.wifi_ssid_manual)data.wifi_ssid=data.wifi_ssid_manual;";
+        html += "  delete data.wifi_ssid_manual;";
+        html += "  document.getElementById('message').innerHTML='<div class=\"status info\">Salvando...</div>';";
+        html += "  fetch('/api/config',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(data)})";
+        html += "  .then(r=>r.json()).then(resp=>{";
+        html += "    if(resp.success){";
+        html += "      document.getElementById('message').innerHTML='<div class=\"status success\">Configuracao salva! Reiniciando...</div>';";
+        html += "      setTimeout(()=>fetch('/api/restart',{method:'POST'}),2000);";
+        html += "    }else{";
+        html += "      document.getElementById('message').innerHTML='<div class=\"status error\">Erro: '+resp.error+'</div>';";
+        html += "    }";
+        html += "  }).catch(e=>{";
+        html += "    document.getElementById('message').innerHTML='<div class=\"status error\">Erro ao salvar</div>';";
+        html += "  });";
+        html += "  return false;";
+        html += "};";
+        html += "</script>";
+        
         html += "</div></body></html>";
         
-        request->send(200, "text/html", html);
+        request->send(200, "text/html; charset=UTF-8", html);
     }
 }
 

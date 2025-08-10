@@ -4,7 +4,7 @@
 # Ferramenta completa de desenvolvimento e debug
 
 PROJETO_DIR="/Users/leechardes/Projetos/AutoCore/firmware/esp32-relay"
-PORTA_SERIAL="/dev/cu.usbserial-10"
+PORTA_SERIAL="/dev/cu.usbserial-0001"
 VELOCIDADE="115200"
 
 # Cores para interface
@@ -223,6 +223,97 @@ list_ports() {
     read -p "Pressione Enter para continuar..."
 }
 
+# Função para selecionar porta serial
+select_serial_port() {
+    echo -e "${CYAN}🔍 Detectando portas seriais disponíveis...${NC}"
+    echo ""
+    
+    # Detectar portas usando PlatformIO
+    local ports_output=$(pio device list 2>/dev/null)
+    
+    # Arrays para armazenar portas
+    declare -a port_names
+    declare -a port_descriptions
+    local port_count=0
+    
+    # Processar saída e encontrar portas USB/Serial
+    while IFS= read -r line; do
+        if [[ "$line" =~ ^/dev/cu\. ]]; then
+            port_name=$(echo "$line" | cut -d' ' -f1)
+            # Pegar apenas portas USB serial relevantes
+            if [[ "$port_name" == *"usbserial"* ]] || [[ "$port_name" == *"usbmodem"* ]] || [[ "$port_name" == *"SLAB"* ]]; then
+                port_names[$port_count]=$port_name
+                # Tentar pegar a descrição na próxima linha
+                read -r desc_line
+                port_descriptions[$port_count]="$desc_line"
+                ((port_count++))
+            fi
+        fi
+    done <<< "$ports_output"
+    
+    if [ $port_count -eq 0 ]; then
+        echo -e "${RED}❌ Nenhuma porta serial USB encontrada!${NC}"
+        echo -e "${YELLOW}Conecte seu ESP32 e tente novamente.${NC}"
+        echo ""
+        read -p "Pressione Enter para continuar..."
+        return 1
+    fi
+    
+    echo -e "${GREEN}Portas disponíveis:${NC}"
+    echo "----------------------------------------"
+    for i in "${!port_names[@]}"; do
+        local num=$((i + 1))
+        echo -e "${WHITE}$num.${NC} ${CYAN}${port_names[$i]}${NC}"
+        if [[ "${port_descriptions[$i]}" == *"ESP"* ]] || [[ "${port_descriptions[$i]}" == *"CP210"* ]] || [[ "${port_descriptions[$i]}" == *"CH340"* ]]; then
+            echo -e "   ${GREEN}└─ Provável ESP32${NC}"
+        else
+            echo -e "   └─ ${port_descriptions[$i]}"
+        fi
+    done
+    echo "----------------------------------------"
+    echo -e "${WHITE}0.${NC} Cancelar"
+    echo ""
+    
+    read -p "Selecione o número da porta: " port_choice
+    
+    if [ "$port_choice" = "0" ]; then
+        echo -e "${YELLOW}Operação cancelada${NC}"
+        return 1
+    fi
+    
+    local index=$((port_choice - 1))
+    if [ $index -ge 0 ] && [ $index -lt $port_count ]; then
+        local selected_port="${port_names[$index]}"
+        echo ""
+        echo -e "${GREEN}✅ Porta selecionada: $selected_port${NC}"
+        
+        # Atualizar variável global
+        PORTA_SERIAL="$selected_port"
+        
+        # Atualizar platformio.ini
+        echo -e "${CYAN}📝 Atualizando platformio.ini...${NC}"
+        if [ -f "$PROJETO_DIR/platformio.ini" ]; then
+            # Usar sed para atualizar a linha upload_port
+            sed -i.bak "s|^upload_port = .*|upload_port = $selected_port|" "$PROJETO_DIR/platformio.ini"
+            echo -e "${GREEN}✅ platformio.ini atualizado${NC}"
+        fi
+        
+        # Atualizar o próprio script
+        echo -e "${CYAN}📝 Salvando configuração...${NC}"
+        sed -i.bak "s|^PORTA_SERIAL=\".*\"|PORTA_SERIAL=\"$selected_port\"|" "$0"
+        echo -e "${GREEN}✅ Configuração salva${NC}"
+        
+        echo ""
+        echo -e "${GREEN}🎉 Porta configurada com sucesso!${NC}"
+        sleep 2
+        return 0
+    else
+        echo -e "${RED}❌ Opção inválida!${NC}"
+        sleep 2
+        return 1
+    fi
+}
+
 # Função para configurações
 configure_settings() {
     while true; do
@@ -233,8 +324,9 @@ configure_settings() {
         echo -e "  📡 Porta: ${WHITE}$PORTA_SERIAL${NC}"
         echo -e "  ⚡ Velocidade: ${WHITE}$VELOCIDADE baud${NC}"
         echo ""
-        echo -e "${GREEN}1.${NC} Alterar porta serial"
+        echo -e "${GREEN}1.${NC} Alterar porta serial (com detecção automática)"
         echo -e "${GREEN}2.${NC} Alterar velocidade"
+        echo -e "${GREEN}3.${NC} Digitar porta manualmente"
         echo -e "${GREEN}0.${NC} Voltar ao menu principal"
         echo ""
         
@@ -242,23 +334,63 @@ configure_settings() {
         
         case $config_option in
             1)
-                echo ""
-                echo -e "${CYAN}Digite a nova porta serial:${NC}"
-                read -p "Porta (ex: /dev/cu.usbserial-210): " nova_porta
-                if [ -n "$nova_porta" ]; then
-                    PORTA_SERIAL="$nova_porta"
-                    echo -e "${GREEN}✅ Porta alterada para: $PORTA_SERIAL${NC}"
-                fi
-                sleep 2
+                clear_screen
+                select_serial_port
                 ;;
             2)
                 echo ""
-                echo -e "${CYAN}Digite a nova velocidade:${NC}"
-                echo -e "${YELLOW}Opções comuns: 9600, 115200, 230400${NC}"
-                read -p "Velocidade: " nova_velocidade
-                if [ -n "$nova_velocidade" ]; then
-                    VELOCIDADE="$nova_velocidade"
-                    echo -e "${GREEN}✅ Velocidade alterada para: $VELOCIDADE baud${NC}"
+                echo -e "${CYAN}Selecione a velocidade:${NC}"
+                echo -e "${GREEN}1.${NC} 9600 baud"
+                echo -e "${GREEN}2.${NC} 115200 baud (padrão)"
+                echo -e "${GREEN}3.${NC} 230400 baud"
+                echo -e "${GREEN}4.${NC} 921600 baud (upload rápido)"
+                echo -e "${GREEN}5.${NC} Outra velocidade"
+                echo ""
+                read -p "Escolha: " speed_choice
+                
+                case $speed_choice in
+                    1) VELOCIDADE="9600" ;;
+                    2) VELOCIDADE="115200" ;;
+                    3) VELOCIDADE="230400" ;;
+                    4) VELOCIDADE="921600" ;;
+                    5)
+                        read -p "Digite a velocidade: " custom_speed
+                        if [ -n "$custom_speed" ]; then
+                            VELOCIDADE="$custom_speed"
+                        fi
+                        ;;
+                    *)
+                        echo -e "${RED}❌ Opção inválida!${NC}"
+                        sleep 1
+                        continue
+                        ;;
+                esac
+                
+                echo -e "${GREEN}✅ Velocidade alterada para: $VELOCIDADE baud${NC}"
+                # Salvar no script
+                sed -i.bak "s|^VELOCIDADE=\".*\"|VELOCIDADE=\"$VELOCIDADE\"|" "$0"
+                sleep 2
+                ;;
+            3)
+                echo ""
+                echo -e "${CYAN}Digite a porta serial manualmente:${NC}"
+                echo -e "${YELLOW}Exemplos:${NC}"
+                echo "  macOS: /dev/cu.usbserial-0001"
+                echo "  Linux: /dev/ttyUSB0"
+                echo "  Windows: COM3"
+                echo ""
+                read -p "Porta: " nova_porta
+                if [ -n "$nova_porta" ]; then
+                    PORTA_SERIAL="$nova_porta"
+                    echo -e "${GREEN}✅ Porta alterada para: $PORTA_SERIAL${NC}"
+                    
+                    # Atualizar platformio.ini
+                    if [ -f "$PROJETO_DIR/platformio.ini" ]; then
+                        sed -i.bak "s|^upload_port = .*|upload_port = $nova_porta|" "$PROJETO_DIR/platformio.ini"
+                    fi
+                    
+                    # Salvar no script
+                    sed -i.bak "s|^PORTA_SERIAL=\".*\"|PORTA_SERIAL=\"$nova_porta\"|" "$0"
                 fi
                 sleep 2
                 ;;
