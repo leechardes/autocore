@@ -41,7 +41,7 @@ bool AutoCoreMQTTClient::begin(const String& uuid, const String& broker, int por
     
     // Configurar cliente MQTT
     mqttClient.setServer(broker.c_str(), port);
-    mqttClient.setKeepAlive(MQTT_KEEPALIVE);
+    mqttClient.setKeepAlive(AUTOCORE_MQTT_KEEPALIVE);
     mqttClient.setSocketTimeout(MQTT_TIMEOUT / 1000);
     
     // Configurar buffer size (importante para mensagens grandes)
@@ -294,7 +294,7 @@ bool AutoCoreMQTTClient::publishToDevice(const String& subtopic, const String& p
 }
 
 bool AutoCoreMQTTClient::publishStatus(const String& status) {
-    DynamicJsonDocument doc(512);
+    JsonDocument doc;
     doc["status"] = status;
     doc["timestamp"] = millis();
     doc["uptime"] = millis() / 1000;
@@ -313,7 +313,7 @@ bool AutoCoreMQTTClient::publishTelemetry(const String& telemetryJson) {
 }
 
 bool AutoCoreMQTTClient::publishRelayState(int channel, bool state) {
-    DynamicJsonDocument doc(256);
+    JsonDocument doc;
     doc["channel"] = channel;
     doc["state"] = state;
     doc["timestamp"] = millis();
@@ -325,7 +325,7 @@ bool AutoCoreMQTTClient::publishRelayState(int channel, bool state) {
 }
 
 bool AutoCoreMQTTClient::publishHeartbeatAck(int channel, int sequence) {
-    DynamicJsonDocument doc(128);
+    JsonDocument doc;
     doc["channel"] = channel;
     doc["sequence"] = sequence;
     doc["timestamp"] = millis();
@@ -343,7 +343,7 @@ bool AutoCoreMQTTClient::publishSafetyEvent(const String& eventJson) {
 }
 
 bool AutoCoreMQTTClient::publishDeviceAnnounce() {
-    DynamicJsonDocument doc(512);
+    JsonDocument doc;
     doc["uuid"] = deviceUUID;
     doc["type"] = DEVICE_TYPE;
     doc["firmware_version"] = FIRMWARE_VERSION;
@@ -463,7 +463,7 @@ void AutoCoreMQTTClient::onConnection(std::function<void(bool connected)> callba
 }
 
 String AutoCoreMQTTClient::getConnectionStatus() {
-    DynamicJsonDocument doc(512);
+    JsonDocument doc;
     doc["initialized"] = initialized;
     doc["connected"] = isConnected();
     doc["mqtt_state"] = mqttClient.state();

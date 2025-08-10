@@ -2,6 +2,7 @@
 #define WATCHDOG_H
 
 #include <Arduino.h>
+#include <ArduinoJson.h>
 #include "../config/device_config.h"
 
 class Watchdog {

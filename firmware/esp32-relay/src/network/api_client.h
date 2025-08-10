@@ -11,6 +11,7 @@ private:
     HTTPClient http;
     String baseURL;
     int timeout;
+    int lastHTTPCode = 0;
     
     // Métodos privados
     bool makeRequest(const String& method, const String& endpoint, const String& payload, String& response);
@@ -41,7 +42,7 @@ public:
     bool validateBackendAPI(const String& ip, int port);
     
     // Gerenciamento de erros
-    int getLastHTTPCode() { return http.getResponseCode(); }
+    int getLastHTTPCode() { return lastHTTPCode; }
     String getLastError();
     
     // Utilitários

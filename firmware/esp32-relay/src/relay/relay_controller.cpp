@@ -115,7 +115,7 @@ bool RelayController::configureChannel(int channel, const RelayChannelConfig& co
 bool RelayController::configureFromJSON(const String& configJson) {
     LOG_INFO_CTX("RelayController", "Carregando configuração de JSON");
     
-    DynamicJsonDocument doc(4096);
+    JsonDocument doc;
     DeserializationError error = deserializeJson(doc, configJson);
     
     if (error) {
@@ -124,7 +124,7 @@ bool RelayController::configureFromJSON(const String& configJson) {
         return false;
     }
     
-    if (!doc.containsKey("channels")) {
+    if (!doc["channels"].is<JsonArray>()) {
         LOG_ERROR_CTX("RelayController", "JSON não contém configuração de canais");
         incrementError();
         return false;
@@ -144,7 +144,8 @@ bool RelayController::configureFromJSON(const String& configJson) {
         RelayChannelConfig config;
         config.enabled = channelObj["enabled"] | false;
         config.gpio_pin = channelObj["gpio_pin"] | -1;
-        config.name = channelObj["name"] | ("Canal " + String(channelId));
+        String defaultName = "Canal " + String(channelId);
+        config.name = channelObj["name"] | defaultName.c_str();
         config.function_type = channelObj["function_type"] | "toggle";
         config.require_password = channelObj["require_password"] | false;
         config.password_hash = channelObj["password_hash"] | "";
@@ -365,7 +366,7 @@ void RelayController::emergencyStop() {
     }
     
     // Publicar evento de emergency stop
-    DynamicJsonDocument doc(256);
+    JsonDocument doc;
     doc["event"] = "emergency_stop";
     doc["timestamp"] = millis();
     doc["channels_affected"] = totalChannels;
@@ -550,7 +551,7 @@ void RelayController::publishStatus() {
 }
 
 String RelayController::getStatisticsJSON() {
-    DynamicJsonDocument doc(512);
+    JsonDocument doc;
     
     doc["total_operations"] = totalOperations;
     doc["total_errors"] = totalErrors;
@@ -574,13 +575,13 @@ void RelayController::resetStatistics() {
 }
 
 String RelayController::getAllChannelsStatusJSON() {
-    DynamicJsonDocument doc(4096);
+    JsonDocument doc;
     
-    JsonArray channelsArray = doc.createNestedArray("channels");
+    JsonArray channelsArray = doc["channels"].to<JsonArray>();
     
     for (int i = 0; i < totalChannels; i++) {
         if (channels[i]) {
-            DynamicJsonDocument channelDoc(512);
+            JsonDocument channelDoc;
             deserializeJson(channelDoc, channels[i]->getStatusJSON());
             channelsArray.add(channelDoc);
         }
@@ -596,13 +597,13 @@ String RelayController::getAllChannelsStatusJSON() {
 }
 
 String RelayController::getAllChannelsTelemetryJSON() {
-    DynamicJsonDocument doc(2048);
+    JsonDocument doc;
     
-    JsonArray channelsArray = doc.createNestedArray("channels");
+    JsonArray channelsArray = doc["channels"].to<JsonArray>();
     
     for (int i = 0; i < totalChannels; i++) {
         if (channels[i] && channels[i]->isEnabled()) {
-            DynamicJsonDocument channelDoc(256);
+            JsonDocument channelDoc;
             deserializeJson(channelDoc, channels[i]->getTelemetryJSON());
             channelsArray.add(channelDoc);
         }
@@ -618,7 +619,7 @@ String RelayController::getAllChannelsTelemetryJSON() {
 }
 
 String RelayController::getSystemStatusJSON() {
-    DynamicJsonDocument doc(1024);
+    JsonDocument doc;
     
     doc["device_uuid"] = configManager.getDeviceUUID();
     doc["timestamp"] = millis();
@@ -633,7 +634,7 @@ String RelayController::getSystemStatusJSON() {
     
     // Lista dos canais ativos
     std::vector<int> activeChannels = getActiveRelays();
-    JsonArray activeArray = doc.createNestedArray("active_relay_channels");
+    JsonArray activeArray = doc["active_relay_channels"].to<JsonArray>();
     for (int channel : activeChannels) {
         activeArray.add(channel);
     }

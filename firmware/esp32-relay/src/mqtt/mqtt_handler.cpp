@@ -47,7 +47,7 @@ void MQTTHandler::handleMessage(const String& topic, const String& payload) {
     else if (topic.endsWith("/command")) {
         handleGeneralCommand(payload);
     }
-    else if (topic.contains("/broadcast")) {
+    else if (topic.indexOf("/broadcast") != -1) {
         handleBroadcast(payload);
     }
     else {
@@ -65,7 +65,7 @@ void MQTTHandler::handleRelayCommand(const String& payload) {
         return;
     }
     
-    DynamicJsonDocument doc(512);
+    JsonDocument doc;
     if (!parseJsonPayload(payload, doc)) {
         errorsCount++;
         return;
@@ -136,7 +136,7 @@ void MQTTHandler::handleHeartbeat(const String& payload) {
         return;
     }
     
-    DynamicJsonDocument doc(256);
+    JsonDocument doc;
     if (!parseJsonPayload(payload, doc)) {
         errorsCount++;
         return;
@@ -174,7 +174,7 @@ void MQTTHandler::handleHeartbeat(const String& payload) {
 void MQTTHandler::handleConfiguration(const String& payload) {
     LOG_INFO_CTX("MQTTHandler", "Processando configuração");
     
-    DynamicJsonDocument doc(2048);
+    JsonDocument doc;
     if (!parseJsonPayload(payload, doc)) {
         errorsCount++;
         return;
@@ -192,7 +192,7 @@ void MQTTHandler::handleConfiguration(const String& payload) {
 void MQTTHandler::handleGeneralCommand(const String& payload) {
     LOG_INFO_CTX("MQTTHandler", "Processando comando geral");
     
-    DynamicJsonDocument doc(512);
+    JsonDocument doc;
     if (!parseJsonPayload(payload, doc)) {
         errorsCount++;
         return;
@@ -227,7 +227,7 @@ void MQTTHandler::handleGeneralCommand(const String& payload) {
 void MQTTHandler::handleBroadcast(const String& payload) {
     LOG_INFO_CTX("MQTTHandler", "Processando broadcast");
     
-    DynamicJsonDocument doc(512);
+    JsonDocument doc;
     if (!parseJsonPayload(payload, doc)) {
         errorsCount++;
         return;
@@ -253,7 +253,7 @@ void MQTTHandler::handleBroadcast(const String& payload) {
 
 bool MQTTHandler::validateRelayCommand(const JsonObject& cmd) {
     // Verificar campos obrigatórios
-    if (!cmd.containsKey("channel") || !cmd.containsKey("state")) {
+    if (!cmd["channel"].is<int>() || !cmd["state"].is<bool>()) {
         LOG_ERROR_CTX("MQTTHandler", "Comando de relé inválido: campos obrigatórios ausentes");
         return false;
     }
@@ -269,7 +269,7 @@ bool MQTTHandler::validateRelayCommand(const JsonObject& cmd) {
 
 bool MQTTHandler::validateHeartbeat(const JsonObject& hb) {
     // Verificar campo obrigatório
-    if (!hb.containsKey("channel")) {
+    if (!hb["channel"].is<int>()) {
         LOG_ERROR_CTX("MQTTHandler", "Heartbeat inválido: canal não especificado");
         return false;
     }
@@ -283,7 +283,7 @@ bool MQTTHandler::validateHeartbeat(const JsonObject& hb) {
     return true;
 }
 
-bool MQTTHandler::parseJsonPayload(const String& payload, DynamicJsonDocument& doc) {
+bool MQTTHandler::parseJsonPayload(const String& payload, JsonDocument& doc) {
     DeserializationError error = deserializeJson(doc, payload);
     
     if (error) {
@@ -296,7 +296,7 @@ bool MQTTHandler::parseJsonPayload(const String& payload, DynamicJsonDocument& d
 }
 
 void MQTTHandler::sendCommandResponse(const String& command, bool success, const String& error) {
-    DynamicJsonDocument doc(256);
+    JsonDocument doc;
     doc["command"] = command;
     doc["success"] = success;
     doc["timestamp"] = millis();
@@ -330,7 +330,7 @@ bool MQTTHandler::isTopicMatch(const String& topic, const String& pattern) {
 }
 
 String MQTTHandler::getStatisticsJSON() {
-    DynamicJsonDocument doc(512);
+    JsonDocument doc;
     doc["messages_received"] = messagesReceived;
     doc["commands_executed"] = commandsExecuted;
     doc["heartbeats_received"] = heartbeatsReceived;

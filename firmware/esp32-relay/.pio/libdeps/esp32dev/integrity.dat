@@ -1,0 +1,5 @@
+PubSubClient@2.8
+DNSServer
+https://github.com/me-no-dev/ESPAsyncWebServer.git
+bblanchon/ArduinoJson@^7.0.4
+https://github.com/me-no-dev/AsyncTCP.git

@@ -203,8 +203,8 @@ void Logger::addToBuffer(const String& message) {
 }
 
 String Logger::getBufferAsJSON() {
-    DynamicJsonDocument doc(8192);
-    JsonArray logs = doc.createNestedArray("logs");
+    JsonDocument doc;
+    JsonArray logs = doc["logs"].to<JsonArray>();
     
     int start_index = (log_buffer_count < LOG_BUFFER_SIZE) ? 0 : log_buffer_index;
     

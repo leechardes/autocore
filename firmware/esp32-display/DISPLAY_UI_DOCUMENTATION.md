@@ -78,14 +78,16 @@ O neumorfismo foi adaptado para funcionar eficientemente no display:
 ```
 Display Layout (320x240)
 ├── Status Bar (320x20)
-│   ├── Left: WiFi + System Name
-│   └── Right: Battery Voltage
-├── Content Area (320x200)
-│   ├── Dashboard Screen
-│   ├── Lighting Screen
-│   ├── Winch Screen
-│   └── Traction Screen
-└── Navigation Dots (320x20)
+│   ├── Left: WiFi + MQTT Status
+│   ├── Center: System Name
+│   └── Right: Battery Voltage + Clock
+├── Content Area (320x180)
+│   └── Dynamic Buttons (Configurados pelo Backend)
+│       ├── Grid Layout (ex: 3x3)
+│       ├── List Layout (vertical)
+│       └── Custom Layout (posições absolutas)
+└── Navigation Bar (320x40)
+    └── Touch Buttons: [◀ Prev] [🏠 Home] [▶ Next]
 ```
 
 ### 1. Dashboard Screen
@@ -227,53 +229,92 @@ static void winch_btn_event_cb(lv_event_t * e) {
 
 ## 🎮 Sistema de Navegação
 
-### Navegação por Botões Físicos
+### Navegação Touch com Navigation Bar
 
-O sistema foi projetado para navegação sem touch, usando 3 botões:
+O sistema utiliza uma barra de navegação touch fixa na parte inferior da tela:
 
 ```
-     [◀]        [⭕]        [▶]
-   Previous    Select      Next
+┌─────────────────────────────────┐
+│                                  │
+│      Content Area (180px)        │
+│   [Botões Dinâmicos do Backend]  │
+│                                  │
+├─────────────────────────────────┤
+│      Navigation Bar (40px)       │
+│  [◀ Prev] [🏠 Home] [▶ Next]   │
+└─────────────────────────────────┘
 ```
 
-**Mapeamento de Navegação:**
+**Funcionalidades da Navigation Bar:**
 
-| Contexto | Previous | Select | Next |
-|----------|----------|--------|------|
-| Dashboard | Tela anterior | Ativar item focado | Próxima tela |
-| Lighting | Item anterior | Toggle switch | Próximo item |
-| Winch | Voltar dashboard | - | Voltar dashboard |
-| Traction | Modo anterior | Selecionar modo | Próximo modo |
+| Botão | Função | Comportamento |
+|-------|--------|---------------|
+| ◀ Previous | Volta para tela anterior | Navega no histórico de telas |
+| 🏠 Home | Retorna ao dashboard | Sempre volta para tela principal |
+| ▶ Next | Avança para próxima tela | Navega entre telas disponíveis |
 
-**Implementação da Navegação:**
+### Sistema de Configuração Web
+
+Quando o ESP32 não está conectado a uma rede WiFi, ele entra em modo de configuração:
+
+1. **Access Point Mode:**
+   - SSID: `ESP32_Display_XXXX` (baseado no MAC)
+   - IP: `192.168.4.1`
+   - Página web de configuração acessível via browser
+
+2. **Configurações Disponíveis:**
+   - SSID e senha da rede WiFi
+   - IP e porta do backend AutoCore
+   - UUID do dispositivo (auto-gerado)
+   - Nome do display (opcional)
+
+3. **Após Configuração:**
+   - ESP32 conecta na rede configurada
+   - Busca configurações no backend
+   - Desativa o Access Point
+   - Opera em modo normal via MQTT
+
+**Implementação da Navigation Bar:**
 ```c
-// Grupo de navegação LVGL
-lv_group_t * nav_group = lv_group_create();
-
-// Adicionar widgets ao grupo
-lv_group_add_obj(nav_group, button1);
-lv_group_add_obj(nav_group, button2);
-lv_group_add_obj(nav_group, button3);
-
-// Input device (encoder/buttons)
-lv_indev_t * encoder_indev = lv_indev_drv_register(&indev_drv);
-lv_indev_set_group(encoder_indev, nav_group);
-
-// Event handler para navegação
-void handle_navigation(navigation_action_t action) {
-    switch(action) {
-        case NAV_PREV:
-            lv_group_focus_prev(nav_group);
-            break;
-        case NAV_NEXT:
-            lv_group_focus_next(nav_group);
-            break;
-        case NAV_SELECT:
-            lv_event_send(lv_group_get_focused(nav_group), 
-                         LV_EVENT_CLICKED, NULL);
-            break;
+// Criar Navigation Bar fixa
+class NavigationBar {
+    lv_obj_t* bar;
+    lv_obj_t* btn_prev;
+    lv_obj_t* btn_home;
+    lv_obj_t* btn_next;
+    
+    void init(lv_obj_t* parent) {
+        // Criar container da barra
+        bar = lv_obj_create(parent);
+        lv_obj_set_size(bar, 320, 40);
+        lv_obj_align(bar, LV_ALIGN_BOTTOM_MID, 0, 0);
+        lv_obj_set_style_bg_color(bar, lv_color_hex(0x2C2C2E), 0);
+        
+        // Botão Previous
+        btn_prev = create_nav_button(bar, "◀", 10);
+        lv_obj_add_event_cb(btn_prev, prev_clicked_cb, LV_EVENT_CLICKED, NULL);
+        
+        // Botão Home
+        btn_home = create_nav_button(bar, "🏠", 110);
+        lv_obj_add_event_cb(btn_home, home_clicked_cb, LV_EVENT_CLICKED, NULL);
+        
+        // Botão Next
+        btn_next = create_nav_button(bar, "▶", 210);
+        lv_obj_add_event_cb(btn_next, next_clicked_cb, LV_EVENT_CLICKED, NULL);
     }
-}
+    
+    static void prev_clicked_cb(lv_event_t* e) {
+        ScreenManager::getInstance()->previousScreen();
+    }
+    
+    static void home_clicked_cb(lv_event_t* e) {
+        ScreenManager::getInstance()->showDashboard();
+    }
+    
+    static void next_clicked_cb(lv_event_t* e) {
+        ScreenManager::getInstance()->nextScreen();
+    }
+};
 ```
 
 ### Navigation Dots
@@ -408,29 +449,122 @@ autocore/can/data
 
 ### Configuração Dinâmica de Telas
 
-**Estrutura JSON para Telas:**
+O display busca sua configuração completa do backend ao iniciar, permitindo customização total sem reprogramação:
+
+**Endpoint de Configuração:**
+```
+GET http://{backend_ip}:{port}/api/config/generate/{display_uuid}
+```
+
+**Estrutura JSON Completa:**
 ```json
 {
+  "device": {
+    "uuid": "esp32-display-001",
+    "name": "Display Principal",
+    "type": "display_touch"
+  },
+  "mqtt": {
+    "broker": "localhost",
+    "port": 1883,
+    "username": "autocore",
+    "password": "generated_password",
+    "topics": {
+      "config": "autocore/display/{uuid}/config",
+      "events": "autocore/display/{uuid}/events",
+      "heartbeat": "autocore/display/{uuid}/heartbeat",
+      "telemetry": "autocore/display/{uuid}/telemetry"
+    }
+  },
   "screens": [
     {
-      "id": 1,
-      "type": "dashboard",
+      "id": "dashboard",
       "title": "Principal",
-      "layout": "grid_3x2",
-      "items": [
+      "layout": {
+        "type": "grid",
+        "cols": 3,
+        "rows": 3,
+        "spacing": 4
+      },
+      "buttons": [
         {
-          "type": "button",
-          "label": "Luzes",
-          "label_short": "Luz",
+          "id": "btn_headlight",
+          "label": "Farol",
           "icon": "💡",
-          "action": "navigate",
-          "target": "lighting_screen",
-          "position": 0,
-          "size_display_small": "normal"
+          "type": "toggle",
+          "position": {"col": 0, "row": 0},
+          "action": {
+            "type": "relay",
+            "channel": 1
+          },
+          "style": {
+            "color_active": "#007AFF",
+            "color_inactive": "#2C2C2E"
+          }
+        },
+        {
+          "id": "btn_starter",
+          "label": "Partida",
+          "icon": "🔑",
+          "type": "momentary",
+          "position": {"col": 1, "row": 0},
+          "action": {
+            "type": "relay",
+            "channel": 2,
+            "requires_heartbeat": true,
+            "heartbeat_interval": 500,
+            "timeout": 1000
+          },
+          "protection": {
+            "type": "confirmation",
+            "message": "Segurar para partida"
+          },
+          "style": {
+            "color_active": "#FF9500",
+            "color_inactive": "#2C2C2E"
+          }
+        }
+      ]
+    },
+    {
+      "id": "lighting",
+      "title": "Iluminação",
+      "layout": {
+        "type": "list",
+        "item_height": 44
+      },
+      "buttons": [
+        {
+          "id": "sw_high_beam",
+          "label": "Farol Alto",
+          "icon": "💡",
+          "type": "switch",
+          "action": {
+            "type": "relay",
+            "channel": 3
+          }
         }
       ]
     }
-  ]
+  ],
+  "theme": {
+    "mode": "dark",
+    "colors": {
+      "primary": "#007AFF",
+      "secondary": "#32D74B",
+      "warning": "#FF9500",
+      "danger": "#FF3B30",
+      "background": "#1C1C1E",
+      "surface": "#2C2C2E",
+      "text_primary": "#FFFFFF",
+      "text_secondary": "#8E8E93"
+    },
+    "fonts": {
+      "size_small": 9,
+      "size_normal": 11,
+      "size_large": 14
+    }
+  }
 }
 ```
 

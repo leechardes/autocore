@@ -19,6 +19,7 @@
 #include <Arduino.h>
 #include <WiFi.h>
 #include <SPIFFS.h>
+#include <ArduinoJson.h>
 
 // Módulos do sistema
 #include "config/config_manager.h"
@@ -239,13 +240,15 @@ void changeState(SystemState newState) {
                 break;
                 
             case CONFIGURING:
-                LOG_INFO("Estado: MODO CONFIGURAÇÃO");
-                // Iniciar Access Point
-                WiFi.mode(WIFI_AP);
-                String apName = String(AP_SSID_PREFIX) + configManager.getDeviceUUID().substring(12);
-                WiFi.softAP(apName.c_str(), AP_PASSWORD);
-                LOG_INFO("Access Point ativo: %s", apName.c_str());
-                LOG_INFO("IP: %s", WiFi.softAPIP().toString().c_str());
+                {
+                    LOG_INFO("Estado: MODO CONFIGURAÇÃO");
+                    // Iniciar Access Point
+                    WiFi.mode(WIFI_AP);
+                    String apName = String(AP_SSID_PREFIX) + configManager.getDeviceUUID().substring(12);
+                    WiFi.softAP(apName.c_str(), AP_PASSWORD);
+                    LOG_INFO("Access Point ativo: %s", apName.c_str());
+                    LOG_INFO("IP: %s", WiFi.softAPIP().toString().c_str());
+                }
                 break;
                 
             case CONNECTING:
@@ -434,7 +437,7 @@ void publishSystemHeartbeat() {
         return;
     }
     
-    DynamicJsonDocument doc(512);
+    JsonDocument doc;
     doc["device_uuid"] = configManager.getDeviceUUID();
     doc["timestamp"] = millis();
     doc["uptime"] = millis() / 1000;
@@ -484,7 +487,7 @@ void handleEmergencyShutdown() {
     
     // Publicar evento de emergency
     if (mqttClient.isConnected()) {
-        DynamicJsonDocument doc(256);
+        JsonDocument doc;
         doc["event"] = "emergency_shutdown";
         doc["timestamp"] = millis();
         doc["reason"] = "manual_trigger";

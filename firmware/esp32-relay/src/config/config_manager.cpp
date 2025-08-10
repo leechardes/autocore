@@ -120,11 +120,11 @@ bool ConfigManager::saveConfig() {
     preferences.putInt("total_channels", config.total_channels);
     
     // Salvar configuração dos canais como JSON para economizar espaço
-    DynamicJsonDocument doc(8192);
-    JsonArray channels = doc.createNestedArray("channels");
+    JsonDocument doc;
+    JsonArray channels = doc["channels"].to<JsonArray>();
     
     for (int i = 0; i < MAX_RELAY_CHANNELS; i++) {
-        JsonObject channel = channels.createNestedObject();
+        JsonObject channel = channels.add<JsonObject>();
         channel["enabled"] = config.channels[i].enabled;
         channel["gpio_pin"] = config.channels[i].gpio_pin;
         channel["name"] = config.channels[i].name;
@@ -187,7 +187,7 @@ bool ConfigManager::loadConfig() {
     // Carregar configuração dos canais
     String channelsJson = preferences.getString("channels_config", "");
     if (channelsJson.length() > 0) {
-        DynamicJsonDocument doc(8192);
+        JsonDocument doc;
         DeserializationError error = deserializeJson(doc, channelsJson);
         
         if (!error) {
@@ -196,7 +196,8 @@ bool ConfigManager::loadConfig() {
                 JsonObject channel = channels[i];
                 config.channels[i].enabled = channel["enabled"] | false;
                 config.channels[i].gpio_pin = channel["gpio_pin"] | -1;
-                config.channels[i].name = channel["name"] | ("Canal " + String(i + 1));
+                String defaultName = "Canal " + String(i + 1);
+                config.channels[i].name = channel["name"] | defaultName.c_str();
                 config.channels[i].function_type = channel["function_type"] | "toggle";
                 config.channels[i].require_password = channel["require_password"] | false;
                 config.channels[i].password_hash = channel["password_hash"] | "";
@@ -325,7 +326,7 @@ String ConfigManager::getDeviceName() {
 }
 
 String ConfigManager::getStatusJSON() {
-    DynamicJsonDocument doc(1024);
+    JsonDocument doc;
     
     doc["uuid"] = config.device_uuid;
     doc["name"] = config.device_name;
@@ -348,7 +349,7 @@ String ConfigManager::getStatusJSON() {
 }
 
 String ConfigManager::getConfigJSON() {
-    DynamicJsonDocument doc(4096);
+    JsonDocument doc;
     
     // Informações básicas (sem senhas)
     doc["device_uuid"] = config.device_uuid;
@@ -363,10 +364,10 @@ String ConfigManager::getConfigJSON() {
     doc["configured"] = config.config_completed;
     
     // Canais habilitados
-    JsonArray channels = doc.createNestedArray("channels");
+    JsonArray channels = doc["channels"].to<JsonArray>();
     for (int i = 0; i < config.total_channels; i++) {
         if (config.channels[i].enabled) {
-            JsonObject channel = channels.createNestedObject();
+            JsonObject channel = channels.add<JsonObject>();
             channel["id"] = i + 1;
             channel["name"] = config.channels[i].name;
             channel["gpio_pin"] = config.channels[i].gpio_pin;

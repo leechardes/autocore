@@ -34,7 +34,7 @@
 
 // Timeouts MQTT
 #define MQTT_RECONNECT_INTERVAL 5000    // 5 segundos
-#define MQTT_KEEPALIVE 60              // 60 segundos
+#define AUTOCORE_MQTT_KEEPALIVE 60     // 60 segundos
 #define MQTT_TIMEOUT 10000             // 10 segundos
 
 // Heartbeat sistema

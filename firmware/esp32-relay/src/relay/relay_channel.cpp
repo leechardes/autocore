@@ -408,7 +408,7 @@ void RelayChannel::logStateChange(bool newState, const String& reason) {
 }
 
 void RelayChannel::publishSafetyEvent(const String& event, const String& reason) {
-    DynamicJsonDocument doc(256);
+    JsonDocument doc;
     doc["channel"] = channelId;
     doc["event"] = event;
     doc["reason"] = reason;
@@ -435,7 +435,7 @@ unsigned long RelayChannel::getOnDuration() {
 }
 
 String RelayChannel::getStatusJSON() {
-    DynamicJsonDocument doc(512);
+    JsonDocument doc;
     
     doc["channel"] = channelId;
     doc["enabled"] = config.enabled;
@@ -463,7 +463,7 @@ String RelayChannel::getStatusJSON() {
 }
 
 String RelayChannel::getTelemetryJSON() {
-    DynamicJsonDocument doc(256);
+    JsonDocument doc;
     
     doc["channel"] = channelId;
     doc["state"] = state.current_state;

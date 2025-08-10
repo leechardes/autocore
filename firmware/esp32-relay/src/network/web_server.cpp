@@ -166,7 +166,9 @@ void AutoCoreWebServer::handleRoot(AsyncWebServerRequest *request) {
         html += "<p>Configure seu dispositivo de relés para integrar com o sistema AutoCore.</p>";
         html += "<div class='status error'>⚠️ Interface de configuração básica - SPIFFS não disponível</div>";
         html += "<p><strong>UUID:</strong> " + configManager.getDeviceUUID() + "</p>";
-        html += "<p><strong>Status:</strong> " + (configManager.isConfigured() ? "Configurado" : "Aguardando Configuração") + "</p>";
+        html += "<p><strong>Status:</strong> ";
+        html += configManager.isConfigured() ? "Configurado" : "Aguardando Configuração";
+        html += "</p>";
         html += "<p><a href='/api/config' target='_blank'>Ver Configuração (JSON)</a></p>";
         html += "<p><a href='/api/status' target='_blank'>Ver Status (JSON)</a></p>";
         html += "<p><a href='/api/logs' target='_blank'>Ver Logs (JSON)</a></p>";
@@ -194,7 +196,7 @@ void AutoCoreWebServer::handleConfigPost(AsyncWebServerRequest *request) {
         LOG_INFO_CTX("WebServer", "Recebida configuração: %s", configJson.c_str());
         
         // Parser do JSON de configuração
-        DynamicJsonDocument doc(2048);
+        JsonDocument doc;
         DeserializationError error = deserializeJson(doc, configJson);
         
         if (error) {
@@ -207,7 +209,7 @@ void AutoCoreWebServer::handleConfigPost(AsyncWebServerRequest *request) {
         String errorMsg = "";
         
         // Configurar WiFi
-        if (doc.containsKey("wifi_ssid") && doc.containsKey("wifi_password")) {
+        if (doc["wifi_ssid"].is<String>() && doc["wifi_password"].is<String>()) {
             String ssid = doc["wifi_ssid"];
             String password = doc["wifi_password"];
             
@@ -217,7 +219,7 @@ void AutoCoreWebServer::handleConfigPost(AsyncWebServerRequest *request) {
         }
         
         // Configurar Backend
-        if (doc.containsKey("backend_ip") && doc.containsKey("backend_port")) {
+        if (doc["backend_ip"].is<String>() && doc["backend_port"].is<int>()) {
             String ip = doc["backend_ip"];
             int port = doc["backend_port"];
             
@@ -227,7 +229,7 @@ void AutoCoreWebServer::handleConfigPost(AsyncWebServerRequest *request) {
         }
         
         // Configurar MQTT (opcional)
-        if (doc.containsKey("mqtt_broker") && doc.containsKey("mqtt_port")) {
+        if (doc["mqtt_broker"].is<String>() && doc["mqtt_port"].is<int>()) {
             String broker = doc["mqtt_broker"];
             int port = doc["mqtt_port"];
             String user = doc["mqtt_user"] | "";
@@ -277,7 +279,7 @@ void AutoCoreWebServer::handleTestConnection(AsyncWebServerRequest *request) {
     
     bool success = testBackendConnection(ip, port);
     
-    DynamicJsonDocument doc(512);
+    JsonDocument doc;
     doc["success"] = success;
     doc["ip"] = ip;
     doc["port"] = port;
@@ -327,7 +329,7 @@ void AutoCoreWebServer::handleFactoryReset(AsyncWebServerRequest *request) {
 void AutoCoreWebServer::handleNotFound(AsyncWebServerRequest *request) {
     logRequest(request);
     
-    DynamicJsonDocument doc(512);
+    JsonDocument doc;
     doc["error"] = "Endpoint não encontrado";
     doc["method"] = request->methodToString();
     doc["url"] = request->url();
@@ -338,8 +340,8 @@ void AutoCoreWebServer::handleNotFound(AsyncWebServerRequest *request) {
 }
 
 String AutoCoreWebServer::scanWiFiNetworks() {
-    DynamicJsonDocument doc(2048);
-    JsonArray networks = doc.createNestedArray("networks");
+    JsonDocument doc;
+    JsonArray networks = doc["networks"].to<JsonArray>();
     
     int n = WiFi.scanNetworks();
     
@@ -349,7 +351,7 @@ String AutoCoreWebServer::scanWiFiNetworks() {
         LOG_INFO_CTX("WebServer", "Encontradas %d redes WiFi", n);
         
         for (int i = 0; i < n; ++i) {
-            JsonObject network = networks.createNestedObject();
+            JsonObject network = networks.add<JsonObject>();
             network["ssid"] = WiFi.SSID(i);
             network["rssi"] = WiFi.RSSI(i);
             network["security"] = (WiFi.encryptionType(i) == WIFI_AUTH_OPEN) ? "open" : "secure";

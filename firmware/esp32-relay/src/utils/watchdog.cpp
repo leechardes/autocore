@@ -322,7 +322,7 @@ void Watchdog::setTimeout(unsigned long timeoutSeconds) {
 }
 
 String Watchdog::getStatusJSON() {
-    DynamicJsonDocument doc(512);
+    JsonDocument doc;
     
     doc["initialized"] = initialized;
     doc["enabled"] = enabled;
@@ -341,16 +341,16 @@ String Watchdog::getStatusJSON() {
 }
 
 String Watchdog::getTasksStatusJSON() {
-    DynamicJsonDocument doc(1024);
+    JsonDocument doc;
     
-    JsonArray tasksArray = doc.createNestedArray("tasks");
+    JsonArray tasksArray = doc["tasks"].to<JsonArray>();
     
     unsigned long now = millis();
     
     for (int i = 0; i < MAX_TASKS; i++) {
         if (!tasks[i].active) continue;
         
-        JsonObject task = tasksArray.createNestedObject();
+        JsonObject task = tasksArray.add<JsonObject>();
         task["name"] = tasks[i].name;
         task["timeout_ms"] = tasks[i].timeout;
         task["last_activity"] = tasks[i].lastActivity;

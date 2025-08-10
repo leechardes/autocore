@@ -75,7 +75,7 @@ bool APIClient::ping() {
 bool APIClient::announceDevice(const String& deviceUUID, const String& deviceType) {
     LOG_INFO_CTX("APIClient", "Anunciando dispositivo: %s (%s)", deviceUUID.c_str(), deviceType.c_str());
     
-    DynamicJsonDocument doc(512);
+    JsonDocument doc;
     doc["uuid"] = deviceUUID;
     doc["type"] = deviceType;
     doc["firmware_version"] = FIRMWARE_VERSION;
@@ -231,6 +231,9 @@ bool APIClient::makeRequest(const String& method, const String& endpoint, const 
         httpCode = http.sendRequest("DELETE", payload);
     }
     
+    // Salvar o código HTTP para uso posterior
+    lastHTTPCode = httpCode;
+    
     if (httpCode > 0) {
         response = http.getString();
         
@@ -266,7 +269,7 @@ void APIClient::setRequestHeaders() {
 }
 
 String APIClient::getLastError() {
-    int code = http.getResponseCode();
+    int code = lastHTTPCode;
     
     switch (code) {
         case HTTPC_ERROR_CONNECTION_REFUSED:
@@ -301,11 +304,11 @@ bool APIClient::isConnected() {
 }
 
 String APIClient::getServerInfo() {
-    DynamicJsonDocument doc(512);
+    JsonDocument doc;
     doc["base_url"] = baseURL;
     doc["timeout"] = timeout;
     doc["wifi_connected"] = WiFi.isConnected();
-    doc["last_http_code"] = http.getResponseCode();
+    doc["last_http_code"] = lastHTTPCode;
     
     String info;
     serializeJson(doc, info);
@@ -313,7 +316,7 @@ String APIClient::getServerInfo() {
 }
 
 void APIClient::printLastResponse() {
-    LOG_INFO_CTX("APIClient", "Último código HTTP: %d", http.getResponseCode());
+    LOG_INFO_CTX("APIClient", "Último código HTTP: %d", lastHTTPCode);
     LOG_INFO_CTX("APIClient", "URL base: %s", baseURL.c_str());
 }
 

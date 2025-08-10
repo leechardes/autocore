@@ -28,7 +28,7 @@ private:
     // Validação e parsing
     bool validateRelayCommand(const JsonObject& cmd);
     bool validateHeartbeat(const JsonObject& hb);
-    bool parseJsonPayload(const String& payload, DynamicJsonDocument& doc);
+    bool parseJsonPayload(const String& payload, JsonDocument& doc);
     
     // Respostas e acknowledgments
     void sendCommandResponse(const String& command, bool success, const String& error = "");
