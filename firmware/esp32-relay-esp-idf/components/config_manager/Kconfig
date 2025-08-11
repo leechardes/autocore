@@ -1,0 +1,38 @@
+menu "Configuration Manager"
+
+    config CONFIG_MANAGER_DEFAULT_DEVICE_NAME
+        string "Default device name prefix"
+        default "ESP32-Relay"
+        help
+            Default prefix for device name generation.
+
+    config CONFIG_MANAGER_MAX_WIFI_SSID_LEN
+        int "Maximum WiFi SSID length"
+        default 32
+        range 1 32
+        help
+            Maximum length for WiFi SSID string.
+
+    config CONFIG_MANAGER_MAX_WIFI_PASSWORD_LEN
+        int "Maximum WiFi password length"
+        default 64
+        range 1 64
+        help
+            Maximum length for WiFi password string.
+
+    config CONFIG_MANAGER_MAX_MQTT_BROKER_LEN
+        int "Maximum MQTT broker address length"
+        default 64
+        range 1 128
+        help
+            Maximum length for MQTT broker address string.
+
+    config CONFIG_MANAGER_AUTO_SAVE_INTERVAL
+        int "Auto-save configuration interval (seconds)"
+        default 300
+        range 30 3600
+        help
+            Interval in seconds for automatic configuration saving to NVS.
+            Set to 0 to disable auto-save.
+
+endmenu

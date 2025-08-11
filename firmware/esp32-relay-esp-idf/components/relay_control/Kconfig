@@ -1,0 +1,64 @@
+menu "Relay Control Configuration"
+
+    config RELAY_MAX_CHANNELS
+        int "Maximum number of relay channels"
+        default 8
+        range 1 16
+        help
+            Set the maximum number of relay channels supported by the hardware.
+
+    config RELAY_DEFAULT_STATE
+        bool "Default relay state on boot"
+        default n
+        help
+            Set the default state of relays when the device boots.
+            - Disabled (n): All relays OFF on boot
+            - Enabled (y): All relays ON on boot
+            
+    config RELAY_INVERT_LOGIC
+        bool "Invert relay logic"
+        default n
+        help
+            If enabled, relay logic is inverted:
+            - HIGH = OFF (relay not energized)
+            - LOW = ON (relay energized)
+
+    config RELAY_ENABLE_PROTECTION
+        bool "Enable relay protection features"
+        default y
+        help
+            Enable advanced relay protection features like:
+            - Switch counting
+            - Temperature monitoring
+            - Overload detection
+
+    config RELAY_SWITCH_COUNT_PERSISTENCE
+        bool "Save switch counts to NVS"
+        default y
+        depends on RELAY_ENABLE_PROTECTION
+        help
+            Save relay switch counts to NVS for persistence across reboots.
+
+    config RELAY_MAX_SWITCHES_PER_HOUR
+        int "Maximum switches per hour (protection)"
+        default 100
+        range 10 1000
+        depends on RELAY_ENABLE_PROTECTION
+        help
+            Maximum number of relay switches allowed per hour before protection kicks in.
+
+    config RELAY_DEBOUNCE_TIME_MS
+        int "Relay debounce time (ms)"
+        default 50
+        range 10 500
+        help
+            Debounce time for relay switching to prevent contact bounce issues.
+
+    config RELAY_GPIO_PINS
+        string "Relay GPIO pin mapping"
+        default "{2,4,16,17,5,18,19,21}"
+        help
+            GPIO pin mapping for relay channels in array format.
+            Example: {2,4,16,17,5,18,19,21} for 8 channels.
+
+endmenu

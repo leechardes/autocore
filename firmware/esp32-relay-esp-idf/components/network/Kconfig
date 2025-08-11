@@ -1,0 +1,85 @@
+menu "Network Component"
+
+    menu "WiFi Manager"
+        
+        config WIFI_MANAGER_MAX_RETRY
+            int "WiFi connection maximum retry attempts"
+            default 10
+            range 1 50
+            help
+                Maximum number of retry attempts for WiFi connection.
+
+        config WIFI_MANAGER_RETRY_DELAY_MS
+            int "WiFi connection retry delay (ms)"
+            default 5000
+            range 1000 30000
+            help
+                Delay between WiFi connection retry attempts in milliseconds.
+
+        config WIFI_MANAGER_AP_TIMEOUT_MS
+            int "AP mode timeout (ms)"
+            default 300000
+            range 60000 1800000
+            help
+                Timeout for AP mode before switching back to STA mode.
+
+    endmenu
+
+    menu "HTTP Server"
+
+        config HTTP_SERVER_PORT
+            int "HTTP server port"
+            default 80
+            range 1 65535
+            help
+                Port number for the HTTP server.
+
+        config HTTP_SERVER_MAX_HANDLERS
+            int "Maximum HTTP handlers"
+            default 20
+            range 5 50
+            help
+                Maximum number of HTTP request handlers.
+
+        config HTTP_SERVER_STACK_SIZE
+            int "HTTP server task stack size"
+            default 4096
+            range 2048 8192
+            help
+                Stack size for HTTP server task in bytes.
+
+    endmenu
+
+    menu "MQTT Handler"
+
+        config MQTT_KEEPALIVE_INTERVAL
+            int "MQTT keepalive interval (seconds)"
+            default 60
+            range 10 300
+            help
+                MQTT keepalive interval in seconds.
+
+        config MQTT_MAX_RETRIES
+            int "MQTT connection maximum retries"
+            default 5
+            range 1 20
+            help
+                Maximum number of MQTT connection retry attempts.
+
+        config MQTT_RETRY_DELAY_MS
+            int "MQTT retry delay (ms)"
+            default 5000
+            range 1000 30000
+            help
+                Delay between MQTT connection retry attempts.
+
+        config MQTT_TELEMETRY_INTERVAL_MS
+            int "Telemetry publish interval (ms)"
+            default 10000
+            range 1000 60000
+            help
+                Interval for publishing telemetry data via MQTT.
+
+    endmenu
+
+endmenu

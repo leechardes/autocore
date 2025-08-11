@@ -1,0 +1,65 @@
+# ESP32 Relay Project Configuration
+
+menu "ESP32 Relay Configuration"
+
+    config ESP32_RELAY_MAX_CHANNELS
+        int "Maximum number of relay channels"
+        range 1 16
+        default 16
+        help
+            Maximum number of relay channels supported by the device
+
+    config ESP32_RELAY_DEFAULT_AP_SSID_PREFIX
+        string "Default AP SSID prefix"
+        default "ESP32-Relay"
+        help
+            Prefix for the Access Point SSID when in AP mode
+
+    config ESP32_RELAY_DEFAULT_AP_PASSWORD
+        string "Default AP password"
+        default "12345678"
+        help
+            Default password for the Access Point
+
+    config ESP32_RELAY_DEFAULT_BACKEND_IP
+        string "Default backend IP address"
+        default "10.0.10.100"
+        help
+            Default IP address of the AutoCore backend
+
+    config ESP32_RELAY_DEFAULT_BACKEND_PORT
+        int "Default backend port"
+        range 1 65535
+        default 8081
+        help
+            Default port of the AutoCore backend
+
+    config ESP32_RELAY_DEFAULT_MQTT_PORT
+        int "Default MQTT port"
+        range 1 65535
+        default 1883
+        help
+            Default MQTT broker port
+
+    config ESP32_RELAY_TELEMETRY_INTERVAL
+        int "Telemetry publishing interval (seconds)"
+        range 5 300
+        default 30
+        help
+            Interval in seconds for publishing telemetry data
+
+    config ESP32_RELAY_WIFI_TIMEOUT
+        int "WiFi connection timeout (seconds)"
+        range 5 60
+        default 15
+        help
+            Timeout in seconds for WiFi connection attempts
+
+    config ESP32_RELAY_MQTT_RETRY_COUNT
+        int "MQTT connection retry count"
+        range 1 10
+        default 5
+        help
+            Number of MQTT connection retry attempts
+
+endmenu

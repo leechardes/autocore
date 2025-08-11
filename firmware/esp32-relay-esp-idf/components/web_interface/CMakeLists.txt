@@ -1,0 +1,13 @@
+idf_component_register(
+    SRCS 
+        "src/web_interface.c"
+    INCLUDE_DIRS 
+        "include"
+    REQUIRES 
+        esp_http_server
+        network
+    EMBED_FILES
+        "www/index.html"
+        "www/style.css"
+        "www/app.js"
+)

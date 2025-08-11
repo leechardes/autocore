@@ -1,0 +1,14 @@
+idf_component_register(
+    SRCS 
+        "src/config_manager.c"
+    INCLUDE_DIRS 
+        "include"
+    PRIV_INCLUDE_DIRS 
+        "src"
+    REQUIRES 
+        nvs_flash
+        esp_system
+        esp_wifi
+        esp_netif
+        esp_event
+)

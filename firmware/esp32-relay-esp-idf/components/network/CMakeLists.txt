@@ -1,0 +1,21 @@
+idf_component_register(
+    SRCS 
+        "src/wifi_manager.c"
+        "src/http_server_config.c"
+        "src/mqtt_handler.c"
+    INCLUDE_DIRS 
+        "include"
+    PRIV_INCLUDE_DIRS 
+        "src"
+    REQUIRES 
+        esp_wifi
+        esp_http_server
+        mqtt
+        esp_netif
+        esp_event
+        lwip
+        json
+        esp_http_client
+        config_manager
+        relay_control
+)

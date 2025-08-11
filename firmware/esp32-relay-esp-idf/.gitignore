@@ -1,0 +1,39 @@
+# Python
+.venv/
+venv/
+*.pyc
+__pycache__/
+*.egg-info/
+dist/
+build/
+
+# ESP-IDF
+sdkconfig
+sdkconfig.old
+*.bin
+*.elf
+*.map
+build/
+.espressif/
+managed_components/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# Logs
+*.log
+
+# Backups
+backups/
+*.bak
+
+# OTA
+ota_config.json
+
+# OS
+.DS_Store
+Thumbs.db

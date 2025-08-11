@@ -1,0 +1,12 @@
+idf_component_register(
+    SRCS 
+        "src/relay_control.c"
+    INCLUDE_DIRS 
+        "include"
+    PRIV_INCLUDE_DIRS 
+        "src"
+    REQUIRES 
+        driver
+        esp_timer
+        config_manager
+)

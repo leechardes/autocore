@@ -1,0 +1,25 @@
+menu "Web Interface Configuration"
+
+    config WEB_INTERFACE_ENABLE
+        bool "Enable web interface component"
+        default n
+        help
+            Enable the web interface component for future implementation.
+            Currently acts as placeholder for modular architecture.
+
+    config WEB_INTERFACE_COMPRESSION
+        bool "Enable web asset compression"
+        default y
+        depends on WEB_INTERFACE_ENABLE
+        help
+            Enable compression for web assets (HTML, CSS, JS) to save flash space.
+
+    config WEB_INTERFACE_MAX_ASSETS
+        int "Maximum number of web assets"
+        default 10
+        range 5 50
+        depends on WEB_INTERFACE_ENABLE
+        help
+            Maximum number of web assets that can be embedded.
+
+endmenu
