@@ -130,6 +130,7 @@ def register_with_backend(config):
         print("ℹ️ Backend não configurado")
         return False
     
+    # Sempre re-registrar para garantir dados atualizados
     print("📞 Registrando com backend...")
     
     try:
@@ -146,7 +147,7 @@ def register_with_backend(config):
         payload = {
             "uuid": config['device_id'],
             "name": config['device_name'], 
-            "type": "relay",
+            "type": "esp32_relay",
             "mac_address": mac_address,
             "ip_address": device_ip,
             "firmware_version": "2.0.0",
