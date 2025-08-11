@@ -53,9 +53,9 @@ DEFAULT_CONFIG = {
     'device_name': f'ESP32 Relay {UNIQUE_ID}',
     'wifi_ssid': '',
     'wifi_password': '',
-    'backend_ip': '10.0.10.100',
+    'backend_ip': '192.168.1.100',
     'backend_port': 8081,
-    'mqtt_broker': '10.0.10.100',
+    'mqtt_broker': '192.168.1.100',
     'mqtt_port': 1883,
     'mqtt_user': '',
     'mqtt_password': '',
@@ -107,12 +107,12 @@ def http_request(method, url, data=None, timeout=10):
         if urequests:
             if method.upper() == 'POST':
                 headers = {'Content-Type': 'application/json'}
-                response = urequests.post(url, json=data, headers=headers)
+                response = urequests.post(url, json=data, headers=headers, timeout=timeout)
                 result = response.json() if response.text else {}
                 response.close()
                 return True, result
             else:
-                response = urequests.get(url)
+                response = urequests.get(url, timeout=timeout)
                 result = response.json() if response.text else {}
                 response.close()
                 return True, result
@@ -126,79 +126,59 @@ def http_request(method, url, data=None, timeout=10):
 
 def register_with_backend(config):
     """Registra dispositivo no backend e obtém configuração MQTT"""
-    if not config.get('backend_ip'):
-        print("ℹ️ Backend não configurado")
-        return False
+    if not config.get('backend_ip') or config.get('mqtt_registered'):
+        print("ℹ️ Registro não necessário")
+        return True
     
     print("📞 Registrando com backend...")
     
     try:
-        # Obter IP e MAC atual
+        # Obter IP atual
         sta = network.WLAN(network.STA_IF)
         if not sta.isconnected():
             print("❌ WiFi não conectado para registro")
             return False
         
         device_ip = sta.ifconfig()[0]
-        mac_address = ubinascii.hexlify(sta.config('mac'), ':').decode()
         
-        # 1. Registrar dispositivo
+        # Payload de registro
         payload = {
             "uuid": config['device_id'],
             "name": config['device_name'], 
             "type": "relay",
-            "mac_address": mac_address,
-            "ip_address": device_ip,
             "firmware_version": "2.0.0",
-            "hardware_version": "ESP32-WROOM-32"
+            "relay_channels": config.get('relay_channels', 16),
+            "ip_address": device_ip
         }
         
-        url = f"http://{config['backend_ip']}:{config['backend_port']}/api/devices"
+        url = f"http://{config['backend_ip']}:{config['backend_port']}/api/devices/register"
         print(f"📡 POST {url}")
         
         success, response = http_request('POST', url, payload)
         
-        if success:
-            print("✅ Dispositivo registrado!")
-        else:
-            print(f"⚠️ Registro falhou ou já existe")
-        
-        # 2. Buscar configuração MQTT
-        mqtt_url = f"http://{config['backend_ip']}:{config['backend_port']}/api/mqtt/config"
-        print(f"📡 GET {mqtt_url}")
-        
-        mqtt_success, mqtt_response = http_request('GET', mqtt_url)
-        
-        if mqtt_success and mqtt_response:
-            print("✅ Configuração MQTT recebida!")
+        if success and response:
+            print("✅ Registro bem-sucedido!")
             
             # Atualizar configuração MQTT
-            if 'broker' in mqtt_response:
-                config['mqtt_broker'] = mqtt_response['broker']
-            if 'port' in mqtt_response:
-                config['mqtt_port'] = mqtt_response['port']
-            if 'username' in mqtt_response:
-                config['mqtt_user'] = mqtt_response['username']
-            if 'password' in mqtt_response:
-                config['mqtt_password'] = mqtt_response['password']
+            if 'mqtt_broker' in response:
+                config['mqtt_broker'] = response['mqtt_broker']
+            if 'mqtt_port' in response:
+                config['mqtt_port'] = response['mqtt_port']
+            if 'mqtt_user' in response:
+                config['mqtt_user'] = response['mqtt_user']
+            if 'mqtt_password' in response:
+                config['mqtt_password'] = response['mqtt_password']
             
             config['mqtt_registered'] = True
             save_config(config)
             
             print(f"🔧 MQTT: {config['mqtt_broker']}:{config['mqtt_port']}")
             print(f"👤 User: {config.get('mqtt_user', 'N/A')}")
-            print(f"🔑 Pass recebida: {'Sim' if config.get('mqtt_password') else 'Não'}")
             
             return True
         else:
-            print(f"❌ Falha ao obter config MQTT")
-            # Usar config default do backend_ip
-            config['mqtt_broker'] = config['backend_ip']
-            config['mqtt_port'] = 1883
-            config['mqtt_user'] = config['device_id']
-            config['mqtt_password'] = ''
-            save_config(config)
-            return True
+            print(f"❌ Falha no registro: {response}")
+            return False
             
     except Exception as e:
         print(f"❌ Erro no registro: {e}")
@@ -339,8 +319,6 @@ def setup_mqtt(config):
         user = config.get('mqtt_user', '')
         password = config.get('mqtt_password', '')
         
-        print(f"🔑 Auth: user={user}, pass={'*' * len(password) if password else 'vazio'}")
-        
         if user and password:
             client = MQTTClient(client_id, broker, port=port, user=user, password=password)
         else:
@@ -467,19 +445,22 @@ def connect_wifi(ssid, password, timeout=15):
 # ============================================================================
 
 def generate_html_inline(config, message=""):
-    """Gera HTML simplificado para economizar memória"""
+    """Gera HTML inline sem usar web_page.py"""
     
-    # Limpar memória antes
-    gc.collect()
+    # Status do WiFi
+    sta = network.WLAN(network.STA_IF)
+    wifi_status = "✅ Conectado" if sta.isconnected() else "❌ Desconectado"
+    if sta.isconnected():
+        wifi_status += f" ({sta.ifconfig()[0]})"
     
-    # Importar HTML simples
-    try:
-        from simple_html import get_simple_html
-        return get_simple_html(config)
-    except ImportError:
-        pass
+    # Mensagem de feedback
+    msg_html = ""
+    if message:
+        msg_type, msg_text = message if isinstance(message, tuple) else ("info", message)
+        color = {"success": "#4CAF50", "error": "#f44336", "info": "#2196F3"}.get(msg_type, "#2196F3")
+        msg_html = f'<div style="padding: 10px; background: {color}; color: white; border-radius: 5px; margin: 10px 0;">{msg_text}</div>'
     
-    # HTML super simplificado para economizar memória
+    # HTML simplificado mas com visual melhorado
     html = """<!DOCTYPE html>
 <html>
 <head>
@@ -727,13 +708,9 @@ def handle_http_request(request, config):
         
         # GET / - Página principal
         if method == 'GET' and path == '/':
-            try:
-                html = generate_html_inline(config)
-                response = f"HTTP/1.1 200 OK\r\nContent-Type: text/html; charset=UTF-8\r\n\r\n{html}"
-                return response.encode('utf-8')
-            except Exception as e:
-                print(f"❌ Erro gerando HTML: {e}")
-                return b"HTTP/1.1 500 Internal Server Error\r\n\r\n<h1>Erro interno</h1>"
+            html = generate_html_inline(config)
+            response = f"HTTP/1.1 200 OK\r\nContent-Type: text/html; charset=UTF-8\r\n\r\n{html}"
+            return response.encode('utf-8')
         
         # POST /config - Salvar configuração
         elif method == 'POST' and path == '/config':
@@ -857,68 +834,49 @@ def start_http_server(config):
     print("🌐 Servidor HTTP rodando na porta 80")
     
     while True:
-        conn = None
         try:
             conn, addr = s.accept()
-            conn.settimeout(2.0)  # Timeout de 2 segundos
+            request = conn.recv(2048).decode('utf-8')
             
-            # Receber requisição de uma vez
-            try:
-                request = conn.recv(2048).decode('utf-8')
-            except OSError:
-                request = ""
+            # Processar requisição
+            result = handle_http_request(request, config)
             
-            if request:
-                # Processar requisição
-                print(f"📥 Processando requisição...")
-                result = handle_http_request(request, config)
-                print(f"📤 Resposta pronta: {len(result) if result else 0} bytes")
+            # Se retornar tupla, tem ação adicional
+            if isinstance(result, tuple):
+                response, action = result
+                conn.send(response)
+                conn.close()
                 
-                # Se retornar tupla, tem ação adicional
-                if isinstance(result, tuple):
-                    response, action = result
-                    conn.send(response)
-                    conn.close()
-                    conn = None
-                    
-                    # Executar ação
-                    if action.get('action') == 'connect_wifi':
-                        print("📡 Tentando conectar ao WiFi...")
-                        if connect_wifi(config['wifi_ssid'], config['wifi_password']):
-                            print("✅ WiFi conectado! Reiniciando...")
-                            time.sleep(3)
-                            machine.reset()
-                        else:
-                            print("❌ Falha na conexão WiFi")
-                    
-                    elif action.get('action') == 'reboot':
-                        time.sleep(2)
+                # Executar ação
+                if action.get('action') == 'connect_wifi':
+                    print("📡 Tentando conectar ao WiFi...")
+                    if connect_wifi(config['wifi_ssid'], config['wifi_password']):
+                        print("✅ WiFi conectado! Reiniciando...")
+                        time.sleep(3)
                         machine.reset()
-                    
-                    elif action.get('action') == 'reset':
-                        time.sleep(2)
-                        machine.reset()
-                else:
-                    conn.send(result)
-                    conn.close()
-                    conn = None
+                    else:
+                        print("❌ Falha na conexão WiFi")
+                
+                elif action.get('action') == 'reboot':
+                    time.sleep(2)
+                    machine.reset()
+                
+                elif action.get('action') == 'reset':
+                    time.sleep(2)
+                    machine.reset()
+            else:
+                conn.send(result)
+                conn.close()
             
             # Limpeza de memória
             gc.collect()
             
-        except OSError as e:
-            if e.args[0] in [11, 113, 116, 128]:  # EAGAIN, ECONNABORTED, ETIMEDOUT, ENOTCONN
-                pass  # Erros esperados, ignorar
-            else:
-                print(f"❌ Erro OSError: {e.args[0]} - {e}")
         except Exception as e:
             print(f"❌ Erro: {e}")
-        finally:
-            if conn:
-                try:
-                    conn.close()
-                except:
-                    pass
+            try:
+                conn.close()
+            except:
+                pass
 
 # ============================================================================
 # MAIN

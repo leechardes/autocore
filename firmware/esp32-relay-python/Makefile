@@ -34,13 +34,16 @@ flash: ## Instala firmware MicroPython no ESP32
 	@echo "${GREEN}✅ Firmware instalado! Aguarde 5 segundos para boot...${NC}"
 	@sleep 5
 
-deploy: ## Envia main.py para ESP32 usando ampy
-	@echo "${BLUE}Fazendo deploy do main.py...${NC}"
+deploy: ## Envia main.py e simple_html.py para ESP32 usando ampy
+	@echo "${BLUE}Fazendo deploy dos arquivos...${NC}"
 	@if [ ! -f "main.py" ]; then \
 		echo "${RED}❌ Arquivo main.py não encontrado${NC}"; \
 		exit 1; \
 	fi
 	python3 -m ampy.cli --port $(PORT) --baud $(BAUD_RATE) put main.py
+	@if [ -f "simple_html.py" ]; then \
+		python3 -m ampy.cli --port $(PORT) --baud $(BAUD_RATE) put simple_html.py; \
+	fi
 	@echo "${GREEN}✅ Deploy concluído!${NC}"
 
 restart: ## Reinicia ESP32 via software reset
