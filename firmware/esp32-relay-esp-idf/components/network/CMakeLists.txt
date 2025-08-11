@@ -6,6 +6,7 @@ idf_component_register(
         "src/mqtt_registration.c"
         "src/mqtt_commands.c"
         "src/mqtt_telemetry.c"
+        "src/mqtt_momentary.c"
     INCLUDE_DIRS 
         "include"
     PRIV_INCLUDE_DIRS 

@@ -361,6 +361,22 @@ esp_err_t mqtt_subscribe_commands(void) {
         ret = ESP_FAIL;
     }
     
+    // Subscribe to heartbeat for momentary relays: autocore/devices/{uuid}/relay/heartbeat
+    if (strlen(config->mqtt_topic_prefix) > 0) {
+        snprintf(topic, sizeof(topic), "%s/devices/%s/relay/heartbeat", 
+                config->mqtt_topic_prefix, config->device_id);
+    } else {
+        snprintf(topic, sizeof(topic), "autocore/devices/%s/relay/heartbeat", config->device_id);
+    }
+    
+    int msg_id3 = esp_mqtt_client_subscribe(mqtt_client_handle, topic, 0); // QoS 0 para heartbeat
+    if (msg_id3 >= 0) {
+        ESP_LOGI(TAG, "Subscribed to relay heartbeat: %s", topic);
+    } else {
+        ESP_LOGE(TAG, "Failed to subscribe to relay heartbeat");
+        // Não é crítico, então não falha
+    }
+    
     return ret;
 }
 

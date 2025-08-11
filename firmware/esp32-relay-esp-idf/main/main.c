@@ -32,6 +32,7 @@
 #include "http_server.h"
 #include "mqtt_handler.h"
 #include "mqtt_registration.h"
+#include "mqtt_momentary.h"
 #include "relay_control.h"
 
 // Logging tag
@@ -116,6 +117,8 @@ static void wifi_connected_handler(void) {
             
             // Start MQTT client with saved credentials
             if (mqtt_client_init() == ESP_OK) {
+                // Inicializa sistema de relés momentâneos
+                mqtt_momentary_init();
                 // Create MQTT task on core 1 for optimal performance
                 xTaskCreatePinnedToCore(
                     mqtt_task,

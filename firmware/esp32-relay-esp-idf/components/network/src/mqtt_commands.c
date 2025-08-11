@@ -1,5 +1,7 @@
 #include "mqtt_protocol.h"
 #include "mqtt_handler.h"
+#include "mqtt_momentary.h"
+#include "mqtt_telemetry.h"
 #include "relay_control.h"
 #include "config_manager.h"
 #include "esp_log.h"
@@ -35,6 +37,16 @@ esp_err_t mqtt_parse_command(const char* topic, const char* payload, mqtt_comman
     if (strstr(topic, "/relay/command")) {
         cmd->type = MQTT_CMD_RELAY;
         ret = mqtt_parse_relay_command(json, cmd);
+    } else if (strstr(topic, "/relay/heartbeat")) {
+        // Processa heartbeat de relé momentâneo
+        cJSON *channel_json = cJSON_GetObjectItem(json, "channel");
+        if (channel_json && cJSON_IsNumber(channel_json)) {
+            int channel = cJSON_GetNumberValue(channel_json);
+            ESP_LOGD(TAG, "💓 Heartbeat recebido para canal %d", channel);
+            mqtt_momentary_heartbeat(channel);
+        }
+        cJSON_Delete(json);
+        return ESP_OK; // Retorna direto, não precisa processar mais
     } else if (strstr(topic, "/commands/")) {
         cmd->type = MQTT_CMD_GENERAL;
         ret = mqtt_parse_general_command(json, cmd);
@@ -113,7 +125,11 @@ esp_err_t mqtt_parse_relay_command(cJSON* json, mqtt_command_struct_t* cmd)
         strcpy(cmd->data.relay.user, "system");
     }
 
-    cJSON *momentary_json = cJSON_GetObjectItem(json, "is_momentary");
+    // Tenta ambos os formatos: "momentary" e "is_momentary"
+    cJSON *momentary_json = cJSON_GetObjectItem(json, "momentary");
+    if (!momentary_json) {
+        momentary_json = cJSON_GetObjectItem(json, "is_momentary");
+    }
     cmd->data.relay.is_momentary = (momentary_json && cJSON_IsBool(momentary_json)) ? cJSON_IsTrue(momentary_json) : false;
 
     ESP_LOGI(TAG, "Comando de relé parsed: canal=%d, cmd=%s, source=%s, momentary=%s",
@@ -259,17 +275,28 @@ esp_err_t mqtt_process_relay_command(mqtt_command_struct_t* cmd)
             return ESP_ERR_INVALID_ARG;
         }
 
-        ESP_LOGI(TAG, "Executando comando no canal %d (índice %d)", cmd->data.relay.channel, channel_idx);
+        ESP_LOGI(TAG, "Executando comando no canal %d (índice %d)%s", 
+                 cmd->data.relay.channel, channel_idx,
+                 cmd->data.relay.is_momentary ? " [MOMENTÂNEO]" : "");
 
         switch (cmd->data.relay.cmd) {
             case RELAY_CMD_ON:
                 relay_turn_on(channel_idx);
-                ESP_LOGI(TAG, "Relé %d ligado", cmd->data.relay.channel);
+                ESP_LOGI(TAG, "Relé %d ligado%s", cmd->data.relay.channel,
+                        cmd->data.relay.is_momentary ? " (modo momentâneo)" : "");
+                
+                // Se for momentâneo, ativa monitoramento
+                if (cmd->data.relay.is_momentary) {
+                    ESP_LOGW(TAG, "⚠️ Relé %d em modo momentâneo - iniciando monitoramento", cmd->data.relay.channel);
+                    mqtt_momentary_start(cmd->data.relay.channel);
+                }
                 break;
 
             case RELAY_CMD_OFF:
                 relay_turn_off(channel_idx);
                 ESP_LOGI(TAG, "Relé %d desligado", cmd->data.relay.channel);
+                // Para monitoramento momentâneo se estiver ativo
+                mqtt_momentary_stop(cmd->data.relay.channel);
                 break;
 
             case RELAY_CMD_TOGGLE:

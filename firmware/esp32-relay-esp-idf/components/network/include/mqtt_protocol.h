@@ -10,6 +10,10 @@
 extern "C" {
 #endif
 
+// Configurações de timeout para relé momentâneo
+#define MOMENTARY_TIMEOUT_MS 1000  // 1 segundo sem heartbeat = desliga
+#define MOMENTARY_CHECK_INTERVAL_MS 100  // Verifica a cada 100ms
+
 // Tipos de comando MQTT
 typedef enum {
     MQTT_CMD_RELAY,     // Comandos de relé (on/off/toggle)
