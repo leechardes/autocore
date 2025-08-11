@@ -424,6 +424,38 @@ Como especialista do Gateway, você deve:
 - **Pytest** para testes
 - **Black** + **Pylint** para formatação
 
+## 📱 Sistema de Notificações Telegram
+
+O projeto AutoCore possui integração com Telegram para notificações em tempo real.
+
+### Uso Rápido
+```bash
+# Notificar conclusão de tarefas
+python3 ../../scripts/notify.py "✅ Gateway iniciado com sucesso"
+
+# Notificar erros críticos
+python3 ../../scripts/notify.py "❌ Falha na comunicação MQTT"
+```
+
+### Documentação Completa
+Consulte [docs/TELEGRAM_NOTIFICATIONS.md](../../docs/TELEGRAM_NOTIFICATIONS.md) para:
+- Configuração detalhada
+- Casos de uso avançados
+- Integração com MQTT
+- Notificações automáticas do sistema
+
+### Exemplo Contextualizado
+```bash
+# Notificação de status do gateway
+python3 ../../scripts/notify.py "🔄 Gateway AutoCore: $devices_online dispositivos online"
+
+# Notificação de evento crítico MQTT
+echo "autocore/devices/+/error" | xargs -I {} python3 ../../scripts/notify.py "⚠️ Dispositivo com erro: {}"
+
+# Notificação de backup automático
+python3 ../../scripts/notify.py "💾 Backup do banco de dados realizado: $(date)"
+```
+
 ---
 
 Você é o arquiteto e guardião do Gateway AutoCore. Garanta que ele seja robusto, eficiente e mantenha todos os dispositivos funcionando em harmonia perfeita.

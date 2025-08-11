@@ -108,9 +108,24 @@ void AutoCoreWebServer::setupRoutes() {
         handleConfig(request);
     });
     
-    server->on("/api/config", HTTP_POST, [this](AsyncWebServerRequest *request) {
-        handleConfigPost(request);
+    // Endpoint de teste simples
+    server->on("/api/test-post", HTTP_POST, [this](AsyncWebServerRequest *request) {
+        LOG_INFO_CTX("WebServer", "Test POST recebido!");
+        request->send(200, "application/json", "{\"success\":true,\"message\":\"POST funcionando\"}");
     });
+    
+    // Handler com body para JSON
+    server->on("/api/config", HTTP_POST, 
+        [this](AsyncWebServerRequest *request) {
+            // Chamado quando a requisição termina
+            // Resposta será enviada pelo handler do body
+        },
+        nullptr,  // upload handler
+        [this](AsyncWebServerRequest *request, uint8_t *data, size_t len, size_t index, size_t total) {
+            // Body handler
+            handleConfigPostWithBody(request, data, len, index, total);
+        }
+    );
     
     // API de scan WiFi
     server->on("/api/wifi/scan", HTTP_GET, [this](AsyncWebServerRequest *request) {
@@ -189,13 +204,9 @@ void AutoCoreWebServer::handleRoot(AsyncWebServerRequest *request) {
         html += "<h1>AutoCore ESP32 Relay</h1>";
         html += "<div class='status info'>UUID: " + configManager.getDeviceUUID() + "</div>";
         
-        // Formulário de configuração
+        // Formulário de configuração SIMPLIFICADO
         html += "<form id='configForm'>";
         html += "<h3>Configuracao WiFi</h3>";
-        html += "<div class='form-group'>";
-        html += "<label>Nome do Dispositivo:</label>";
-        html += "<input type='text' name='device_name' value='" + configManager.getConfig().device_name + "' required>";
-        html += "</div>";
         
         html += "<div class='form-group'>";
         html += "<button type='button' class='scan-btn' onclick='scanWifi()'>Buscar Redes WiFi</button>";
@@ -211,7 +222,7 @@ void AutoCoreWebServer::handleRoot(AsyncWebServerRequest *request) {
         html += "<input type='password' name='wifi_password' placeholder='Deixe em branco para rede aberta'>";
         html += "</div>";
         
-        html += "<h3>Configuracao Backend</h3>";
+        html += "<h3>Configuracao Backend AutoCore</h3>";
         html += "<div class='form-group'>";
         html += "<label>IP do Backend:</label>";
         html += "<input type='text' name='backend_ip' placeholder='Ex: 192.168.1.100' required>";
@@ -219,31 +230,14 @@ void AutoCoreWebServer::handleRoot(AsyncWebServerRequest *request) {
         
         html += "<div class='form-group'>";
         html += "<label>Porta do Backend:</label>";
-        html += "<input type='number' name='backend_port' value='8000' required>";
+        html += "<input type='number' name='backend_port' value='8081' required>";
         html += "</div>";
         
-        html += "<h3>Configuracao MQTT (Opcional)</h3>";
-        html += "<div class='form-group'>";
-        html += "<label>Broker MQTT:</label>";
-        html += "<input type='text' name='mqtt_broker' placeholder='Ex: 192.168.1.100'>";
+        html += "<div class='status info' style='margin-top:20px'>";
+        html += "<strong>Nota:</strong> As configuracoes MQTT serao obtidas automaticamente do backend apos a conexao.";
         html += "</div>";
         
-        html += "<div class='form-group'>";
-        html += "<label>Porta MQTT:</label>";
-        html += "<input type='number' name='mqtt_port' value='1883'>";
-        html += "</div>";
-        
-        html += "<div class='form-group'>";
-        html += "<label>Usuario MQTT:</label>";
-        html += "<input type='text' name='mqtt_user' placeholder='Opcional'>";
-        html += "</div>";
-        
-        html += "<div class='form-group'>";
-        html += "<label>Senha MQTT:</label>";
-        html += "<input type='password' name='mqtt_password' placeholder='Opcional'>";
-        html += "</div>";
-        
-        html += "<button type='submit'>Salvar Configuracao</button>";
+        html += "<button type='submit'>Salvar e Conectar</button>";
         html += "</form>";
         
         html += "<div id='message'></div>";
@@ -271,17 +265,38 @@ void AutoCoreWebServer::handleRoot(AsyncWebServerRequest *request) {
         html += "  formData.forEach((v,k)=>data[k]=v);";
         html += "  if(data.wifi_ssid_manual)data.wifi_ssid=data.wifi_ssid_manual;";
         html += "  delete data.wifi_ssid_manual;";
-        html += "  document.getElementById('message').innerHTML='<div class=\"status info\">Salvando...</div>';";
-        html += "  fetch('/api/config',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(data)})";
-        html += "  .then(r=>r.json()).then(resp=>{";
+        html += "  data.device_name='ESP32_Relay_" + configManager.getDeviceUUID().substring(12) + "';";  // Nome automático
+        html += "  console.log('Enviando dados:', data);";
+        html += "  document.getElementById('message').innerHTML='<div class=\"status info\">Salvando configuracao...</div>';";
+        html += "  const controller = new AbortController();";
+        html += "  const timeoutId = setTimeout(() => controller.abort(), 10000);";  // Timeout de 10 segundos
+        html += "  fetch('/api/config',{";
+        html += "    method:'POST',";
+        html += "    headers:{'Content-Type':'application/json'},";
+        html += "    body:JSON.stringify({config:data}),";
+        html += "    signal: controller.signal";
+        html += "  })";
+        html += "  .then(r=>{";
+        html += "    clearTimeout(timeoutId);";
+        html += "    console.log('Resposta recebida:', r.status);";
+        html += "    if(!r.ok) throw new Error('Status: '+r.status);";
+        html += "    return r.json();";
+        html += "  })";
+        html += "  .then(resp=>{";
+        html += "    console.log('JSON parseado:', resp);";
         html += "    if(resp.success){";
-        html += "      document.getElementById('message').innerHTML='<div class=\"status success\">Configuracao salva! Reiniciando...</div>';";
-        html += "      setTimeout(()=>fetch('/api/restart',{method:'POST'}),2000);";
+        html += "      document.getElementById('message').innerHTML='<div class=\"status success\">Configuracao salva! O dispositivo ira reiniciar em 3 segundos...</div>';";
+        html += "      setTimeout(()=>window.location.reload(),3000);";
         html += "    }else{";
-        html += "      document.getElementById('message').innerHTML='<div class=\"status error\">Erro: '+resp.error+'</div>';";
+        html += "      document.getElementById('message').innerHTML='<div class=\"status error\">Erro: '+(resp.error||'Desconhecido')+'</div>';";
         html += "    }";
         html += "  }).catch(e=>{";
-        html += "    document.getElementById('message').innerHTML='<div class=\"status error\">Erro ao salvar</div>';";
+        html += "    console.error('Erro:', e);";
+        html += "    if(e.name === 'AbortError'){";
+        html += "      document.getElementById('message').innerHTML='<div class=\"status error\">Timeout - servidor nao respondeu</div>';";
+        html += "    }else{";
+        html += "      document.getElementById('message').innerHTML='<div class=\"status error\">Erro: '+e.message+'</div>';";
+        html += "    }";
         html += "  });";
         html += "  return false;";
         html += "};";
@@ -303,16 +318,40 @@ void AutoCoreWebServer::handleConfig(AsyncWebServerRequest *request) {
 void AutoCoreWebServer::handleConfigPost(AsyncWebServerRequest *request) {
     logRequest(request);
     
-    // Esta função será chamada para requisições POST
-    // O corpo será tratado no callback body
-    if (request->hasParam("config", true)) {
-        String configJson = request->getParam("config", true)->value();
+    // Para requisições JSON, precisamos de um handler diferente
+    // Esta função será chamada sem o body
+    LOG_ERROR_CTX("WebServer", "handleConfigPost chamado sem body - use handler com body");
+    request->send(400, "application/json", "{\"success\":false,\"error\":\"Método incorreto\"}");
+}
+
+void AutoCoreWebServer::handleConfigPostWithBody(AsyncWebServerRequest *request, uint8_t *data, size_t len, size_t index, size_t total) {
+    // Log imediato para debug
+    if(index == 0) {
+        LOG_INFO_CTX("WebServer", "=== INICIO POST /api/config ===");
+        logRequest(request);
+    }
+    
+    LOG_INFO_CTX("WebServer", "Recebendo body - index: %d, len: %d, total: %d", index, len, total);
+    
+    // Acumular o body completo
+    static String bodyContent = "";
+    
+    if (index == 0) {
+        bodyContent = ""; // Reset no início
+    }
+    
+    // Adicionar chunk atual
+    for (size_t i = 0; i < len; i++) {
+        bodyContent += (char)data[i];
+    }
+    
+    // Se recebemos tudo, processar
+    if (index + len == total) {
+        LOG_INFO_CTX("WebServer", "Body completo recebido: %s", bodyContent.c_str());
         
-        LOG_INFO_CTX("WebServer", "Recebida configuração: %s", configJson.c_str());
-        
-        // Parser do JSON de configuração
+        // Parser do JSON
         JsonDocument doc;
-        DeserializationError error = deserializeJson(doc, configJson);
+        DeserializationError error = deserializeJson(doc, bodyContent);
         
         if (error) {
             LOG_ERROR_CTX("WebServer", "Erro ao parsear JSON: %s", error.c_str());
@@ -320,13 +359,24 @@ void AutoCoreWebServer::handleConfigPost(AsyncWebServerRequest *request) {
             return;
         }
         
+        // Verificar se tem o campo config
+        if (!doc.containsKey("config")) {
+            LOG_ERROR_CTX("WebServer", "Campo 'config' não encontrado no JSON");
+            request->send(400, "application/json", "{\"success\":false,\"error\":\"Parâmetro 'config' obrigatório\"}");
+            return;
+        }
+        
+        JsonObject configObj = doc["config"];
+        LOG_INFO_CTX("WebServer", "Processando configuração...");
+        
         bool success = true;
         String errorMsg = "";
         
         // Configurar WiFi
-        if (doc["wifi_ssid"].is<String>() && doc["wifi_password"].is<String>()) {
-            String ssid = doc["wifi_ssid"];
-            String password = doc["wifi_password"];
+        if (configObj["wifi_ssid"].is<String>() && configObj["wifi_password"].is<String>()) {
+            String ssid = configObj["wifi_ssid"];
+            String password = configObj["wifi_password"];
+            LOG_INFO_CTX("WebServer", "Configurando WiFi: %s", ssid.c_str());
             
             if (ssid.length() > 0) {
                 success &= configManager.setWiFiCredentials(ssid, password);
@@ -334,9 +384,10 @@ void AutoCoreWebServer::handleConfigPost(AsyncWebServerRequest *request) {
         }
         
         // Configurar Backend
-        if (doc["backend_ip"].is<String>() && doc["backend_port"].is<int>()) {
-            String ip = doc["backend_ip"];
-            int port = doc["backend_port"];
+        if (configObj["backend_ip"].is<String>() && configObj["backend_port"]) {
+            String ip = configObj["backend_ip"];
+            int port = configObj["backend_port"].as<int>();
+            LOG_INFO_CTX("WebServer", "Configurando Backend: %s:%d", ip.c_str(), port);
             
             if (ip.length() > 0 && port > 0) {
                 success &= configManager.setBackendInfo(ip, port);
@@ -344,11 +395,12 @@ void AutoCoreWebServer::handleConfigPost(AsyncWebServerRequest *request) {
         }
         
         // Configurar MQTT (opcional)
-        if (doc["mqtt_broker"].is<String>() && doc["mqtt_port"].is<int>()) {
-            String broker = doc["mqtt_broker"];
-            int port = doc["mqtt_port"];
-            String user = doc["mqtt_user"] | "";
-            String pass = doc["mqtt_password"] | "";
+        if (configObj["mqtt_broker"].is<String>() && configObj["mqtt_port"]) {
+            String broker = configObj["mqtt_broker"];
+            int port = configObj["mqtt_port"].as<int>();
+            String user = configObj["mqtt_user"] | "";
+            String pass = configObj["mqtt_password"] | "";
+            LOG_INFO_CTX("WebServer", "Configurando MQTT: %s:%d", broker.c_str(), port);
             
             if (broker.length() > 0 && port > 0) {
                 success &= configManager.setMQTTInfo(broker, port, user, pass);
@@ -366,8 +418,6 @@ void AutoCoreWebServer::handleConfigPost(AsyncWebServerRequest *request) {
         } else {
             request->send(400, "application/json", "{\"success\":false,\"error\":\"Erro ao salvar configuração\"}");
         }
-    } else {
-        request->send(400, "application/json", "{\"success\":false,\"error\":\"Parâmetro 'config' obrigatório\"}");
     }
 }
 
@@ -560,8 +610,19 @@ String AutoCoreWebServer::getClientInfo(AsyncWebServerRequest *request) {
 }
 
 void AutoCoreWebServer::logRequest(AsyncWebServerRequest *request) {
-    LOG_DEBUG_CTX("WebServer", "%s %s - %s", 
+    // Mudar para INFO para aparecer sempre nos logs
+    LOG_INFO_CTX("WebServer", "REQ: %s %s - IP: %s", 
                   request->methodToString(), 
                   request->url().c_str(),
                   request->client()->remoteIP().toString().c_str());
+    
+    // Logs adicionais para POST
+    if(request->method() == HTTP_POST) {
+        if(request->hasHeader("Content-Type")) {
+            LOG_INFO_CTX("WebServer", "Content-Type: %s", request->getHeader("Content-Type")->value().c_str());
+        }
+        if(request->hasHeader("Content-Length")) {
+            LOG_INFO_CTX("WebServer", "Content-Length: %s", request->getHeader("Content-Length")->value().c_str());
+        }
+    }
 }

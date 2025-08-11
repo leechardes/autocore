@@ -13,6 +13,14 @@ import paho.mqtt.client as mqtt
 from fastapi import WebSocket
 from dotenv import load_dotenv
 
+# Importar notificador Telegram
+try:
+    from services.telegram_notifier import telegram
+    TELEGRAM_ENABLED = telegram.enabled
+except ImportError:
+    TELEGRAM_ENABLED = False
+    telegram = None
+
 # Carregar variáveis de ambiente
 load_dotenv()
 
@@ -139,6 +147,10 @@ class MQTTMonitor:
             
             # Log da mensagem
             logger.debug(f"📨 Mensagem recebida: {mqtt_msg.topic}")
+            
+            # Notificar Telegram para mensagens importantes
+            if TELEGRAM_ENABLED and telegram:
+                self._notify_telegram_if_important(mqtt_msg)
             
             # WebSockets serão notificados no próximo poll
             
@@ -426,6 +438,51 @@ class MQTTMonitor:
             logger.error(f"❌ Erro ao publicar mensagem: {e}")
             return False
             
+    def _notify_telegram_if_important(self, mqtt_msg: MQTTMessage):
+        """Notifica Telegram para mensagens importantes"""
+        try:
+            topic = mqtt_msg.topic.lower()
+            
+            # Mensagens de segurança/emergência
+            if "safety" in topic or "emergency" in topic:
+                telegram.send_alert(
+                    "🚨 Segurança AutoCore",
+                    f"Tópico: {mqtt_msg.topic}\nPayload: {mqtt_msg.payload}",
+                    "CRITICAL"
+                )
+                return
+            
+            # Dispositivos online/offline
+            if "status" in topic:
+                try:
+                    payload = json.loads(mqtt_msg.payload)
+                    if "online" in payload or "offline" in payload:
+                        status = "online" if payload.get("online", False) else "offline"
+                        device = mqtt_msg.device_uuid or "Desconhecido"
+                        telegram.notify_device_status(device, status)
+                except:
+                    pass
+            
+            # Ações de relé
+            if "relay" in topic and ("set" in topic or "toggle" in topic):
+                try:
+                    payload = json.loads(mqtt_msg.payload)
+                    channel = payload.get("channel", "?")
+                    action = payload.get("state", "TOGGLE")
+                    telegram.notify_relay_action(channel, action)
+                except:
+                    pass
+            
+            # Erros
+            if "error" in topic:
+                telegram.send_alert(
+                    "❌ Erro no Sistema",
+                    f"Tópico: {mqtt_msg.topic}\nErro: {mqtt_msg.payload}",
+                    "ERROR"
+                )
+        except Exception as e:
+            logger.debug(f"Erro ao notificar Telegram: {e}")
+    
     def get_stats(self) -> Dict[str, Any]:
         """Retorna estatísticas do monitor"""
         return {

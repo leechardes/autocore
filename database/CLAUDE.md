@@ -238,6 +238,38 @@ Em caso de dúvidas:
 3. Use o console SQL para investigação
 4. Faça backup antes de mudanças críticas
 
+## 📱 Sistema de Notificações Telegram
+
+O projeto AutoCore possui integração com Telegram para notificações em tempo real.
+
+### Uso Rápido
+```bash
+# Notificar conclusão de backup
+python3 ../../scripts/notify.py "✅ Backup do banco AutoCore realizado"
+
+# Notificar erros de integridade
+python3 ../../scripts/notify.py "❌ Falha na integridade do banco de dados"
+```
+
+### Documentação Completa
+Consulte [docs/TELEGRAM_NOTIFICATIONS.md](../../docs/TELEGRAM_NOTIFICATIONS.md) para:
+- Configuração detalhada
+- Casos de uso avançados
+- Integração com MQTT
+- Notificações automáticas do sistema
+
+### Exemplo Contextualizado
+```bash
+# Notificação de migration aplicada
+python src/migrations/auto_migrate.py auto -m "Add new field" && python3 ../../scripts/notify.py "🔄 Database: Migration aplicada com sucesso"
+
+# Notificação de limpeza automática
+python scripts/maintenance.py clean && python3 ../../scripts/notify.py "🧹 Database: Limpeza automática concluída"
+
+# Notificação de status do banco
+python src/cli/manage.py status | grep "healthy" && python3 ../../scripts/notify.py "💚 Database: Status saudável"
+```
+
 ---
 
 **Última Atualização:** 07 de agosto de 2025  

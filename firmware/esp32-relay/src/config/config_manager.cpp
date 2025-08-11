@@ -312,6 +312,16 @@ bool ConfigManager::isBackendConfigured() {
     return config.backend_ip.length() > 0 && config.backend_port > 0;
 }
 
+void ConfigManager::updateMQTTSettings(const String& broker, int port, const String& user, const String& password) {
+    LOG_INFO_CTX("ConfigManager", "Atualizando configurações MQTT");
+    config.mqtt_broker = broker;
+    config.mqtt_port = port;
+    config.mqtt_user = user;
+    config.mqtt_password = password;
+    saveConfig();
+    LOG_INFO_CTX("ConfigManager", "Configurações MQTT salvas no NVS");
+}
+
 void ConfigManager::setConfigured(bool configured) {
     config.config_completed = configured;
     saveConfig();

@@ -37,6 +37,13 @@ public:
     bool updateStatus(const String& deviceUUID, const String& statusJson);
     bool reportTelemetry(const String& deviceUUID, const String& telemetryJson);
     
+    // Auto-registro e configuração MQTT
+    bool checkDeviceRegistration(const String& deviceUUID);
+    bool registerDevice(const String& uuid, const String& name, const String& type,
+                       const String& macAddress, const String& ipAddress,
+                       const String& firmwareVersion, const String& hardwareVersion);
+    String getMQTTConfig();
+    
     // Descoberta e configuração
     bool discoverBackend(String& discoveredIP, int& discoveredPort);
     bool validateBackendAPI(const String& ip, int port);

@@ -640,6 +640,38 @@ Como especialista ESP32 CAN FuelTech do AutoCore, você deve:
 9. **Implementar retry e recovery automático**
 10. **Documentar protocolo e troubleshooting**
 
+## 📱 Sistema de Notificações Telegram
+
+O projeto AutoCore possui integração com Telegram para notificações em tempo real.
+
+### Uso Rápido
+```bash
+# Notificar conclusão de upload de firmware
+python3 ../../../scripts/notify.py "✅ Firmware ESP32 CAN carregado com sucesso"
+
+# Notificar erros de comunicação CAN
+python3 ../../../scripts/notify.py "❌ Falha na comunicação CAN Bus"
+```
+
+### Documentação Completa
+Consulte [docs/TELEGRAM_NOTIFICATIONS.md](../../../docs/TELEGRAM_NOTIFICATIONS.md) para:
+- Configuração detalhada
+- Casos de uso avançados
+- Integração com MQTT
+- Notificações automáticas do sistema
+
+### Exemplo Contextualizado
+```bash
+# Notificação de upload de firmware via PlatformIO
+pio run --target upload && python3 ../../../scripts/notify.py "🚗 ESP32 CAN: Firmware atualizado" || python3 ../../../scripts/notify.py "❌ ESP32 CAN: Falha no upload"
+
+# Notificação de dados críticos da ECU
+echo "RPM > 8000" | python3 ../../../scripts/notify.py "⚠️ ESP32 CAN: RPM crítico detectado"
+
+# Notificação de erro de comunicação FuelTech
+python3 ../../../scripts/notify.py "🔧 ESP32 CAN: Conexão com ECU FuelTech perdida"
+```
+
 ---
 
 Lembre-se: A comunicação CAN com a ECU é **CRÍTICA PARA SEGURANÇA**. Sempre valide comandos, implemente timeouts e nunca envie dados corrompidos!

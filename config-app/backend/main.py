@@ -150,6 +150,14 @@ class StatusResponse(BaseModel):
     devices_online: int = 0
     timestamp: datetime
 
+class MQTTConfigResponse(BaseModel):
+    """Configurações MQTT para dispositivos ESP32"""
+    broker: str = "localhost"  # IP será sempre localhost (mesmo IP do backend)
+    port: int = 1883
+    username: Optional[str] = None
+    password: Optional[str] = None
+    topic_prefix: str = "autocore"
+
 # ====================================
 # ENDPOINTS - ROOT
 # ====================================
@@ -268,6 +276,47 @@ async def get_device(device_id: int):
     """Busca dispositivo por ID"""
     try:
         device = devices.get_by_id(device_id)
+        if not device:
+            raise HTTPException(status_code=404, detail="Dispositivo não encontrado")
+        
+        # Extrair location do configuration_json
+        import json
+        location = None
+        if device.configuration_json:
+            try:
+                config = json.loads(device.configuration_json)
+                location = config.get('location')
+            except:
+                pass
+        
+        return DeviceResponse(
+            id=device.id,
+            uuid=device.uuid,
+            name=device.name,
+            type=device.type,
+            mac_address=device.mac_address,
+            ip_address=device.ip_address,
+            firmware_version=device.firmware_version,
+            hardware_version=device.hardware_version,
+            status=device.status,
+            last_seen=device.last_seen,
+            location=location,
+            configuration_json=device.configuration_json,
+            capabilities_json=device.capabilities_json,
+            is_active=device.is_active,
+            created_at=device.created_at,
+            updated_at=device.updated_at
+        )
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.get("/api/devices/uuid/{device_uuid}", response_model=DeviceResponse, tags=["Devices"])
+async def get_device_by_uuid(device_uuid: str):
+    """Busca dispositivo por UUID - usado pelo ESP32 para auto-registro"""
+    try:
+        device = devices.get_by_uuid(device_uuid)
         if not device:
             raise HTTPException(status_code=404, detail="Dispositivo não encontrado")
         
@@ -1297,6 +1346,20 @@ async def websocket_mqtt_monitor(websocket: WebSocket):
                     })
     except WebSocketDisconnect:
         await mqtt_monitor.remove_websocket(websocket)
+
+@app.get("/api/mqtt/config", response_model=MQTTConfigResponse, tags=["MQTT"])
+async def get_mqtt_config():
+    """Retorna configurações MQTT para dispositivos ESP32"""
+    try:
+        return MQTTConfigResponse(
+            broker="localhost",  # O ESP32 usará o mesmo IP do backend
+            port=int(os.getenv("MQTT_PORT", "1883")),
+            username=os.getenv("MQTT_USERNAME"),
+            password=os.getenv("MQTT_PASSWORD"),
+            topic_prefix=os.getenv("MQTT_TOPIC_PREFIX", "autocore")
+        )
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
 
 @app.get("/api/mqtt/status", tags=["MQTT"])
 async def get_mqtt_status():

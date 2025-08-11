@@ -524,6 +524,38 @@ location /api {
 - [Lucide Icons](https://lucide.dev/icons/)
 - [shadcn/ui Examples](https://ui.shadcn.com/examples)
 
+## 📱 Sistema de Notificações Telegram
+
+O projeto AutoCore possui integração com Telegram para notificações em tempo real.
+
+### Uso Rápido
+```bash
+# Notificar conclusão de build
+python3 ../../../scripts/notify.py "✅ Config-App Frontend: Build concluído com sucesso"
+
+# Notificar erros de build
+python3 ../../../scripts/notify.py "❌ Config-App Frontend: Falha no build"
+```
+
+### Documentação Completa
+Consulte [docs/TELEGRAM_NOTIFICATIONS.md](../../../docs/TELEGRAM_NOTIFICATIONS.md) para:
+- Configuração detalhada
+- Casos de uso avançados
+- Integração com MQTT
+- Notificações automáticas do sistema
+
+### Exemplo Contextualizado
+```bash
+# Notificação de build e deploy
+npm run build && python3 ../../../scripts/notify.py "📦 Config-App Frontend: Build finalizado" || python3 ../../../scripts/notify.py "❌ Config-App Frontend: Falha no build"
+
+# Notificação de deploy para Raspberry Pi
+scp -r dist/* pi@raspberrypi.local:/var/www/autocore/ && python3 ../../../scripts/notify.py "🚀 Config-App Frontend: Deploy para Raspberry Pi concluído"
+
+# Notificação de servidor de desenvolvimento
+npm run dev && python3 ../../../scripts/notify.py "💻 Config-App Frontend: Servidor de desenvolvimento ativo"
+```
+
 ---
 
 **Última Atualização:** 07 de agosto de 2025  

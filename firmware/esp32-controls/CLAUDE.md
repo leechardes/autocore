@@ -673,6 +673,35 @@ Como especialista ESP32 Controls do AutoCore, você deve:
 9. **Implementar detecção de long press e double click**
 10. **Criar sistema de debug e monitoramento**
 
+## 📱 Sistema de Notificações Telegram
+
+O projeto AutoCore possui integração com Telegram para notificações em tempo real.
+
+### Uso Rápido
+```bash
+# Notificar conclusão de upload de firmware
+python3 ../../../scripts/notify.py "✅ Firmware ESP32 Controls carregado com sucesso"
+
+# Notificar erros de compilação
+python3 ../../../scripts/notify.py "❌ Falha na compilação ESP32 Controls"
+```
+
+### Documentação Completa
+Consulte [docs/TELEGRAM_NOTIFICATIONS.md](../../../docs/TELEGRAM_NOTIFICATIONS.md) para:
+- Configuração detalhada
+- Casos de uso avançados
+- Integração com MQTT
+- Notificações automáticas do sistema
+
+### Exemplo Contextualizado
+```bash
+# Notificação de upload de firmware via PlatformIO
+pio run --target upload && python3 ../../../scripts/notify.py "🎮 ESP32 Controls: Firmware atualizado" || python3 ../../../scripts/notify.py "❌ ESP32 Controls: Falha no upload"
+
+# Notificação de debug/monitor
+pio device monitor | grep "ERROR" | xargs -I {} python3 ../../../scripts/notify.py "⚠️ ESP32 Controls erro: {}"
+```
+
 ---
 
 Lembre-se: Nos controles do AutoCore, **PRECISÃO E RESPONSIVIDADE** são críticos. Cada input deve ser detectado e processado instantaneamente!

@@ -383,6 +383,41 @@ O **AutoCore Config App** é agora uma aplicação **COMPLETA** e **PROFISSIONAL
 
 Com toda a base configurada, estamos prontos para implementar o **AutoCore Gateway** que fará a ponte entre o Config App e os dispositivos ESP32 reais via MQTT.
 
+## 📱 Sistema de Notificações Telegram
+
+O projeto AutoCore possui integração com Telegram para notificações em tempo real.
+
+### Uso Rápido
+```bash
+# Notificar conclusão de setup completo
+python3 ../../scripts/notify.py "✅ AutoCore Config-App: Setup completo - Backend e Frontend rodando"
+
+# Notificar erros críticos
+python3 ../../scripts/notify.py "❌ AutoCore Config-App: Sistema com falha crítica"
+```
+
+### Documentação Completa
+Consulte [docs/TELEGRAM_NOTIFICATIONS.md](../../docs/TELEGRAM_NOTIFICATIONS.md) para:
+- Configuração detalhada
+- Casos de uso avançados
+- Integração com MQTT
+- Notificações automáticas do sistema
+
+### Exemplo Contextualizado
+```bash
+# Notificação de stack completa ativa
+make dev && python3 ../../scripts/notify.py "🚀 Config-App: Stack completa rodando (Backend + Frontend + Database)"
+
+# Notificação de deploy para produção
+make deploy && python3 ../../scripts/notify.py "🎉 Config-App: Deploy para Raspberry Pi concluído"
+
+# Notificação de integrações
+echo "MQTT + WebSocket + Database" | python3 ../../scripts/notify.py "🔗 Config-App: Todas integrações ativas"
+
+# Notificação de milestone atingido
+python3 ../../scripts/notify.py "🏆 Config-App: BETA COMPLETO - Pronto para Gateway Integration!"
+```
+
 ---
 
 **Estado:** 🎯 **BETA COMPLETO** - Ready for Gateway Integration  

@@ -18,6 +18,7 @@ private:
     void handleRoot(AsyncWebServerRequest *request);
     void handleConfig(AsyncWebServerRequest *request);
     void handleConfigPost(AsyncWebServerRequest *request);
+    void handleConfigPostWithBody(AsyncWebServerRequest *request, uint8_t *data, size_t len, size_t index, size_t total);
     void handleScanWiFi(AsyncWebServerRequest *request);
     void handleTestConnection(AsyncWebServerRequest *request);
     void handleStatus(AsyncWebServerRequest *request);

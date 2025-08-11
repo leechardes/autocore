@@ -989,6 +989,41 @@ Como especialista Flutter do AutoCore (execution-only), você deve:
 5. **SEMPRE** implemente timeout de 1 segundo no ESP32
 6. **SEMPRE** notifique usuário de safety shutoff
 
+## 📱 Sistema de Notificações Telegram
+
+O projeto AutoCore possui integração com Telegram para notificações em tempo real.
+
+### Uso Rápido
+```bash
+# Notificar conclusão de build do app
+python3 ../../scripts/notify.py "✅ App Flutter: Build APK concluído com sucesso"
+
+# Notificar erros críticos de segurança
+python3 ../../scripts/notify.py "❌ App Flutter: Falha crítica no sistema de heartbeat"
+```
+
+### Documentação Completa
+Consulte [docs/TELEGRAM_NOTIFICATIONS.md](../../docs/TELEGRAM_NOTIFICATIONS.md) para:
+- Configuração detalhada
+- Casos de uso avançados
+- Integração com MQTT
+- Notificações automáticas do sistema
+
+### Exemplo Contextualizado
+```bash
+# Notificação de build e deploy
+flutter build apk --release && python3 ../../scripts/notify.py "📦 App Flutter: APK de produção gerado"
+
+# Notificação de evento de segurança
+echo "Heartbeat timeout detected" | python3 ../../scripts/notify.py "⚠️ App Flutter: Safety shutoff - botão desligado automaticamente"
+
+# Notificação de execução de macro
+python3 ../../scripts/notify.py "🎨 App Flutter: Macro 'Modo Trilha' executada com sucesso"
+
+# Notificação de hot reload em desenvolvimento
+flutter run && python3 ../../scripts/notify.py "📱 App Flutter: Modo desenvolvimento ativo com hot reload"
+```
+
 ---
 
 **IMPORTANTE**: O AutoCore Flutter é uma **interface de execução com segurança crítica**. Toda configuração é feita no Config-App web. O app Flutter apenas carrega, exibe e executa com **heartbeat obrigatório para momentâneos**!

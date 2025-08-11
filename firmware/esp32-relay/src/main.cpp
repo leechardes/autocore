@@ -337,12 +337,71 @@ void handleSystemState() {
                             LOG_INFO("Servidor web iniciado na porta %d", WEB_SERVER_PORT);
                         }
                         
-                        // Tentar conectar MQTT se configurado
-                        if (config.mqtt_broker.length() > 0) {
-                            if (!mqttClient.begin(config.device_uuid, config.mqtt_broker, 
-                                                config.mqtt_port, config.mqtt_user, config.mqtt_password)) {
-                                LOG_ERROR("Falha ao inicializar cliente MQTT");
+                        // Auto-registro e busca de config MQTT do backend
+                        if (config.backend_ip.length() > 0) {
+                            LOG_INFO("Verificando registro no backend...");
+                            
+                            // 1. Verificar se está registrado
+                            if (apiClient.checkDeviceRegistration(config.device_uuid)) {
+                                LOG_INFO("Dispositivo já registrado no backend");
+                            } else {
+                                LOG_INFO("Dispositivo não registrado - fazendo auto-registro...");
+                                
+                                // Preparar dados para registro
+                                String deviceName = "ESP32_Relay_" + config.device_uuid.substring(12);
+                                String macAddress = WiFi.macAddress();
+                                String ipAddress = WiFi.localIP().toString();
+                                String firmwareVersion = "1.0.0";
+                                String hardwareVersion = "ESP32-D0WD-V3";
+                                
+                                if (apiClient.registerDevice(config.device_uuid, deviceName, "relay", 
+                                                            macAddress, ipAddress, firmwareVersion, hardwareVersion)) {
+                                    LOG_INFO("Auto-registro concluído com sucesso!");
+                                } else {
+                                    LOG_ERROR("Falha no auto-registro");
+                                }
                             }
+                            
+                            // 2. Buscar configurações MQTT do backend
+                            LOG_INFO("Buscando configurações MQTT do backend...");
+                            String mqttConfig = apiClient.getMQTTConfig();
+                            
+                            if (mqttConfig.length() > 0) {
+                                // Parsear configurações MQTT
+                                JsonDocument doc;
+                                DeserializationError error = deserializeJson(doc, mqttConfig);
+                                
+                                if (!error) {
+                                    // Aplicar configurações MQTT (broker será o mesmo IP do backend)
+                                    config.mqtt_broker = config.backend_ip;  // Usar IP do backend
+                                    config.mqtt_port = doc["port"] | 1883;
+                                    config.mqtt_user = doc["username"] | "";
+                                    config.mqtt_password = doc["password"] | "";
+                                    
+                                    // Salvar configurações atualizadas
+                                    configManager.updateMQTTSettings(config.mqtt_broker, config.mqtt_port, 
+                                                                    config.mqtt_user, config.mqtt_password);
+                                    
+                                    LOG_INFO("Configurações MQTT obtidas do backend:");
+                                    LOG_INFO("  Broker: %s", config.mqtt_broker.c_str());
+                                    LOG_INFO("  Porta: %d", config.mqtt_port);
+                                    LOG_INFO("  Usuário: %s", config.mqtt_user.length() > 0 ? "***" : "nenhum");
+                                    
+                                    // Conectar MQTT com as novas configurações
+                                    if (!mqttClient.begin(config.device_uuid, config.mqtt_broker, 
+                                                        config.mqtt_port, config.mqtt_user, config.mqtt_password)) {
+                                        LOG_ERROR("Falha ao inicializar cliente MQTT");
+                                    } else {
+                                        LOG_INFO("Cliente MQTT inicializado com configurações do backend");
+                                    }
+                                } else {
+                                    LOG_ERROR("Erro ao parsear configurações MQTT: %s", error.c_str());
+                                }
+                            } else {
+                                LOG_WARN("Não foi possível obter configurações MQTT do backend");
+                            }
+                        } else {
+                            LOG_WARN("Backend não configurado - pulando auto-registro e config MQTT");
                         }
                         
                         changeState(RUNNING);

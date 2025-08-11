@@ -53,6 +53,9 @@ public:
     bool isMQTTConfigured();
     bool isBackendConfigured();
     
+    // Atualização de configurações MQTT
+    void updateMQTTSettings(const String& broker, int port, const String& user, const String& password);
+    
     // Utilitários
     String getDeviceUUID();
     String getDeviceName();

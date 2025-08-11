@@ -324,3 +324,65 @@ void APIClient::setDebug(bool enabled) {
     debugEnabled = enabled;
     LOG_INFO_CTX("APIClient", "Debug %s", enabled ? "habilitado" : "desabilitado");
 }
+
+// ============================================
+// AUTO-REGISTRO E CONFIGURAÇÃO MQTT
+// ============================================
+
+bool APIClient::checkDeviceRegistration(const String& deviceUUID) {
+    String response;
+    String endpoint = "/api/devices/uuid/" + deviceUUID;
+    
+    LOG_INFO_CTX("APIClient", "Verificando registro do dispositivo: %s", deviceUUID.c_str());
+    
+    if (makeRequest("GET", endpoint, "", response)) {
+        // Se retornou 200, o dispositivo está registrado
+        return true;
+    } else {
+        // Se retornou 404 ou outro erro, não está registrado
+        return false;
+    }
+}
+
+bool APIClient::registerDevice(const String& uuid, const String& name, const String& type,
+                               const String& macAddress, const String& ipAddress,
+                               const String& firmwareVersion, const String& hardwareVersion) {
+    
+    LOG_INFO_CTX("APIClient", "Registrando dispositivo: %s", uuid.c_str());
+    
+    // Criar JSON com dados do dispositivo
+    JsonDocument doc;
+    doc["uuid"] = uuid;
+    doc["name"] = name;
+    doc["type"] = type;
+    doc["mac_address"] = macAddress;
+    doc["ip_address"] = ipAddress;
+    doc["firmware_version"] = firmwareVersion;
+    doc["hardware_version"] = hardwareVersion;
+    
+    String payload;
+    serializeJson(doc, payload);
+    
+    String response;
+    if (makeRequest("POST", "/api/devices", payload, response)) {
+        LOG_INFO_CTX("APIClient", "Dispositivo registrado com sucesso");
+        return true;
+    } else {
+        LOG_ERROR_CTX("APIClient", "Falha ao registrar dispositivo (HTTP %d)", lastHTTPCode);
+        return false;
+    }
+}
+
+String APIClient::getMQTTConfig() {
+    String response;
+    
+    LOG_INFO_CTX("APIClient", "Buscando configurações MQTT do backend");
+    
+    if (makeRequest("GET", "/api/mqtt/config", "", response)) {
+        LOG_INFO_CTX("APIClient", "Configurações MQTT obtidas com sucesso");
+        return response;
+    } else {
+        LOG_ERROR_CTX("APIClient", "Falha ao obter configurações MQTT (HTTP %d)", lastHTTPCode);
+        return "";
+    }
+}

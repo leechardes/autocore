@@ -363,6 +363,38 @@ Antes de commit:
 4. **Documente** - FastAPI gera docs automaticamente
 5. **Teste localmente** - Simule Pi Zero limitado
 
+## 📱 Sistema de Notificações Telegram
+
+O projeto AutoCore possui integração com Telegram para notificações em tempo real.
+
+### Uso Rápido
+```bash
+# Notificar conclusão de deploy da API
+python3 ../../../scripts/notify.py "✅ Config-App Backend: API iniciada com sucesso"
+
+# Notificar erros de API
+python3 ../../../scripts/notify.py "❌ Config-App Backend: Falha na inicialização da API"
+```
+
+### Documentação Completa
+Consulte [docs/TELEGRAM_NOTIFICATIONS.md](../../../docs/TELEGRAM_NOTIFICATIONS.md) para:
+- Configuração detalhada
+- Casos de uso avançados
+- Integração com MQTT
+- Notificações automáticas do sistema
+
+### Exemplo Contextualizado
+```bash
+# Notificação de startup da API
+uvicorn main:app --host 0.0.0.0 --port 8000 && python3 ../../../scripts/notify.py "🚀 Config-App Backend: API rodando na porta 8000"
+
+# Notificação de integração com MQTT monitor
+echo "MQTT connected" | python3 ../../../scripts/notify.py "🔗 Config-App Backend: Conectado ao MQTT broker"
+
+# Notificação de erro crítico na API
+tail -f logs/api.log | grep "ERROR" | xargs -I {} python3 ../../../scripts/notify.py "⚠️ Config-App Backend: {}"
+```
+
 ---
 
 **Última Atualização:** 07 de agosto de 2025  

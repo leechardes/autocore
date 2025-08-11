@@ -675,6 +675,38 @@ Como especialista ESP32 Display do AutoCore, você deve:
 9. **Implementar cache de recursos**
 10. **Documentar código para manutenção**
 
+## 📱 Sistema de Notificações Telegram
+
+O projeto AutoCore possui integração com Telegram para notificações em tempo real.
+
+### Uso Rápido
+```bash
+# Notificar conclusão de upload de firmware
+python3 ../../../scripts/notify.py "✅ Firmware ESP32 Display carregado com sucesso"
+
+# Notificar erros de display
+python3 ../../../scripts/notify.py "❌ Falha na inicialização do display"
+```
+
+### Documentação Completa
+Consulte [docs/TELEGRAM_NOTIFICATIONS.md](../../../docs/TELEGRAM_NOTIFICATIONS.md) para:
+- Configuração detalhada
+- Casos de uso avançados
+- Integração com MQTT
+- Notificações automáticas do sistema
+
+### Exemplo Contextualizado
+```bash
+# Notificação de upload de firmware via PlatformIO
+pio run --target upload && python3 ../../../scripts/notify.py "🖥️ ESP32 Display: Firmware atualizado" || python3 ../../../scripts/notify.py "❌ ESP32 Display: Falha no upload"
+
+# Notificação de tema aplicado
+python3 ../../../scripts/notify.py "🎨 ESP32 Display: Novo tema aplicado com sucesso"
+
+# Notificação de performance
+echo "FPS < 15" | python3 ../../../scripts/notify.py "⚠️ ESP32 Display: Performance baixa detectada"
+```
+
 ---
 
 Lembre-se: No ESP32 Display AutoCore, **PERFORMANCE E TEMATIZAÇÃO** são igualmente importantes. Se não roda suave e não é tematizável, precisa ser refeito!
