@@ -3,6 +3,7 @@
 #include <time.h>
 #include <stdbool.h>
 #include <stdint.h>
+#include "esp_err.h"
 #include "cJSON.h"
 
 #ifdef __cplusplus
@@ -49,7 +50,7 @@ typedef struct {
             char data[128];        // Dados extras (URL OTA, etc)
         } general;
     } data;
-} mqtt_command_t;
+} mqtt_command_struct_t;
 
 // Estrutura de telemetria
 typedef struct {
@@ -62,14 +63,14 @@ typedef struct {
 } telemetry_event_t;
 
 // Funções do parser
-esp_err_t mqtt_parse_command(const char* topic, const char* payload, mqtt_command_t* cmd);
-esp_err_t mqtt_parse_relay_command(cJSON* json, mqtt_command_t* cmd);
-esp_err_t mqtt_parse_general_command(cJSON* json, mqtt_command_t* cmd);
+esp_err_t mqtt_parse_command(const char* topic, const char* payload, mqtt_command_struct_t* cmd);
+esp_err_t mqtt_parse_relay_command(cJSON* json, mqtt_command_struct_t* cmd);
+esp_err_t mqtt_parse_general_command(cJSON* json, mqtt_command_struct_t* cmd);
 
 // Funções de processamento
-esp_err_t mqtt_process_command(mqtt_command_t* cmd);
-esp_err_t mqtt_process_relay_command(mqtt_command_t* cmd);
-esp_err_t mqtt_process_general_command(mqtt_command_t* cmd);
+esp_err_t mqtt_process_command_struct(mqtt_command_struct_t* cmd);
+esp_err_t mqtt_process_relay_command(mqtt_command_struct_t* cmd);
+esp_err_t mqtt_process_general_command(mqtt_command_struct_t* cmd);
 
 // Funções de telemetria
 esp_err_t mqtt_publish_telemetry_event(telemetry_event_t* event);

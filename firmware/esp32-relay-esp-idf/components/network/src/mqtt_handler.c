@@ -17,6 +17,8 @@
 #include <mqtt_client.h>
 #include "mqtt_handler.h"
 #include "mqtt_registration.h"
+#include "mqtt_protocol.h"
+#include "mqtt_telemetry.h"
 #include "config_manager.h"
 #include "wifi_manager.h"
 #include "relay_control.h"
@@ -67,9 +69,12 @@ static void mqtt_event_handler(void *handler_args, esp_event_base_t base, int32_
             // Subscribe to command topic
             mqtt_subscribe_commands();
             
-            // Publish initial status after subscription is confirmed
+            // Publish online status immediately (counteracts LWT)
+            mqtt_publish_online_status();
+            
+            // Publish initial relay status after subscription is confirmed
             // Will be triggered on MQTT_EVENT_SUBSCRIBED instead
-            ESP_LOGI(TAG, "📊 Will publish status after subscription confirmed");
+            ESP_LOGI(TAG, "📊 Will publish relay status after subscription confirmed");
             
             // Call connected callback
             if (mqtt_connected_callback) {
@@ -192,6 +197,31 @@ esp_err_t mqtt_client_init(void) {
     mqtt_cfg.network.timeout_ms = MQTT_CONNECT_TIMEOUT_MS;
     mqtt_cfg.network.reconnect_timeout_ms = MQTT_RETRY_DELAY_MS;
     
+    // Configure Last Will Testament (LWT)
+    char lwt_topic[MQTT_MAX_TOPIC_LEN];
+    char lwt_payload[MQTT_MAX_PAYLOAD_LEN];
+    
+    // Generate LWT topic: autocore/devices/{uuid}/status
+    if (strlen(config->mqtt_topic_prefix) > 0) {
+        snprintf(lwt_topic, sizeof(lwt_topic), "%s/devices/%s/status", 
+                config->mqtt_topic_prefix, config->device_id);
+    } else {
+        snprintf(lwt_topic, sizeof(lwt_topic), "autocore/devices/%s/status", config->device_id);
+    }
+    
+    // Generate LWT payload (device offline)
+    snprintf(lwt_payload, sizeof(lwt_payload), 
+            "{\"uuid\":\"%s\",\"board_id\":1,\"status\":\"offline\",\"timestamp\":\"1970-01-01T00:00:00\",\"type\":\"esp32_relay\"}", 
+            config->device_id);
+    
+    mqtt_cfg.session.last_will.topic = lwt_topic;
+    mqtt_cfg.session.last_will.msg = lwt_payload;
+    mqtt_cfg.session.last_will.msg_len = strlen(lwt_payload);
+    mqtt_cfg.session.last_will.qos = 1;
+    mqtt_cfg.session.last_will.retain = true;
+    
+    ESP_LOGI(TAG, "LWT configured: %s", lwt_topic);
+    
     // Create MQTT client
     mqtt_client_handle = esp_mqtt_client_init(&mqtt_cfg);
     if (mqtt_client_handle == NULL) {
@@ -277,7 +307,7 @@ mqtt_state_t mqtt_client_get_state(void) {
 }
 
 /**
- * Subscribe to command topic
+ * Subscribe to command topics
  */
 esp_err_t mqtt_subscribe_commands(void) {
     if (!mqtt_client_is_connected()) {
@@ -297,21 +327,87 @@ esp_err_t mqtt_subscribe_commands(void) {
     }
     
     char topic[MQTT_MAX_TOPIC_LEN];
+    esp_err_t ret = ESP_OK;
     
-    // Generate topic using saved topic prefix if available
+    // Subscribe to relay commands: autocore/devices/{uuid}/relay/command
     if (strlen(config->mqtt_topic_prefix) > 0) {
-        snprintf(topic, sizeof(topic), "%s/devices/%s/command", 
+        snprintf(topic, sizeof(topic), "%s/devices/%s/relay/command", 
                 config->mqtt_topic_prefix, config->device_id);
     } else {
-        snprintf(topic, sizeof(topic), MQTT_TOPIC_COMMAND_PATTERN, config->device_id);
+        snprintf(topic, sizeof(topic), "autocore/devices/%s/relay/command", config->device_id);
     }
     
-    int msg_id = esp_mqtt_client_subscribe(mqtt_client_handle, topic, 1); // QoS 1
+    int msg_id1 = esp_mqtt_client_subscribe(mqtt_client_handle, topic, 1); // QoS 1
+    if (msg_id1 >= 0) {
+        ESP_LOGI(TAG, "Subscribed to relay commands: %s", topic);
+    } else {
+        ESP_LOGE(TAG, "Failed to subscribe to relay commands");
+        ret = ESP_FAIL;
+    }
+    
+    // Subscribe to general commands: autocore/devices/{uuid}/commands/+
+    if (strlen(config->mqtt_topic_prefix) > 0) {
+        snprintf(topic, sizeof(topic), "%s/devices/%s/commands/+", 
+                config->mqtt_topic_prefix, config->device_id);
+    } else {
+        snprintf(topic, sizeof(topic), "autocore/devices/%s/commands/+", config->device_id);
+    }
+    
+    int msg_id2 = esp_mqtt_client_subscribe(mqtt_client_handle, topic, 1); // QoS 1
+    if (msg_id2 >= 0) {
+        ESP_LOGI(TAG, "Subscribed to general commands: %s", topic);
+    } else {
+        ESP_LOGE(TAG, "Failed to subscribe to general commands");
+        ret = ESP_FAIL;
+    }
+    
+    return ret;
+}
+
+/**
+ * Publish online status (counteracts LWT)
+ */
+esp_err_t mqtt_publish_online_status(void) {
+    if (!mqtt_client_is_connected()) {
+        ESP_LOGD(TAG, "MQTT not connected, skipping online status publish");
+        return ESP_ERR_INVALID_STATE;
+    }
+    
+    if (mqtt_client_handle == NULL) {
+        ESP_LOGE(TAG, "MQTT client handle is NULL");
+        return ESP_ERR_INVALID_STATE;
+    }
+    
+    device_config_t* config = config_get();
+    if (config == NULL) {
+        ESP_LOGE(TAG, "Config is NULL");
+        return ESP_ERR_INVALID_STATE;
+    }
+    
+    char topic[MQTT_MAX_TOPIC_LEN];
+    char payload[MQTT_MAX_PAYLOAD_LEN];
+    
+    // Generate topic for online status: autocore/devices/{uuid}/status
+    if (strlen(config->mqtt_topic_prefix) > 0) {
+        snprintf(topic, sizeof(topic), "%s/devices/%s/status", 
+                config->mqtt_topic_prefix, config->device_id);
+    } else {
+        snprintf(topic, sizeof(topic), "autocore/devices/%s/status", config->device_id);
+    }
+    
+    // Generate online status payload
+    snprintf(payload, sizeof(payload),
+            "{\"uuid\":\"%s\",\"board_id\":1,\"status\":\"online\",\"timestamp\":\"%s\",\"type\":\"esp32_relay\",\"channels\":16}",
+            config->device_id, "1970-01-01T00:00:00");  // Timestamp will be fixed when SNTP is working
+    
+    // Publish with QoS 1 and retain
+    int msg_id = esp_mqtt_client_publish(mqtt_client_handle, topic, payload, 0, 1, 1);
+    
     if (msg_id >= 0) {
-        ESP_LOGI(TAG, "Subscribed to commands: %s", topic);
+        ESP_LOGI(TAG, "✅ Online status published: %s", topic);
         return ESP_OK;
     } else {
-        ESP_LOGE(TAG, "Failed to subscribe to commands");
+        ESP_LOGE(TAG, "❌ Failed to publish online status");
         return ESP_FAIL;
     }
 }
@@ -382,6 +478,22 @@ esp_err_t mqtt_publish_message(const char* topic, const char* payload, size_t pa
 }
 
 /**
+ * Publish MQTT message with QoS and retain options
+ */
+esp_err_t mqtt_publish(const char* topic, const char* payload, int qos, bool retain) {
+    if (!mqtt_client_is_connected()) {
+        return ESP_ERR_INVALID_STATE;
+    }
+    
+    if (!topic || !payload) {
+        return ESP_ERR_INVALID_ARG;
+    }
+    
+    int msg_id = esp_mqtt_client_publish(mqtt_client_handle, topic, payload, strlen(payload), qos, retain ? 1 : 0);
+    return (msg_id >= 0) ? ESP_OK : ESP_FAIL;
+}
+
+/**
  * Process received MQTT command
  */
 esp_err_t mqtt_process_command(const char* topic, const char* data, size_t data_len) {
@@ -389,21 +501,36 @@ esp_err_t mqtt_process_command(const char* topic, const char* data, size_t data_
         return ESP_ERR_INVALID_ARG;
     }
     
-    // Parse command JSON
-    mqtt_cmd_data_t cmd_data;
-    esp_err_t ret = parse_mqtt_command(data, data_len, &cmd_data);
+    // Criar string null-terminated para o payload
+    char payload[MQTT_MAX_PAYLOAD_LEN];
+    size_t copy_len = MIN(data_len, sizeof(payload) - 1);
+    memcpy(payload, data, copy_len);
+    payload[copy_len] = '\0';
+    
+    ESP_LOGI(TAG, "Processing MQTT command from topic: %s", topic);
+    ESP_LOGD(TAG, "Payload: %s", payload);
+    
+    // Usar o novo parser de comandos
+    mqtt_command_struct_t command;
+    esp_err_t ret = mqtt_parse_command(topic, payload, &command);
     
     if (ret != ESP_OK) {
-        ESP_LOGE(TAG, "Failed to parse MQTT command");
+        ESP_LOGE(TAG, "Failed to parse MQTT command: %s", esp_err_to_name(ret));
         return ret;
     }
     
-    // Execute command
-    execute_mqtt_command(&cmd_data);
+    // Processar comando usando as novas funções
+    ret = mqtt_process_command_struct(&command);
+    if (ret != ESP_OK) {
+        ESP_LOGE(TAG, "Failed to process MQTT command: %s", esp_err_to_name(ret));
+        return ret;
+    }
     
-    // Call command callback if set
+    // Manter compatibilidade com callback antigo se definido
     if (mqtt_command_callback) {
-        mqtt_command_callback(&cmd_data);
+        mqtt_cmd_data_t legacy_cmd = {0};
+        // Mapear para estrutura antiga se necessário
+        mqtt_command_callback(&legacy_cmd);
     }
     
     return ESP_OK;

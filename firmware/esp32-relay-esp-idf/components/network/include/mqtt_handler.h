@@ -98,6 +98,7 @@ mqtt_state_t mqtt_client_get_state(void);
  * @return ESP_OK on success
  */
 esp_err_t mqtt_publish_status(void);
+esp_err_t mqtt_publish_online_status(void);
 
 /**
  * Publish custom message
@@ -107,6 +108,7 @@ esp_err_t mqtt_publish_status(void);
  * @return ESP_OK on success
  */
 esp_err_t mqtt_publish_message(const char* topic, const char* payload, size_t payload_len);
+esp_err_t mqtt_publish(const char* topic, const char* payload, int qos, bool retain);
 
 /**
  * Subscribe to command topic

@@ -230,6 +230,141 @@ validate: ## Valida configuração e código
 # FERRAMENTAS E UTILIDADES
 # ============================================================================
 
+list-ports: ## Lista todas as portas USB/Serial disponíveis
+	@$(PYTHON) scripts/list_ports.py || { \
+		echo "${CYAN}🔌 Portas USB/Serial disponíveis (fallback):${NC}"; \
+		echo "────────────────────────────────────────────"; \
+		if [ "$(UNAME_S)" = "Darwin" ]; then \
+			ls -la /dev/cu.* 2>/dev/null | awk '{print NR". " $$9}' | grep -E "usb|serial" || echo "Nenhuma porta USB encontrada"; \
+		else \
+			ls -la /dev/ttyUSB* /dev/ttyACM* 2>/dev/null | awk '{print NR". " $$9}' || echo "Nenhuma porta USB encontrada"; \
+		fi; \
+		echo "────────────────────────────────────────────"; \
+	}
+	@echo ""
+	@echo "${YELLOW}Porta atual configurada: ${GREEN}$(PORT)${NC}"
+
+ports: list-ports ## Alias para list-ports
+
+select-port: ## Seleciona porta USB interativamente
+	@echo "${CYAN}🔌 Seleção de Porta USB/Serial${NC}"
+	@echo "────────────────────────────────────────────"
+	@if [ "$(UNAME_S)" = "Darwin" ]; then \
+		ports=$$(ls /dev/cu.* 2>/dev/null | grep -E "usb|serial"); \
+	else \
+		ports=$$(ls /dev/ttyUSB* /dev/ttyACM* 2>/dev/null); \
+	fi; \
+	if [ -z "$$ports" ]; then \
+		echo "${RED}❌ Nenhuma porta USB encontrada${NC}"; \
+		exit 1; \
+	fi; \
+	echo "Portas disponíveis:"; \
+	echo "$$ports" | nl; \
+	echo ""; \
+	read -p "Digite o número da porta desejada: " port_num; \
+	selected=$$(echo "$$ports" | sed -n "$${port_num}p"); \
+	if [ -n "$$selected" ]; then \
+		echo "${GREEN}✅ Porta selecionada: $$selected${NC}"; \
+		echo ""; \
+		echo "${YELLOW}Para tornar permanente, adicione ao Makefile:${NC}"; \
+		echo "${CYAN}PORT = $$selected${NC}"; \
+		echo ""; \
+		echo "${YELLOW}Ou exporte a variável:${NC}"; \
+		echo "${CYAN}export PORT=$$selected${NC}"; \
+		echo ""; \
+		read -p "Deseja usar esta porta agora? (s/N): " use_now; \
+		if [ "$$use_now" = "s" ]; then \
+			$(MAKE) PORT=$$selected monitor; \
+		fi; \
+	else \
+		echo "${RED}❌ Seleção inválida${NC}"; \
+	fi
+
+configure: ## Configura porta e outras opções interativamente
+	@echo "${CYAN}╔══════════════════════════════════════════════════════════╗${NC}"
+	@echo "${CYAN}║            Configuração Interativa ESP32-Relay          ║${NC}"
+	@echo "${CYAN}╚══════════════════════════════════════════════════════════╝${NC}"
+	@echo ""
+	@echo "${YELLOW}1. Configuração de Porta${NC}"
+	@echo "────────────────────────────────────────────"
+	@if [ "$(UNAME_S)" = "Darwin" ]; then \
+		ports=$$(ls /dev/cu.* 2>/dev/null | grep -E "usb|serial"); \
+	else \
+		ports=$$(ls /dev/ttyUSB* /dev/ttyACM* 2>/dev/null); \
+	fi; \
+	if [ -z "$$ports" ]; then \
+		echo "${RED}❌ Nenhuma porta USB encontrada${NC}"; \
+		selected_port="$(PORT)"; \
+	else \
+		echo "Portas disponíveis:"; \
+		echo "$$ports" | nl; \
+		echo "0. Manter atual ($(PORT))"; \
+		echo ""; \
+		read -p "Digite o número da porta (0 para manter): " port_num; \
+		if [ "$$port_num" = "0" ] || [ -z "$$port_num" ]; then \
+			selected_port="$(PORT)"; \
+		else \
+			selected_port=$$(echo "$$ports" | sed -n "$${port_num}p"); \
+		fi; \
+	fi; \
+	echo "${GREEN}✅ Porta: $$selected_port${NC}"; \
+	echo ""; \
+	echo "${YELLOW}2. Configuração de Baud Rate${NC}"; \
+	echo "────────────────────────────────────────────"
+	echo "1. 115200 (padrão)"
+	echo "2. 230400"
+	echo "3. 460800"
+	echo "4. 921600"
+	echo "0. Manter atual ($(BAUD_RATE))"
+	echo ""
+	read -p "Digite o número do baud rate (0 para manter): " baud_num
+	case "$$baud_num" in \
+		1) selected_baud="115200" ;; \
+		2) selected_baud="230400" ;; \
+		3) selected_baud="460800" ;; \
+		4) selected_baud="921600" ;; \
+		*) selected_baud="$(BAUD_RATE)" ;; \
+	esac
+	echo "${GREEN}✅ Baud Rate: $$selected_baud${NC}"
+	echo ""
+	echo "${YELLOW}3. Ação a executar${NC}"
+	echo "────────────────────────────────────────────"
+	echo "1. Monitor Serial"
+	echo "2. Build"
+	echo "3. Flash"
+	echo "4. Flash + Monitor"
+	echo "5. Build + Flash + Monitor"
+	echo "6. Menuconfig"
+	echo "7. Erase Flash"
+	echo "0. Apenas salvar configuração"
+	echo ""
+	read -p "Digite o número da ação: " action_num
+	echo ""
+	echo "${CYAN}╔══════════════════════════════════════════════════════════╗${NC}"
+	echo "${CYAN}║                    Configuração Final                    ║${NC}"
+	echo "${CYAN}╚══════════════════════════════════════════════════════════╝${NC}"
+	echo "  Porta: $$selected_port"
+	echo "  Baud Rate: $$selected_baud"
+	echo ""
+	echo "${YELLOW}Para tornar permanente, edite o Makefile:${NC}"
+	echo "${CYAN}PORT = $$selected_port${NC}"
+	echo "${CYAN}BAUD_RATE = $$selected_baud${NC}"
+	echo ""
+	echo "${YELLOW}Ou exporte as variáveis:${NC}"
+	echo "${CYAN}export PORT=$$selected_port${NC}"
+	echo "${CYAN}export BAUD_RATE=$$selected_baud${NC}"
+	echo ""
+	case "$$action_num" in \
+		1) $(MAKE) PORT=$$selected_port BAUD_RATE=$$selected_baud monitor ;; \
+		2) $(MAKE) build ;; \
+		3) $(MAKE) PORT=$$selected_port BAUD_RATE=$$selected_baud flash ;; \
+		4) $(MAKE) PORT=$$selected_port BAUD_RATE=$$selected_baud flash-monitor ;; \
+		5) $(MAKE) PORT=$$selected_port BAUD_RATE=$$selected_baud dev ;; \
+		6) $(MAKE) menuconfig ;; \
+		7) $(MAKE) PORT=$$selected_port erase ;; \
+		*) echo "${GREEN}✅ Configuração salva (use as variáveis acima)${NC}" ;; \
+	esac
+
 status: ## Mostra status do ESP32 conectado
 	@echo "${CYAN}📊 Status do ESP32${NC}"
 	@$(PYTHON) scripts/device_status.py $(PORT)
