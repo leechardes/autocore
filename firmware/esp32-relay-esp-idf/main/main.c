@@ -24,12 +24,14 @@
 #include "nvs_flash.h"
 #include "esp_timer.h"
 #include "esp_chip_info.h"
+#include "esp_sntp.h"
 
 // Application modules
 #include "config_manager.h"
 #include "wifi_manager.h"
 #include "http_server.h"
 #include "mqtt_handler.h"
+#include "mqtt_registration.h"
 #include "relay_control.h"
 
 // Logging tag
@@ -48,7 +50,6 @@ static void wifi_connected_handler(void);
 static void wifi_disconnected_handler(void);
 static void wifi_ap_started_handler(void);
 static void mqtt_task(void *pvParameters);
-static esp_err_t backend_register_device(void);
 
 /**
  * Print system information
@@ -93,6 +94,12 @@ static void wifi_connected_handler(void) {
         ESP_LOGI(TAG, "IP Address: %s", ip_str);
     }
     
+    // Initialize SNTP for accurate timestamps
+    ESP_LOGI(TAG, "🕐 Initializing SNTP for timestamps");
+    sntp_setoperatingmode(SNTP_OPMODE_POLL);
+    sntp_setservername(0, "pool.ntp.org");
+    sntp_init();
+    
     // Stop AP mode since we're connected to WiFi
     ESP_LOGI(TAG, "Stopping AP mode as WiFi is connected");
     wifi_manager_stop_ap();
@@ -100,13 +107,14 @@ static void wifi_connected_handler(void) {
     // Start HTTP server (keep it running for configuration access)
     http_server_init();
     
-    // Register with backend if configured
+    // Perform smart registration if backend is configured
     if (strlen(config->backend_ip) > 0 && config->backend_port > 0) {
-        ESP_LOGI(TAG, "🔄 Registering with backend...");
-        if (backend_register_device() == ESP_OK) {
-            ESP_LOGI(TAG, "✅ Backend registration successful");
+        ESP_LOGI(TAG, "🔄 Starting smart MQTT registration...");
+        
+        if (mqtt_smart_registration() == ESP_OK) {
+            ESP_LOGI(TAG, "✅ Smart MQTT registration successful");
             
-            // Start MQTT client
+            // Start MQTT client with saved credentials
             if (mqtt_client_init() == ESP_OK) {
                 // Create MQTT task on core 1 for optimal performance
                 xTaskCreatePinnedToCore(
@@ -121,7 +129,7 @@ static void wifi_connected_handler(void) {
                 ESP_LOGI(TAG, "✅ MQTT task started on core 1");
             }
         } else {
-            ESP_LOGW(TAG, "⚠️ Backend registration failed, continuing without MQTT");
+            ESP_LOGW(TAG, "⚠️ Smart registration failed, continuing without MQTT");
         }
     } else {
         ESP_LOGI(TAG, "Backend not configured, running HTTP-only mode");
@@ -176,43 +184,36 @@ static void mqtt_task(void *pvParameters) {
         return;
     }
     
-    // Start telemetry publishing
-    if (mqtt_start_telemetry_task() != ESP_OK) {
-        ESP_LOGE(TAG, "❌ Failed to start telemetry task");
-    }
+    // Wait for MQTT to be fully connected before starting telemetry
+    vTaskDelay(pdMS_TO_TICKS(3000)); // 3 second delay
+    
+    // Disable timer-based telemetry for now - we'll use the main loop instead
+    ESP_LOGI(TAG, "📊 Telemetry will be handled in main MQTT loop");
     
     // MQTT task main loop
+    uint32_t telemetry_counter = 0;
     while (1) {
-        // Check MQTT connection status
-        if (!mqtt_client_is_connected()) {
-            ESP_LOGW(TAG, "⚠️ MQTT disconnected, attempting reconnection");
-            mqtt_client_reconnect();
-        }
-        
         // Task runs every 5 seconds
         vTaskDelay(pdMS_TO_TICKS(5000));
+        
+        // Check MQTT connection status after delay
+        if (mqtt_client_is_connected()) {
+            // Publish telemetry every 30 seconds (6 iterations * 5 seconds)
+            telemetry_counter++;
+            if (telemetry_counter >= 6) {
+                telemetry_counter = 0;
+                ESP_LOGD(TAG, "📊 Publishing telemetry status");
+                mqtt_publish_status();
+            }
+        } else {
+            ESP_LOGW(TAG, "⚠️ MQTT disconnected, attempting reconnection");
+            mqtt_client_reconnect();
+            telemetry_counter = 0; // Reset counter on disconnect
+        }
     }
 }
 
-/**
- * Register device with AutoCore backend
- */
-static esp_err_t backend_register_device(void) {
-    device_config_t* config = config_get();
-    
-    // Use mqtt_register_device function which handles HTTP registration
-    esp_err_t ret = mqtt_register_device();
-    
-    if (ret == ESP_OK) {
-        // Save updated configuration
-        config_save();
-        ESP_LOGI(TAG, "✅ Device registered with backend");
-    } else {
-        ESP_LOGE(TAG, "❌ Backend registration failed");
-    }
-    
-    return ret;
-}
+// Note: backend_register_device removed - now using mqtt_smart_registration()
 
 /**
  * Application main function
@@ -265,18 +266,47 @@ void app_main(void) {
     wifi_manager_set_disconnected_cb(wifi_disconnected_handler);
     wifi_manager_set_ap_started_cb(wifi_ap_started_handler);
     
-    // Start WiFi in smart configuration mode
-    ESP_LOGI(TAG, "🔄 Starting WiFi smart configuration...");
-    ret = wifi_manager_smart_config();
+    // Smart boot sequence - try STA mode first without activating AP
+    device_config_t* config = config_get();
+    bool wifi_connected = false;
     
-    if (ret != ESP_OK) {
-        ESP_LOGE(TAG, "❌ WiFi initialization failed");
-        // Continue in AP mode for configuration
-        device_config_t* config = config_get();
+    ESP_LOGI(TAG, "🔍 Checking WiFi boot conditions:");
+    ESP_LOGI(TAG, "  config->configured: %s", config->configured ? "TRUE" : "FALSE");
+    ESP_LOGI(TAG, "  config->wifi_ssid: '%s' (len: %d)", config->wifi_ssid, (int)strlen(config->wifi_ssid));
+    ESP_LOGI(TAG, "  config->wifi_password length: %d", (int)strlen(config->wifi_password));
+    
+    if (config->configured && strlen(config->wifi_ssid) > 0) {
+        ESP_LOGI(TAG, "✅ WiFi credentials found!");
+        ESP_LOGI(TAG, "🔄 Attempting WiFi connection (STA only): %s", config->wifi_ssid);
+        
+        // Try to connect to WiFi in STA mode only with 15 second timeout
+        ret = wifi_manager_connect_sta_only(config->wifi_ssid, config->wifi_password, 15000);
+        
+        if (ret == ESP_OK) {
+            ESP_LOGI(TAG, "✅ WiFi connected successfully on boot!");
+            wifi_connected = true;
+        } else {
+            ESP_LOGW(TAG, "⚠️ WiFi connection failed on boot (err: %s), will start AP mode", esp_err_to_name(ret));
+        }
+    } else {
+        ESP_LOGI(TAG, "ℹ️ Device not configured or SSID empty, will start in AP mode");
+        ESP_LOGI(TAG, "  Reason: configured=%s, ssid_len=%d", 
+                config->configured ? "true" : "false", (int)strlen(config->wifi_ssid));
+    }
+    
+    // Only start AP mode if WiFi connection failed or device is not configured
+    if (!wifi_connected) {
+        ESP_LOGI(TAG, "🌐 Starting WiFi AP mode for configuration...");
         char ap_ssid[32];
         config_get_ap_ssid(ap_ssid, sizeof(ap_ssid));
-        wifi_manager_start_ap(ap_ssid, CONFIG_ESP32_RELAY_DEFAULT_AP_PASSWORD);
-        http_server_init();
+        
+        ret = wifi_manager_start_ap(ap_ssid, CONFIG_ESP32_RELAY_DEFAULT_AP_PASSWORD);
+        if (ret != ESP_OK) {
+            ESP_LOGE(TAG, "❌ Failed to start AP mode");
+        } else {
+            // Start HTTP server for configuration
+            http_server_init();
+        }
     }
     
     // System initialization complete
@@ -288,11 +318,13 @@ void app_main(void) {
     uint32_t loop_count = 0;
     while (1) {
         // Periodic system maintenance
-        if (loop_count % 60 == 0) { // Every 60 seconds
-            // Log system status
-            ESP_LOGI(TAG, "📊 System Status - Uptime: %llu s, Free Heap: %lu bytes", 
-                    (unsigned long long)(esp_timer_get_time() / 1000000),
-                    (unsigned long)esp_get_free_heap_size());
+        if (loop_count % 60 == 0 && loop_count > 0) { // Every 60 seconds, but NOT on first iteration
+            // Log system status (reduced frequency to every 5 minutes)
+            if (loop_count % 300 == 0) { // Every 5 minutes
+                ESP_LOGI(TAG, "📊 System Status - Uptime: %llu s, Free Heap: %lu bytes", 
+                        (unsigned long long)(esp_timer_get_time() / 1000000),
+                        (unsigned long)esp_get_free_heap_size());
+            }
             
             // Check memory and cleanup if necessary
             if (esp_get_free_heap_size() < 10240) { // Less than 10KB
@@ -301,8 +333,8 @@ void app_main(void) {
                 esp_restart(); // In extreme cases, restart to recover
             }
             
-            // Save configuration periodically
-            config_save();
+            // Configuration is saved automatically when changed
+            // No need for periodic saves - this just wears out the flash
         }
         
         // Check WiFi connectivity

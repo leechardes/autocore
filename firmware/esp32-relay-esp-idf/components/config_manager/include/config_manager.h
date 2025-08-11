@@ -42,12 +42,21 @@ typedef struct {
     char backend_ip[CONFIG_IP_STR_MAX_LEN];
     uint16_t backend_port;
     
-    // MQTT configuration
+    // MQTT configuration (legacy fields for compatibility)
     char mqtt_broker[CONFIG_IP_STR_MAX_LEN];
     uint16_t mqtt_port;
     char mqtt_user[CONFIG_MQTT_USER_MAX_LEN];
     char mqtt_password[CONFIG_MQTT_PASSWORD_MAX_LEN];
     bool mqtt_registered;
+    
+    // New MQTT configuration fields for smart registration
+    bool device_registered;              // Track if device is registered with backend
+    char mqtt_broker_host[64];          // MQTT broker hostname/IP from backend  
+    uint16_t mqtt_broker_port;          // MQTT broker port from backend
+    char mqtt_username[32];             // MQTT username from backend
+    char mqtt_password_new[64];         // MQTT password from backend (new field to avoid conflicts)
+    char mqtt_topic_prefix[32];         // Topic prefix for MQTT messages
+    uint32_t last_registration;         // Timestamp of last registration attempt
     
     // Relay states (16 channels max)
     uint8_t relay_states[CONFIG_ESP32_RELAY_MAX_CHANNELS];
@@ -147,6 +156,39 @@ esp_err_t config_get_ap_ssid(char* ap_ssid, size_t max_len);
  * @return true if configuration is valid
  */
 bool config_validate(void);
+
+/**
+ * Save MQTT credentials from backend registration
+ * @param broker_host MQTT broker hostname/IP
+ * @param broker_port MQTT broker port
+ * @param username MQTT username
+ * @param password MQTT password
+ * @param topic_prefix Topic prefix for messages
+ * @return ESP_OK on success
+ */
+esp_err_t config_save_mqtt_credentials(const char* broker_host, uint16_t broker_port,
+                                     const char* username, const char* password,
+                                     const char* topic_prefix);
+
+/**
+ * Set device registration status
+ * @param registered Registration status
+ * @return ESP_OK on success
+ */
+esp_err_t config_set_registration_status(bool registered);
+
+/**
+ * Check if device is registered with backend
+ * @return true if registered
+ */
+bool config_is_device_registered(void);
+
+/**
+ * Factory reset - completely erase all NVS data and restart
+ * This will stop all services, clear all configuration, and restart the device
+ * @return ESP_OK on success (device will restart)
+ */
+esp_err_t config_factory_reset(void);
 
 #ifdef __cplusplus
 }

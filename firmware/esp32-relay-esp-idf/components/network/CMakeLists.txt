@@ -3,6 +3,7 @@ idf_component_register(
         "src/wifi_manager.c"
         "src/http_server_config.c"
         "src/mqtt_handler.c"
+        "src/mqtt_registration.c"
     INCLUDE_DIRS 
         "include"
     PRIV_INCLUDE_DIRS 

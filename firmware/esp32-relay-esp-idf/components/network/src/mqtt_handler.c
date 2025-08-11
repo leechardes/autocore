@@ -5,6 +5,7 @@
 
 #include <string.h>
 #include <stdio.h>
+#include <time.h>
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
 #include "freertos/timers.h"
@@ -15,6 +16,7 @@
 #include "cJSON.h"
 #include <mqtt_client.h>
 #include "mqtt_handler.h"
+#include "mqtt_registration.h"
 #include "config_manager.h"
 #include "wifi_manager.h"
 #include "relay_control.h"
@@ -55,7 +57,6 @@ static void execute_mqtt_command(mqtt_cmd_data_t* cmd_data);
  */
 static void mqtt_event_handler(void *handler_args, esp_event_base_t base, int32_t event_id, void *event_data) {
     esp_mqtt_event_handle_t event = event_data;
-    esp_mqtt_client_handle_t client = event->client;
     
     switch (event->event_id) {
         case MQTT_EVENT_CONNECTED:
@@ -66,8 +67,9 @@ static void mqtt_event_handler(void *handler_args, esp_event_base_t base, int32_
             // Subscribe to command topic
             mqtt_subscribe_commands();
             
-            // Publish initial status
-            mqtt_publish_status();
+            // Publish initial status after subscription is confirmed
+            // Will be triggered on MQTT_EVENT_SUBSCRIBED instead
+            ESP_LOGI(TAG, "📊 Will publish status after subscription confirmed");
             
             // Call connected callback
             if (mqtt_connected_callback) {
@@ -87,6 +89,16 @@ static void mqtt_event_handler(void *handler_args, esp_event_base_t base, int32_
             
         case MQTT_EVENT_SUBSCRIBED:
             ESP_LOGI(TAG, "MQTT subscribed, msg_id=%d", event->msg_id);
+            
+            // Publish initial status after subscription is confirmed
+            // This ensures everything is properly initialized
+            ESP_LOGI(TAG, "📊 Publishing initial status...");
+            esp_err_t ret = mqtt_publish_status();
+            if (ret == ESP_OK) {
+                ESP_LOGI(TAG, "✅ Initial status published successfully");
+            } else {
+                ESP_LOGW(TAG, "⚠️ Failed to publish initial status: %s", esp_err_to_name(ret));
+            }
             break;
             
         case MQTT_EVENT_UNSUBSCRIBED:
@@ -123,7 +135,7 @@ static void mqtt_event_handler(void *handler_args, esp_event_base_t base, int32_
 }
 
 /**
- * Initialize MQTT client
+ * Initialize MQTT client with saved credentials (or fallback to legacy)
  */
 esp_err_t mqtt_client_init(void) {
     if (mqtt_client_handle != NULL) {
@@ -132,36 +144,53 @@ esp_err_t mqtt_client_init(void) {
     }
     
     device_config_t* config = config_get();
+    mqtt_config_t mqtt_config = {0};
     
-    // Build MQTT URI
+    // Try to get saved MQTT credentials first
+    esp_err_t cred_ret = mqtt_get_saved_credentials(&mqtt_config);
+    
+    // Build MQTT URI and configuration
     char mqtt_uri[128];
-    snprintf(mqtt_uri, sizeof(mqtt_uri), "mqtt://%s:%d", 
-            strlen(config->mqtt_broker) > 0 ? config->mqtt_broker : config->backend_ip,
-            config->mqtt_port > 0 ? config->mqtt_port : 1883);
+    esp_mqtt_client_config_t mqtt_cfg = {0};
     
-    // Configure MQTT client
-    esp_mqtt_client_config_t mqtt_cfg = {
-        .broker = {
-            .address = {
-                .uri = mqtt_uri,
-            },
-        },
-        .credentials = {
-            .client_id = config->device_id,
-            .username = config->mqtt_user,
-            .authentication = {
-                .password = config->mqtt_password,
-            },
-        },
-        .session = {
-            .keepalive = MQTT_KEEPALIVE_SEC,
-            .disable_clean_session = false,
-        },
-        .network = {
-            .timeout_ms = MQTT_CONNECT_TIMEOUT_MS,
-            .reconnect_timeout_ms = MQTT_RETRY_DELAY_MS,
-        }
-    };
+    if (cred_ret == ESP_OK && strlen(mqtt_config.broker_host) > 0) {
+        // Use saved credentials from smart registration
+        ESP_LOGI(TAG, "🔑 Using saved MQTT credentials");
+        
+        snprintf(mqtt_uri, sizeof(mqtt_uri), "mqtt://%s:%d", 
+                mqtt_config.broker_host, 
+                mqtt_config.broker_port > 0 ? mqtt_config.broker_port : 1883);
+        
+        mqtt_cfg.broker.address.uri = mqtt_uri;
+        mqtt_cfg.credentials.client_id = config->device_id;
+        mqtt_cfg.credentials.username = mqtt_config.username;
+        mqtt_cfg.credentials.authentication.password = mqtt_config.password;
+        
+        ESP_LOGI(TAG, "Using saved broker: %s:%d", mqtt_config.broker_host, mqtt_config.broker_port);
+        ESP_LOGI(TAG, "Using saved username: %s", mqtt_config.username);
+        
+    } else {
+        // Fallback to legacy configuration
+        ESP_LOGW(TAG, "⚠️ No saved credentials, using legacy configuration");
+        
+        snprintf(mqtt_uri, sizeof(mqtt_uri), "mqtt://%s:%d", 
+                strlen(config->mqtt_broker) > 0 ? config->mqtt_broker : config->backend_ip,
+                config->mqtt_port > 0 ? config->mqtt_port : 1883);
+        
+        mqtt_cfg.broker.address.uri = mqtt_uri;
+        mqtt_cfg.credentials.client_id = config->device_id;
+        mqtt_cfg.credentials.username = config->mqtt_user;
+        mqtt_cfg.credentials.authentication.password = config->mqtt_password;
+        
+        ESP_LOGI(TAG, "Using legacy broker: %s", mqtt_uri);
+        ESP_LOGI(TAG, "Using legacy username: %s", config->mqtt_user);
+    }
+    
+    // Common session and network configuration
+    mqtt_cfg.session.keepalive = MQTT_KEEPALIVE_SEC;
+    mqtt_cfg.session.disable_clean_session = false;
+    mqtt_cfg.network.timeout_ms = MQTT_CONNECT_TIMEOUT_MS;
+    mqtt_cfg.network.reconnect_timeout_ms = MQTT_RETRY_DELAY_MS;
     
     // Create MQTT client
     mqtt_client_handle = esp_mqtt_client_init(&mqtt_cfg);
@@ -182,7 +211,6 @@ esp_err_t mqtt_client_init(void) {
     ESP_LOGI(TAG, "MQTT client initialized");
     ESP_LOGI(TAG, "Broker URI: %s", mqtt_uri);
     ESP_LOGI(TAG, "Client ID: %s", config->device_id);
-    ESP_LOGI(TAG, "Username: %s", config->mqtt_user);
     
     return ESP_OK;
 }
@@ -257,10 +285,26 @@ esp_err_t mqtt_subscribe_commands(void) {
         return ESP_ERR_INVALID_STATE;
     }
     
+    if (mqtt_client_handle == NULL) {
+        ESP_LOGE(TAG, "MQTT client handle is NULL");
+        return ESP_ERR_INVALID_STATE;
+    }
+    
     device_config_t* config = config_get();
+    if (config == NULL) {
+        ESP_LOGE(TAG, "Config is NULL");
+        return ESP_ERR_INVALID_STATE;
+    }
+    
     char topic[MQTT_MAX_TOPIC_LEN];
     
-    snprintf(topic, sizeof(topic), MQTT_TOPIC_COMMAND_PATTERN, config->device_id);
+    // Generate topic using saved topic prefix if available
+    if (strlen(config->mqtt_topic_prefix) > 0) {
+        snprintf(topic, sizeof(topic), "%s/devices/%s/command", 
+                config->mqtt_topic_prefix, config->device_id);
+    } else {
+        snprintf(topic, sizeof(topic), MQTT_TOPIC_COMMAND_PATTERN, config->device_id);
+    }
     
     int msg_id = esp_mqtt_client_subscribe(mqtt_client_handle, topic, 1); // QoS 1
     if (msg_id >= 0) {
@@ -281,12 +325,27 @@ esp_err_t mqtt_publish_status(void) {
         return ESP_ERR_INVALID_STATE;
     }
     
+    if (mqtt_client_handle == NULL) {
+        ESP_LOGE(TAG, "MQTT client handle is NULL");
+        return ESP_ERR_INVALID_STATE;
+    }
+    
     device_config_t* config = config_get();
+    if (config == NULL) {
+        ESP_LOGE(TAG, "Config is NULL");
+        return ESP_ERR_INVALID_STATE;
+    }
+    
     char topic[MQTT_MAX_TOPIC_LEN];
     char payload[MQTT_MAX_PAYLOAD_LEN];
     
-    // Generate topic
-    snprintf(topic, sizeof(topic), MQTT_TOPIC_STATUS_PATTERN, config->device_id);
+    // Generate topic for relay state: autocore/devices/{uuid}/relays/state
+    if (strlen(config->mqtt_topic_prefix) > 0) {
+        snprintf(topic, sizeof(topic), "%s/devices/%s/relays/state", 
+                config->mqtt_topic_prefix, config->device_id);
+    } else {
+        snprintf(topic, sizeof(topic), "autocore/devices/%s/relays/state", config->device_id);
+    }
     
     // Generate status JSON
     esp_err_t ret = mqtt_generate_status_json(payload, sizeof(payload));
@@ -453,37 +512,61 @@ static void execute_mqtt_command(mqtt_cmd_data_t* cmd_data) {
  * Generate status JSON payload
  */
 esp_err_t mqtt_generate_status_json(char* buffer, size_t max_len) {
-    if (!buffer) {
+    if (!buffer || max_len == 0) {
         return ESP_ERR_INVALID_ARG;
     }
     
     device_config_t* config = config_get();
-    
-    // Get system info
-    uint32_t uptime = esp_timer_get_time() / 1000000; // Convert to seconds
-    int8_t rssi = wifi_manager_get_rssi();
-    uint32_t free_memory = esp_get_free_heap_size();
+    if (!config) {
+        ESP_LOGE(TAG, "Config is NULL in mqtt_generate_status_json");
+        return ESP_ERR_INVALID_STATE;
+    }
     
     // Get relay states
     uint8_t relay_states[RELAY_MAX_CHANNELS];
+    memset(relay_states, 0, sizeof(relay_states)); // Initialize to 0
     relay_get_all_states(relay_states);
+    
+    // Get current timestamp in ISO 8601 format
+    time_t now;
+    time(&now);
+    struct tm timeinfo = {0};
+    localtime_r(&now, &timeinfo);
+    char timestamp[64];
+    strftime(timestamp, sizeof(timestamp), "%Y-%m-%dT%H:%M:%S", &timeinfo);
     
     // Create JSON object
     cJSON *json = cJSON_CreateObject();
-    cJSON *relay_array = cJSON_CreateArray();
+    if (!json) {
+        ESP_LOGE(TAG, "Failed to create JSON object");
+        return ESP_ERR_NO_MEM;
+    }
     
     // Add device info
-    cJSON_AddStringToObject(json, "uuid", config->device_id);
-    cJSON_AddStringToObject(json, "status", "online");
-    cJSON_AddNumberToObject(json, "uptime", uptime);
-    cJSON_AddNumberToObject(json, "wifi_rssi", rssi);
-    cJSON_AddNumberToObject(json, "free_memory", free_memory);
-    
-    // Add relay states
-    for (int i = 0; i < config->relay_channels; i++) {
-        cJSON_AddItemToArray(relay_array, cJSON_CreateNumber(relay_states[i]));
+    if (config->device_id[0] != '\0') {
+        cJSON_AddStringToObject(json, "uuid", config->device_id);
+    } else {
+        cJSON_AddStringToObject(json, "uuid", "unknown");
     }
-    cJSON_AddItemToObject(json, "relay_states", relay_array);
+    
+    // Add board_id (usando um ID fixo ou pode derivar do device_id)
+    cJSON_AddNumberToObject(json, "board_id", 1); // TODO: Implementar board_id real se necessário
+    
+    // Add timestamp
+    cJSON_AddStringToObject(json, "timestamp", timestamp);
+    
+    // Add channels object with relay states
+    cJSON *channels = cJSON_CreateObject();
+    if (channels) {
+        for (int i = 0; i < config->relay_channels && i < RELAY_MAX_CHANNELS; i++) {
+            char channel_str[4];
+            snprintf(channel_str, sizeof(channel_str), "%d", i + 1);
+            cJSON_AddBoolToObject(channels, channel_str, relay_states[i] ? true : false);
+        }
+        cJSON_AddItemToObject(json, "channels", channels);
+    } else {
+        ESP_LOGW(TAG, "Failed to create channels object");
+    }
     
     // Convert to compact string (no formatting)
     char *json_string = cJSON_PrintUnformatted(json);
@@ -491,6 +574,10 @@ esp_err_t mqtt_generate_status_json(char* buffer, size_t max_len) {
         strncpy(buffer, json_string, max_len - 1);
         buffer[max_len - 1] = '\0';
         free(json_string);
+    } else {
+        ESP_LOGE(TAG, "Failed to print JSON");
+        cJSON_Delete(json);
+        return ESP_ERR_NO_MEM;
     }
     
     cJSON_Delete(json);
@@ -708,8 +795,14 @@ esp_err_t mqtt_client_reconnect(void) {
         return ESP_ERR_INVALID_STATE;
     }
     
+    // Check if already connected or connecting
     if (current_mqtt_state == MQTT_STATE_CONNECTED) {
-        ESP_LOGI(TAG, "MQTT already connected");
+        ESP_LOGD(TAG, "MQTT already connected");
+        return ESP_OK;
+    }
+    
+    if (current_mqtt_state == MQTT_STATE_CONNECTING) {
+        ESP_LOGD(TAG, "MQTT connection already in progress");
         return ESP_OK;
     }
     
@@ -722,11 +815,41 @@ esp_err_t mqtt_client_reconnect(void) {
     ESP_LOGI(TAG, "🔄 MQTT reconnection attempt %d/%d", mqtt_retry_count, MQTT_MAX_RETRY_COUNT);
     
     current_mqtt_state = MQTT_STATE_CONNECTING;
+    
+    // Only call reconnect if we're actually disconnected
     esp_err_t ret = esp_mqtt_client_reconnect(mqtt_client_handle);
     
     if (ret != ESP_OK) {
         ESP_LOGE(TAG, "Failed to initiate MQTT reconnection: %s", esp_err_to_name(ret));
-        current_mqtt_state = MQTT_STATE_ERROR;
+        current_mqtt_state = MQTT_STATE_DISCONNECTED;
+    }
+    
+    return ret;
+}
+
+/**
+ * Connect MQTT using saved credentials
+ * Alternative to mqtt_client_init specifically for saved credentials
+ */
+esp_err_t mqtt_connect_with_saved_credentials(void) {
+    mqtt_config_t mqtt_config = {0};
+    
+    // Get saved credentials
+    esp_err_t ret = mqtt_get_saved_credentials(&mqtt_config);
+    if (ret != ESP_OK) {
+        ESP_LOGE(TAG, "No saved MQTT credentials available");
+        return ESP_ERR_NOT_FOUND;
+    }
+    
+    ESP_LOGI(TAG, "🔑 Connecting MQTT with saved credentials");
+    ESP_LOGI(TAG, "Broker: %s:%d", mqtt_config.broker_host, mqtt_config.broker_port);
+    ESP_LOGI(TAG, "Username: %s", mqtt_config.username);
+    ESP_LOGI(TAG, "Topic prefix: %s", mqtt_config.topic_prefix);
+    
+    // Initialize and start MQTT client
+    ret = mqtt_client_init();
+    if (ret == ESP_OK) {
+        ret = mqtt_client_start();
     }
     
     return ret;

@@ -180,6 +180,12 @@ esp_err_t mqtt_stop_telemetry_task(void);
  */
 esp_err_t mqtt_client_reconnect(void);
 
+/**
+ * Connect MQTT using saved credentials from smart registration
+ * @return ESP_OK on success, ESP_ERR_NOT_FOUND if no credentials saved
+ */
+esp_err_t mqtt_connect_with_saved_credentials(void);
+
 #ifdef __cplusplus
 }
 #endif

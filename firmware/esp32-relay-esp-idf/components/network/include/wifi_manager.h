@@ -151,6 +151,16 @@ esp_err_t wifi_manager_reconnect(void);
  */
 esp_err_t wifi_manager_smart_config(void);
 
+/**
+ * Connect to WiFi in Station mode only (no AP fallback)
+ * Used for smart boot sequence where we don't want to activate AP mode
+ * @param ssid Network SSID
+ * @param password Network password
+ * @param timeout_ms Connection timeout in milliseconds (0 for default)
+ * @return ESP_OK on success, ESP_FAIL on connection failure, ESP_ERR_TIMEOUT on timeout
+ */
+esp_err_t wifi_manager_connect_sta_only(const char* ssid, const char* password, uint32_t timeout_ms);
+
 #ifdef __cplusplus
 }
 #endif

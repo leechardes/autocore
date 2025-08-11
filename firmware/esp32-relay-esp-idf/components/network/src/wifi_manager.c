@@ -488,3 +488,90 @@ esp_err_t wifi_manager_stop_ap(void) {
     
     return ret;
 }
+
+/**
+ * Connect to WiFi in Station mode only (no AP fallback)
+ * Used for smart boot sequence where we don't want to activate AP mode
+ */
+esp_err_t wifi_manager_connect_sta_only(const char* ssid, const char* password, uint32_t timeout_ms) {
+    if (!ssid || strlen(ssid) == 0) {
+        ESP_LOGE(TAG, "Invalid SSID");
+        return ESP_ERR_INVALID_ARG;
+    }
+    
+    if (timeout_ms == 0) {
+        timeout_ms = WIFI_CONNECT_TIMEOUT_MS;
+    }
+    
+    ESP_LOGI(TAG, "🔄 Connecting to WiFi (STA only): %s", ssid);
+    
+    esp_err_t ret;
+    
+    // Stop any current WiFi operation
+    if (current_wifi_state == WIFI_STATE_AP_MODE) {
+        ESP_LOGI(TAG, "Stopping AP mode for STA connection");
+        wifi_manager_stop();
+        vTaskDelay(pdMS_TO_TICKS(500)); // Wait for stop to complete
+    }
+    
+    // Configure WiFi for station mode
+    wifi_config_t wifi_config = {0};
+    strncpy((char*)wifi_config.sta.ssid, ssid, sizeof(wifi_config.sta.ssid) - 1);
+    
+    if (password && strlen(password) > 0) {
+        strncpy((char*)wifi_config.sta.password, password, sizeof(wifi_config.sta.password) - 1);
+    }
+    
+    wifi_config.sta.threshold.authmode = WIFI_AUTH_WPA2_PSK;
+    wifi_config.sta.pmf_cfg.capable = true;
+    wifi_config.sta.pmf_cfg.required = false;
+    
+    // Set WiFi mode to station only
+    ret = esp_wifi_set_mode(WIFI_MODE_STA);
+    if (ret != ESP_OK) {
+        ESP_LOGE(TAG, "Failed to set WiFi STA mode: %s", esp_err_to_name(ret));
+        return ret;
+    }
+    
+    ret = esp_wifi_set_config(WIFI_IF_STA, &wifi_config);
+    if (ret != ESP_OK) {
+        ESP_LOGE(TAG, "Failed to set WiFi config: %s", esp_err_to_name(ret));
+        return ret;
+    }
+    
+    // Clear event bits
+    xEventGroupClearBits(wifi_event_group, WIFI_CONNECTED_BIT | WIFI_FAIL_BIT);
+    
+    // Start WiFi
+    ret = esp_wifi_start();
+    if (ret != ESP_OK) {
+        ESP_LOGE(TAG, "Failed to start WiFi: %s", esp_err_to_name(ret));
+        return ret;
+    }
+    
+    retry_count = 0;
+    current_wifi_state = WIFI_STATE_CONNECTING;
+    
+    ESP_LOGI(TAG, "Waiting for WiFi connection (timeout: %lu ms)...", (unsigned long)timeout_ms);
+    
+    // Wait for connection with specified timeout
+    EventBits_t bits = xEventGroupWaitBits(wifi_event_group,
+                                          WIFI_CONNECTED_BIT | WIFI_FAIL_BIT,
+                                          pdFALSE,
+                                          pdFALSE,
+                                          pdMS_TO_TICKS(timeout_ms));
+    
+    if (bits & WIFI_CONNECTED_BIT) {
+        ESP_LOGI(TAG, "✅ WiFi connected successfully (STA only)");
+        return ESP_OK;
+    } else if (bits & WIFI_FAIL_BIT) {
+        ESP_LOGW(TAG, "⚠️ WiFi connection failed (STA only)");
+        current_wifi_state = WIFI_STATE_DISCONNECTED;
+        return ESP_FAIL;
+    } else {
+        ESP_LOGW(TAG, "⏰ WiFi connection timeout (STA only)");
+        current_wifi_state = WIFI_STATE_DISCONNECTED;
+        esp_wifi_stop(); // Stop WiFi on timeout
+        return ESP_ERR_TIMEOUT;
+    }
+}
