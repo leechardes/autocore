@@ -12,6 +12,27 @@ import os
 import machine
 import gc
 import ubinascii
+import _thread
+
+# Imports MQTT
+try:
+    from umqtt.simple import MQTTClient
+    print("📡 Using umqtt.simple")
+except ImportError:
+    try:
+        from umqtt.robust import MQTTClient
+        print("📡 Using umqtt.robust")
+    except ImportError:
+        print("⚠️ MQTT não disponível")
+        MQTTClient = None
+
+# Import para requests HTTP
+try:
+    import urequests
+    print("🌐 urequests disponível")
+except ImportError:
+    print("⚠️ urequests não disponível - usando socket básico")
+    urequests = None
 
 # ============================================================================
 # CONFIGURAÇÃO PADRÃO
@@ -36,7 +57,11 @@ DEFAULT_CONFIG = {
     'backend_port': 8081,
     'mqtt_broker': '192.168.1.100',
     'mqtt_port': 1883,
+    'mqtt_user': '',
+    'mqtt_password': '',
+    'mqtt_registered': False,
     'relay_channels': 16,
+    'relay_states': [0] * 16,  # Estado inicial dos relés
     'configured': False
 }
 
@@ -71,6 +96,263 @@ def delete_config():
         return True
     except:
         return False
+
+# ============================================================================
+# SISTEMA MQTT E BACKEND
+# ============================================================================
+
+def http_request(method, url, data=None, timeout=10):
+    """Faz requisição HTTP usando urequests ou socket"""
+    try:
+        if urequests:
+            if method.upper() == 'POST':
+                headers = {'Content-Type': 'application/json'}
+                response = urequests.post(url, json=data, headers=headers, timeout=timeout)
+                result = response.json() if response.text else {}
+                response.close()
+                return True, result
+            else:
+                response = urequests.get(url, timeout=timeout)
+                result = response.json() if response.text else {}
+                response.close()
+                return True, result
+        else:
+            print("⚠️ Usando socket básico para HTTP")
+            return False, {}
+            
+    except Exception as e:
+        print(f"❌ Erro HTTP: {e}")
+        return False, {}
+
+def register_with_backend(config):
+    """Registra dispositivo no backend e obtém configuração MQTT"""
+    if not config.get('backend_ip') or config.get('mqtt_registered'):
+        print("ℹ️ Registro não necessário")
+        return True
+    
+    print("📞 Registrando com backend...")
+    
+    try:
+        # Obter IP atual
+        sta = network.WLAN(network.STA_IF)
+        if not sta.isconnected():
+            print("❌ WiFi não conectado para registro")
+            return False
+        
+        device_ip = sta.ifconfig()[0]
+        
+        # Payload de registro
+        payload = {
+            "uuid": config['device_id'],
+            "name": config['device_name'], 
+            "type": "relay",
+            "firmware_version": "2.0.0",
+            "relay_channels": config.get('relay_channels', 16),
+            "ip_address": device_ip
+        }
+        
+        url = f"http://{config['backend_ip']}:{config['backend_port']}/api/devices/register"
+        print(f"📡 POST {url}")
+        
+        success, response = http_request('POST', url, payload)
+        
+        if success and response:
+            print("✅ Registro bem-sucedido!")
+            
+            # Atualizar configuração MQTT
+            if 'mqtt_broker' in response:
+                config['mqtt_broker'] = response['mqtt_broker']
+            if 'mqtt_port' in response:
+                config['mqtt_port'] = response['mqtt_port']
+            if 'mqtt_user' in response:
+                config['mqtt_user'] = response['mqtt_user']
+            if 'mqtt_password' in response:
+                config['mqtt_password'] = response['mqtt_password']
+            
+            config['mqtt_registered'] = True
+            save_config(config)
+            
+            print(f"🔧 MQTT: {config['mqtt_broker']}:{config['mqtt_port']}")
+            print(f"👤 User: {config.get('mqtt_user', 'N/A')}")
+            
+            return True
+        else:
+            print(f"❌ Falha no registro: {response}")
+            return False
+            
+    except Exception as e:
+        print(f"❌ Erro no registro: {e}")
+        return False
+
+def mqtt_callback(topic, msg):
+    """Callback para mensagens MQTT"""
+    global mqtt_client, config
+    
+    try:
+        topic_str = topic.decode('utf-8')
+        msg_str = msg.decode('utf-8')
+        
+        print(f"📨 MQTT: {topic_str} -> {msg_str}")
+        
+        # Parse do comando
+        try:
+            command_data = json.loads(msg_str)
+        except:
+            print("❌ JSON inválido")
+            return
+        
+        command = command_data.get('command')
+        
+        if command == 'relay_on':
+            channel = command_data.get('channel', 0)
+            if 0 <= channel < len(config['relay_states']):
+                config['relay_states'][channel] = 1
+                print(f"✅ Relé {channel} LIGADO")
+                # TODO: Implementar GPIO real
+                
+        elif command == 'relay_off':
+            channel = command_data.get('channel', 0)
+            if 0 <= channel < len(config['relay_states']):
+                config['relay_states'][channel] = 0
+                print(f"✅ Relé {channel} DESLIGADO")
+                # TODO: Implementar GPIO real
+                
+        elif command == 'get_status':
+            print("📊 Solicitação de status")
+            publish_status(mqtt_client, config)
+            
+        elif command == 'reboot':
+            print("🔄 Comando de reinicialização")
+            time.sleep(1)
+            machine.reset()
+            
+        else:
+            print(f"❓ Comando desconhecido: {command}")
+            
+    except Exception as e:
+        print(f"❌ Erro no callback MQTT: {e}")
+
+def publish_status(client, config):
+    """Publica status do dispositivo"""
+    try:
+        sta = network.WLAN(network.STA_IF)
+        
+        # Coletar métricas
+        status_data = {
+            "uuid": config['device_id'],
+            "status": "online",
+            "uptime": int(time.ticks_ms() / 1000),  # segundos desde boot
+            "wifi_rssi": sta.status('rssi') if hasattr(sta, 'status') else -50,
+            "free_memory": gc.mem_free(),
+            "relay_states": config['relay_states']
+        }
+        
+        topic = f"autocore/devices/{config['device_id']}/status"
+        payload = json.dumps(status_data)
+        
+        client.publish(topic, payload)
+        print(f"📊 Status publicado: {len(payload)} bytes")
+        
+    except Exception as e:
+        print(f"❌ Erro publicando status: {e}")
+
+def setup_mqtt(config):
+    """Configura e conecta cliente MQTT"""
+    global mqtt_client
+    
+    if not MQTTClient:
+        print("❌ MQTT não disponível")
+        return None
+    
+    if not config.get('mqtt_broker'):
+        print("❌ Broker MQTT não configurado")
+        return None
+    
+    try:
+        print(f"🔗 Conectando MQTT: {config['mqtt_broker']}:{config['mqtt_port']}")
+        
+        # Configurar cliente
+        client_id = config['device_id']
+        broker = config['mqtt_broker']
+        port = config.get('mqtt_port', 1883)
+        user = config.get('mqtt_user', '')
+        password = config.get('mqtt_password', '')
+        
+        if user and password:
+            client = MQTTClient(client_id, broker, port=port, user=user, password=password)
+        else:
+            client = MQTTClient(client_id, broker, port=port)
+        
+        client.set_callback(mqtt_callback)
+        client.connect()
+        
+        # Subscrever aos tópicos
+        command_topic = f"autocore/devices/{config['device_id']}/command"
+        client.subscribe(command_topic)
+        
+        print(f"✅ MQTT conectado!")
+        print(f"📥 Subscrito: {command_topic}")
+        
+        # Publicar status inicial
+        publish_status(client, config)
+        
+        return client
+        
+    except Exception as e:
+        print(f"❌ Erro MQTT: {e}")
+        return None
+
+def mqtt_loop(client, config):
+    """Loop principal MQTT em thread separada"""
+    print("🔄 Iniciando loop MQTT")
+    
+    last_status = time.ticks_ms()
+    status_interval = 30000  # 30 segundos
+    
+    reconnect_attempts = 0
+    max_reconnect = 5
+    
+    while True:
+        try:
+            if client is None:
+                time.sleep(5)
+                continue
+            
+            # Verificar mensagens
+            client.check_msg()
+            
+            # Publicar status a cada 30s
+            now = time.ticks_ms()
+            if time.ticks_diff(now, last_status) > status_interval:
+                publish_status(client, config)
+                last_status = now
+                reconnect_attempts = 0  # Reset contador se tudo OK
+            
+            time.sleep(1)
+            
+        except Exception as e:
+            print(f"❌ Erro no loop MQTT: {e}")
+            reconnect_attempts += 1
+            
+            if reconnect_attempts > max_reconnect:
+                print(f"💀 MQTT: Muitas tentativas ({max_reconnect}), parando")
+                break
+            
+            print(f"🔄 Tentando reconectar MQTT ({reconnect_attempts}/{max_reconnect})...")
+            
+            try:
+                client = setup_mqtt(config)
+                if client:
+                    reconnect_attempts = 0
+                else:
+                    time.sleep(10)  # Aguardar antes de tentar novamente
+            except:
+                time.sleep(10)
+    
+    print("🛑 Loop MQTT finalizado")
+
+# Variável global para cliente MQTT
+mqtt_client = None
 
 # ============================================================================
 # GERENCIAMENTO WIFI
@@ -539,14 +821,19 @@ def start_http_server(config):
 
 def main():
     """Função principal"""
+    global mqtt_client, config as global_config
+    
     print("=" * 50)
-    print("🚀 ESP32 WiFi Config v2.0")
+    print("🚀 ESP32 WiFi Config v2.0 + MQTT")
     print("=" * 50)
     
     # Carregar configuração
     config = load_config()
+    global_config = config  # Para acesso global
+    
     print(f"📱 Device: {config['device_name']} ({config['device_id']})")
     print(f"⚙️ Configurado: {'Sim' if config['configured'] else 'Não'}")
+    print(f"🔌 MQTT: {'Registrado' if config.get('mqtt_registered') else 'Não registrado'}")
     
     # Se configurado, tentar conectar ao WiFi
     if config['configured'] and config['wifi_ssid']:
@@ -555,6 +842,45 @@ def main():
             # Modo Station - servidor rodando no IP da rede
             sta = network.WLAN(network.STA_IF)
             print(f"📱 Acesse: http://{sta.ifconfig()[0]}")
+            
+            # ==========================================================
+            # INTEGRAÇÃO MQTT APÓS CONEXÃO WIFI
+            # ==========================================================
+            
+            print("\n" + "=" * 50)
+            print("🔌 INICIANDO INTEGRAÇÃO MQTT")
+            print("=" * 50)
+            
+            # 1. Registrar com backend
+            try:
+                if register_with_backend(config):
+                    print("✅ Registro com backend concluído")
+                    
+                    # 2. Configurar MQTT
+                    mqtt_client = setup_mqtt(config)
+                    
+                    if mqtt_client:
+                        print("✅ MQTT configurado com sucesso")
+                        
+                        # 3. Iniciar loop MQTT em thread separada
+                        try:
+                            _thread.start_new_thread(mqtt_loop, (mqtt_client, config))
+                            print("✅ Thread MQTT iniciada")
+                        except Exception as e:
+                            print(f"⚠️ Erro iniciando thread MQTT: {e}")
+                            print("⚠️ Continuando sem MQTT...")
+                    else:
+                        print("⚠️ Falha na configuração MQTT")
+                else:
+                    print("⚠️ Falha no registro - continuando sem MQTT")
+            except Exception as e:
+                print(f"⚠️ Erro na integração MQTT: {e}")
+                print("⚠️ Continuando apenas com servidor HTTP...")
+            
+            print("=" * 50)
+            print("🌐 SISTEMA PRONTO")
+            print("=" * 50)
+            
         else:
             print("❌ Falha na conexão, iniciando AP...")
             setup_ap(config)
@@ -564,7 +890,7 @@ def main():
         setup_ap(config)
         print("📱 Modo AP ativo - acesse http://192.168.4.1")
     
-    # Iniciar servidor HTTP
+    # Iniciar servidor HTTP (sempre roda)
     start_http_server(config)
 
 # Executar

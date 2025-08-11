@@ -1352,7 +1352,7 @@ async def get_mqtt_config():
     """Retorna configurações MQTT para dispositivos ESP32"""
     try:
         return MQTTConfigResponse(
-            broker="localhost",  # O ESP32 usará o mesmo IP do backend
+            broker=os.getenv("MQTT_BROKER", "10.0.10.100"),  # Usa valor do .env
             port=int(os.getenv("MQTT_PORT", "1883")),
             username=os.getenv("MQTT_USERNAME"),
             password=os.getenv("MQTT_PASSWORD"),
