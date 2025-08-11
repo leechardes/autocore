@@ -40,7 +40,7 @@ deploy: ## Envia main.py para ESP32 usando ampy
 		echo "${RED}❌ Arquivo main.py não encontrado${NC}"; \
 		exit 1; \
 	fi
-	ampy --port $(PORT) --baud $(BAUD_RATE) put main.py
+	python3 -m ampy.cli --port $(PORT) --baud $(BAUD_RATE) put main.py
 	@echo "${GREEN}✅ Deploy concluído!${NC}"
 
 restart: ## Reinicia ESP32 via software reset
@@ -52,7 +52,7 @@ format: ## Formata ESP32 (apaga todos os arquivos)
 	@echo "${RED}⚠️  ATENÇÃO: Isso apagará TODOS os arquivos do ESP32!${NC}"
 	@read -p "Tem certeza? (s/N): " confirm && [ "$$confirm" = "s" ] || exit 1
 	@echo "${BLUE}Formatando ESP32...${NC}"
-	ampy --port $(PORT) --baud $(BAUD_RATE) rmdir /
+	python3 -m ampy.cli --port $(PORT) --baud $(BAUD_RATE) rmdir /
 	@echo "${GREEN}✅ ESP32 formatado!${NC}"
 
 clean: ## Limpa arquivos temporários locais
@@ -75,16 +75,16 @@ dev: deploy monitor ## Deploy + Monitor (desenvolvimento rápido)
 
 check: ## Verifica se ESP32 está conectado
 	@echo "${BLUE}Verificando conexão...${NC}"
-	ampy --port $(PORT) --baud $(BAUD_RATE) ls
+	python3 -m ampy.cli --port $(PORT) --baud $(BAUD_RATE) ls
 	@echo "${GREEN}✅ ESP32 conectado!${NC}"
 
 list-files: ## Lista arquivos no ESP32
 	@echo "${BLUE}Arquivos no ESP32:${NC}"
-	ampy --port $(PORT) --baud $(BAUD_RATE) ls
+	python3 -m ampy.cli --port $(PORT) --baud $(BAUD_RATE) ls
 
 get-config: ## Baixa config.json do ESP32
 	@echo "${BLUE}Baixando configuração...${NC}"
-	ampy --port $(PORT) --baud $(BAUD_RATE) get config.json || echo "${YELLOW}Config não encontrada${NC}"
+	python3 -m ampy.cli --port $(PORT) --baud $(BAUD_RATE) get config.json || echo "${YELLOW}Config não encontrada${NC}"
 
 # Comandos de produção
 production-deploy: clean deploy restart ## Deploy completo para produção

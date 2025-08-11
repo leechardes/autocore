@@ -1,8 +1,7 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-ESP32 WiFi Config v2.0 - Versão Melhorada
-Com suporte UTF-8 e campos de backend
+ESP32 WiFi Config v2.0 - Versão com Interface Melhorada
 """
 
 import network
@@ -12,26 +11,34 @@ import json
 import os
 import machine
 import gc
+import ubinascii
 
 # ============================================================================
 # CONFIGURAÇÃO PADRÃO
 # ============================================================================
 
+def get_unique_id():
+    """Gera ID único baseado no MAC"""
+    try:
+        mac = ubinascii.hexlify(network.WLAN().config('mac')).decode()
+        return mac[-6:].lower()
+    except:
+        return "000001"
+
+UNIQUE_ID = get_unique_id()
+
 DEFAULT_CONFIG = {
-    'device_id': 'esp32_relay_001',
-    'device_name': 'ESP32 Relay',
+    'device_id': f'esp32_relay_{UNIQUE_ID}',
+    'device_name': f'ESP32 Relay {UNIQUE_ID}',
     'wifi_ssid': '',
     'wifi_password': '',
     'backend_ip': '192.168.1.100',
-    'backend_port': 8000,
+    'backend_port': 8081,
     'mqtt_broker': '192.168.1.100',
     'mqtt_port': 1883,
+    'relay_channels': 16,
     'configured': False
 }
-
-# ============================================================================
-# GERENCIAMENTO DE CONFIGURAÇÃO
-# ============================================================================
 
 def load_config():
     """Carrega configuração do arquivo"""
@@ -39,7 +46,6 @@ def load_config():
         if 'config.json' in os.listdir():
             with open('config.json', 'r') as f:
                 config = json.load(f)
-                # Merge com defaults para garantir todos os campos
                 for key in DEFAULT_CONFIG:
                     if key not in config:
                         config[key] = DEFAULT_CONFIG[key]
@@ -75,9 +81,8 @@ def setup_ap(config):
     ap = network.WLAN(network.AP_IF)
     ap.active(True)
     
-    # Nome único do AP
-    device_suffix = config['device_id'][-6:] if len(config['device_id']) > 6 else config['device_id']
-    ssid = f"ESP32-{device_suffix}"
+    device_suffix = config['device_id'].split('_')[-1] if '_' in config['device_id'] else config['device_id'][-6:]
+    ssid = f"ESP32-Relay-{device_suffix}"
     password = "12345678"
     
     ap.config(essid=ssid, password=password)
@@ -101,7 +106,6 @@ def connect_wifi(ssid, password, timeout=15):
     
     sta.connect(ssid, password)
     
-    # Aguardar conexão
     for i in range(timeout):
         if sta.isconnected():
             print(f"✅ Conectado! IP: {sta.ifconfig()[0]}")
@@ -113,11 +117,11 @@ def connect_wifi(ssid, password, timeout=15):
     return False
 
 # ============================================================================
-# INTERFACE WEB MELHORADA
+# INTERFACE WEB MELHORADA (usando web_page.py)
 # ============================================================================
 
-def generate_html(config, message=""):
-    """Gera HTML com UTF-8 correto e campos adicionais"""
+def generate_html_inline(config, message=""):
+    """Gera HTML inline sem usar web_page.py"""
     
     # Status do WiFi
     sta = network.WLAN(network.STA_IF)
@@ -132,68 +136,67 @@ def generate_html(config, message=""):
         color = {"success": "#4CAF50", "error": "#f44336", "info": "#2196F3"}.get(msg_type, "#2196F3")
         msg_html = f'<div style="padding: 10px; background: {color}; color: white; border-radius: 5px; margin: 10px 0;">{msg_text}</div>'
     
-    # HTML com UTF-8 e campos completos
-    html = f'''<!DOCTYPE html>
+    # HTML simplificado mas com visual melhorado
+    html = """<!DOCTYPE html>
 <html>
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>ESP32 Config v2</title>
     <style>
-        * {{ margin: 0; padding: 0; box-sizing: border-box; }}
-        body {{ 
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { 
             font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Arial, sans-serif; 
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            background: linear-gradient(135deg, #667eea 0%%, #764ba2 100%%);
             min-height: 100vh;
             display: flex;
             align-items: center;
             justify-content: center;
             padding: 20px;
-        }}
-        .container {{ 
+        }
+        .container { 
             background: white; 
             padding: 30px; 
             border-radius: 15px; 
             box-shadow: 0 20px 60px rgba(0,0,0,0.3);
-            width: 100%;
+            width: 100%%;
             max-width: 500px;
-        }}
-        h1 {{ 
+        }
+        h1 { 
             color: #333; 
             text-align: center;
             margin-bottom: 20px;
             font-size: 24px;
-        }}
-        h3 {{
+        }
+        h3 {
             color: #555;
             margin-top: 20px;
             margin-bottom: 10px;
             padding-bottom: 5px;
             border-bottom: 2px solid #eee;
-        }}
-        .status {{ 
+        }
+        .status { 
             padding: 15px; 
             margin: 15px 0; 
             border-radius: 8px; 
             background: #f5f5f5;
             border-left: 4px solid #4CAF50;
-        }}
-        .status strong {{ color: #333; }}
-        input, select {{ 
-            width: 100%; 
+        }
+        .status strong { color: #333; }
+        input, select { 
+            width: 100%%; 
             padding: 12px; 
             margin: 8px 0; 
             border: 2px solid #ddd; 
             border-radius: 8px; 
             font-size: 14px;
-            transition: border-color 0.3s;
-        }}
-        input:focus, select:focus {{
+        }
+        input:focus, select:focus {
             outline: none;
             border-color: #667eea;
-        }}
-        button {{ 
-            width: 100%; 
+        }
+        button { 
+            width: 100%%; 
             padding: 14px; 
             margin: 10px 0; 
             border: none; 
@@ -201,46 +204,35 @@ def generate_html(config, message=""):
             cursor: pointer; 
             font-size: 16px;
             font-weight: bold;
-            transition: all 0.3s;
             text-transform: uppercase;
             letter-spacing: 1px;
-        }}
-        .btn-primary {{ 
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        }
+        .btn-primary { 
+            background: linear-gradient(135deg, #667eea 0%%, #764ba2 100%%);
             color: white;
-        }}
-        .btn-primary:hover {{ 
-            transform: translateY(-2px);
-            box-shadow: 0 5px 15px rgba(102, 126, 234, 0.4);
-        }}
-        .btn-warning {{ 
+        }
+        .btn-warning { 
             background: #ff9800;
             color: white;
-        }}
-        .btn-warning:hover {{ 
-            background: #f57c00;
-        }}
-        .btn-danger {{ 
+        }
+        .btn-danger { 
             background: #f44336;
             color: white;
-        }}
-        .btn-danger:hover {{ 
-            background: #d32f2f;
-        }}
-        .info-text {{
+        }
+        .info-text {
             font-size: 12px;
             color: #666;
             margin-top: 5px;
-        }}
-        .field-group {{
+        }
+        .field-group {
             margin-bottom: 15px;
-        }}
-        label {{
+        }
+        label {
             display: block;
             margin-bottom: 5px;
             color: #555;
             font-weight: 500;
-        }}
+        }
     </style>
 </head>
 <body>
@@ -248,22 +240,25 @@ def generate_html(config, message=""):
         <h1>⚙️ ESP32 Relay Config v2</h1>
         
         <div class="status">
-            <strong>ID do Dispositivo:</strong> {config['device_id']}<br>
-            <strong>Nome:</strong> {config['device_name']}<br>
-            <strong>Status WiFi:</strong> {wifi_status}<br>
-            <strong>Backend:</strong> {config['backend_ip']}:{config['backend_port']}
+            <strong>ID do Dispositivo:</strong> %s<br>
+            <strong>Nome:</strong> %s<br>
+            <strong>Status WiFi:</strong> %s<br>
+            <strong>Backend:</strong> %s:%d<br>
+            <strong>Canais de Relé:</strong> %d
         </div>
         
-        {msg_html}
+        %s
         
         <form action="/config" method="post" accept-charset="UTF-8">
             <h3>📱 Configuração do Dispositivo</h3>
             
             <div class="field-group">
-                <label for="device_name">Nome do Dispositivo</label>
+                <label for="device_name">Nome do Dispositivo (somente leitura)</label>
                 <input type="text" id="device_name" name="device_name" 
-                       placeholder="Ex: Relé Garagem" 
-                       value="{config['device_name']}" required>
+                       value="%s" 
+                       readonly
+                       style="background-color: #f5f5f5; color: #666;">
+                <div class="info-text">ID gerado automaticamente: %s</div>
             </div>
             
             <h3>📶 Configuração WiFi</h3>
@@ -272,14 +267,14 @@ def generate_html(config, message=""):
                 <label for="wifi_ssid">Nome da Rede (SSID)</label>
                 <input type="text" id="wifi_ssid" name="wifi_ssid" 
                        placeholder="Nome do seu WiFi" 
-                       value="{config['wifi_ssid']}" required>
+                       value="%s" required>
             </div>
             
             <div class="field-group">
                 <label for="wifi_password">Senha do WiFi</label>
                 <input type="password" id="wifi_password" name="wifi_password" 
-                       placeholder="Senha da rede" required>
-                <div class="info-text">Mínimo 8 caracteres</div>
+                       placeholder="Deixe vazio para manter senha atual">
+                <div class="info-text">Deixe vazio para manter a senha atual</div>
             </div>
             
             <h3>🌐 Configuração Backend</h3>
@@ -288,32 +283,24 @@ def generate_html(config, message=""):
                 <label for="backend_ip">IP do Backend</label>
                 <input type="text" id="backend_ip" name="backend_ip" 
                        placeholder="Ex: 192.168.1.100" 
-                       value="{config['backend_ip']}" 
-                       pattern="[0-9]{{1,3}}\\.[0-9]{{1,3}}\\.[0-9]{{1,3}}\\.[0-9]{{1,3}}"
-                       required>
+                       value="%s" required>
             </div>
             
             <div class="field-group">
                 <label for="backend_port">Porta do Backend</label>
                 <input type="number" id="backend_port" name="backend_port" 
-                       placeholder="Ex: 8000" 
-                       value="{config['backend_port']}" 
+                       placeholder="Ex: 8081" 
+                       value="%d" 
                        min="1" max="65535" required>
             </div>
             
             <div class="field-group">
-                <label for="mqtt_broker">MQTT Broker (opcional)</label>
-                <input type="text" id="mqtt_broker" name="mqtt_broker" 
-                       placeholder="Ex: 192.168.1.100" 
-                       value="{config['mqtt_broker']}">
-            </div>
-            
-            <div class="field-group">
-                <label for="mqtt_port">Porta MQTT</label>
-                <input type="number" id="mqtt_port" name="mqtt_port" 
-                       placeholder="Ex: 1883" 
-                       value="{config['mqtt_port']}" 
-                       min="1" max="65535">
+                <label for="relay_channels">Número de Canais de Relé</label>
+                <input type="number" id="relay_channels" name="relay_channels" 
+                       placeholder="Ex: 16" 
+                       value="%d" 
+                       min="1" max="16" required>
+                <div class="info-text">Quantidade de canais de relé (1 a 16)</div>
             </div>
             
             <button type="submit" class="btn-primary">💾 Salvar Configuração</button>
@@ -324,51 +311,49 @@ def generate_html(config, message=""):
                 <button type="submit" class="btn-warning">🔄 Reiniciar Sistema</button>
             </form>
             
-            <form action="/reset" method="post" onsubmit="return confirm('Isso apagará todas as configurações. Confirma?')">
+            <form action="/reset" method="post">
                 <button type="submit" class="btn-danger">🗑️ Reset de Fábrica</button>
             </form>
         </div>
     </div>
 </body>
-</html>'''
+</html>
+""" % (
+        config['device_id'],
+        config['device_name'],
+        wifi_status,
+        config['backend_ip'],
+        config['backend_port'],
+        config.get('relay_channels', 16),
+        msg_html,
+        config['device_name'],
+        config['device_id'],
+        config['wifi_ssid'],
+        config['backend_ip'],
+        config['backend_port'],
+        config.get('relay_channels', 16)
+    )
     
     return html
 
 def parse_post_data(request):
     """Parse melhorado com suporte UTF-8"""
     try:
-        # Encontra o body
         body_start = request.find('\r\n\r\n')
         if body_start == -1:
             return {}
         
         body = request[body_start + 4:]
         
-        # Parse dos parâmetros
         params = {}
         for item in body.split('&'):
             if '=' in item:
                 key, value = item.split('=', 1)
-                # Decodificar URL encoding
                 value = value.replace('+', ' ')
-                # Decodificar caracteres especiais
-                replacements = [
-                    ('%20', ' '), ('%21', '!'), ('%22', '"'), ('%23', '#'),
-                    ('%24', '$'), ('%25', '%'), ('%26', '&'), ('%27', "'"),
-                    ('%28', '('), ('%29', ')'), ('%2A', '*'), ('%2B', '+'),
-                    ('%2C', ','), ('%2F', '/'), ('%3A', ':'), ('%3B', ';'),
-                    ('%3D', '='), ('%3F', '?'), ('%40', '@'), ('%5B', '['),
-                    ('%5D', ']'), ('%7B', '{'), ('%7D', '}'),
-                    # UTF-8 comum
-                    ('%C3%A1', 'á'), ('%C3%A0', 'à'), ('%C3%A2', 'â'), ('%C3%A3', 'ã'),
-                    ('%C3%A9', 'é'), ('%C3%AA', 'ê'), ('%C3%AD', 'í'),
-                    ('%C3%B3', 'ó'), ('%C3%B4', 'ô'), ('%C3%B5', 'õ'),
-                    ('%C3%BA', 'ú'), ('%C3%A7', 'ç'),
-                    ('%C3%81', 'Á'), ('%C3%89', 'É'), ('%C3%8D', 'Í'),
-                    ('%C3%93', 'Ó'), ('%C3%9A', 'Ú'), ('%C3%87', 'Ç')
-                ]
-                for old, new in replacements:
-                    value = value.replace(old, new)
+                # Decodificar URL encoding básico
+                value = value.replace('%40', '@')
+                value = value.replace('%3A', ':')
+                value = value.replace('%2F', '/')
                 params[key] = value
         
         return params
@@ -384,7 +369,6 @@ def parse_post_data(request):
 def handle_http_request(request, config):
     """Processa requisições HTTP"""
     try:
-        # Parse da primeira linha
         lines = request.split('\n')
         if not lines:
             return b"HTTP/1.1 400 Bad Request\r\n\r\n"
@@ -400,7 +384,7 @@ def handle_http_request(request, config):
         
         # GET / - Página principal
         if method == 'GET' and path == '/':
-            html = generate_html(config)
+            html = generate_html_inline(config)
             response = f"HTTP/1.1 200 OK\r\nContent-Type: text/html; charset=UTF-8\r\n\r\n{html}"
             return response.encode('utf-8')
         
@@ -409,41 +393,61 @@ def handle_http_request(request, config):
             params = parse_post_data(request)
             
             if params:
+                original_config = config.copy()
+                
                 # Atualizar configuração
-                config['device_name'] = params.get('device_name', config['device_name'])
                 config['wifi_ssid'] = params.get('wifi_ssid', '')
-                config['wifi_password'] = params.get('wifi_password', '')
+                
+                # Senha inteligente
+                if params.get('wifi_password'):
+                    config['wifi_password'] = params.get('wifi_password')
+                
                 config['backend_ip'] = params.get('backend_ip', config['backend_ip'])
                 config['backend_port'] = int(params.get('backend_port', config['backend_port']))
-                config['mqtt_broker'] = params.get('mqtt_broker', config['mqtt_broker'])
-                config['mqtt_port'] = int(params.get('mqtt_port', config['mqtt_port']))
+                config['relay_channels'] = int(params.get('relay_channels', config.get('relay_channels', 16)))
                 config['configured'] = True
                 
-                # Salvar
+                # Verificar se algo mudou
+                changed = False
+                for key in ['wifi_ssid', 'wifi_password', 'backend_ip', 'backend_port', 'relay_channels']:
+                    if key in ['backend_port', 'relay_channels']:
+                        if int(original_config.get(key, 0)) != int(config[key]):
+                            changed = True
+                            break
+                    else:
+                        if original_config.get(key, '') != config.get(key, ''):
+                            changed = True
+                            break
+                
+                if not changed:
+                    message = ("info", "ℹ️ Nenhuma alteração detectada.")
+                    html = generate_html_inline(config, message)
+                    response = f"HTTP/1.1 200 OK\r\nContent-Type: text/html; charset=UTF-8\r\n\r\n{html}"
+                    return response.encode('utf-8')
+                
+                # Salvar configuração
                 if save_config(config):
                     print("✅ Configuração salva!")
                     
                     # Tentar conectar ao WiFi
-                    if config['wifi_ssid'] and config['wifi_password']:
-                        message = ("info", "Configuração salva! Tentando conectar ao WiFi...")
-                        html = generate_html(config, message)
+                    if config['wifi_ssid'] and config.get('wifi_password'):
+                        message = ("info", "✅ Configuração salva! Conectando ao WiFi...")
+                        html = generate_html_inline(config, message)
                         response = f"HTTP/1.1 200 OK\r\nContent-Type: text/html; charset=UTF-8\r\n\r\n{html}"
-                        
-                        # Enviar resposta antes de conectar
                         return response.encode('utf-8'), {'action': 'connect_wifi'}
                     else:
-                        message = ("success", "Configuração salva!")
-                        html = generate_html(config, message)
+                        message = ("success", "✅ Configuração salva com sucesso!")
+                        html = generate_html_inline(config, message)
                         response = f"HTTP/1.1 200 OK\r\nContent-Type: text/html; charset=UTF-8\r\n\r\n{html}"
                         return response.encode('utf-8')
                 else:
-                    message = ("error", "Erro ao salvar configuração!")
-                    html = generate_html(config, message)
+                    message = ("error", "❌ Erro ao salvar configuração!")
+                    html = generate_html_inline(config, message)
                     response = f"HTTP/1.1 200 OK\r\nContent-Type: text/html; charset=UTF-8\r\n\r\n{html}"
                     return response.encode('utf-8')
             else:
-                message = ("error", "Dados inválidos!")
-                html = generate_html(config, message)
+                message = ("error", "❌ Dados inválidos!")
+                html = generate_html_inline(config, message)
                 response = f"HTTP/1.1 200 OK\r\nContent-Type: text/html; charset=UTF-8\r\n\r\n{html}"
                 return response.encode('utf-8')
         
