@@ -1,0 +1,62 @@
+[platformio]
+default_envs = esp32-tft-display
+
+[env:esp32-tft-display]
+platform = espressif32
+board = esp32dev
+framework = arduino
+build_src_filter = +<*> -<.git/> -<.svn/>
+monitor_speed = 115200
+upload_speed = 115200  ; Velocidade reduzida para estabilidade
+upload_port = /dev/cu.usbserial-2110
+monitor_port = /dev/cu.usbserial-2110
+; Auto-detect port or use specific port
+; upload_port = /dev/cu.usbserial-*
+; monitor_port = /dev/cu.usbserial-*
+board_build.partitions = huge_app.csv
+
+; Bibliotecas necessárias (igual ao firmware original)
+lib_deps = 
+    bodmer/TFT_eSPI@^2.5.0
+    lvgl/lvgl@^8.3.11
+    bblanchon/ArduinoJson@^7.0.2
+    knolleary/PubSubClient@^2.8
+    https://github.com/PaulStoffregen/XPT2046_Touchscreen.git
+    WiFi
+
+; Configurações de build
+build_flags = 
+    -D USER_SETUP_LOADED=1
+    -D ARDUINOJSON_ENABLE_ARDUINO_STRING=1
+    -D ILI9341_2_DRIVER=1  ; Driver alternativo ILI9341 (mais compatível)
+    -D TFT_WIDTH=240
+    -D TFT_HEIGHT=320
+    -D TFT_MISO=12
+    -D TFT_MOSI=13
+    -D TFT_SCLK=14
+    -D TFT_CS=15
+    -D TFT_DC=2
+    -D TFT_RST=12  ; Pin 12 conforme configuração oficial
+    -D TFT_BL=21
+    -D TFT_INVERSION_ON=1  ; SOLUÇÃO MAIS COMUM para fundo branco ESP32-2432S028R
+    -D TOUCH_CS=33
+    -D USE_HSPI_PORT
+    ; Configurações de fonte
+    -D LOAD_GLCD=1
+    -D LOAD_FONT2=1
+    -D LOAD_FONT4=1
+    -D LOAD_FONT6=1
+    -D LOAD_FONT7=1
+    -D LOAD_FONT8=1
+    -D LOAD_GFXFF=1
+    -D SMOOTH_FONT=1
+    -D SPI_FREQUENCY=65000000  ; Frequência oficial para melhor performance
+    -D SPI_READ_FREQUENCY=20000000
+    -D SPI_TOUCH_FREQUENCY=2500000
+    -D LV_CONF_INCLUDE_SIMPLE
+    -D LV_CONF_PATH=lv_conf.h
+    -I include  ; Incluir diretório de headers
+    ; Configurações LVGL para suporte a caracteres latinos
+    -D LV_FONT_MONTSERRAT_14=1
+    -D LV_FONT_MONTSERRAT_16=1
+    -D LV_FONT_DEFAULT_MONTSERRAT_14=1

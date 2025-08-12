@@ -76,7 +76,7 @@ static void draw_char(uint16_t x, uint16_t y, char c, uint16_t color, uint16_t b
         
         // Get font data for character
         if (c >= '0' && c <= '9') {
-            line = font5x7[c - '0' + 5][i];
+            line = font5x7[c - '0' + 4][i];  // 0 está no índice 4, não 5
         } else if (c == ' ') {
             line = font5x7[0][i];
         } else {
@@ -379,6 +379,11 @@ esp_err_t ui_manager_handle_touch(uint16_t x, uint16_t y, bool pressed) {
     
     if (pressed) {
         ui.total_touches++;
+        
+        // LOG DE DEBUG - coordenadas RAW do touch
+        ESP_LOGI(TAG, "=== TOUCH DEBUG ===");
+        ESP_LOGI(TAG, "Coordenadas RAW do touch: X=%d, Y=%d", x, y);
+        ESP_LOGI(TAG, "Display: 320x240 (landscape)");
         
         // Configuração dos botões (mesmo layout do draw)
         int button_width = 80;

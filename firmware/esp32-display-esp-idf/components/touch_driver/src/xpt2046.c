@@ -331,12 +331,24 @@ static esp_err_t xpt2046_map_coordinates(xpt2046_handle_t handle, uint16_t raw_x
         return ESP_ERR_INVALID_ARG;
     }
 
-    // Map raw coordinates to screen coordinates
-    int32_t x = raw_x - handle->config.min_x;
-    int32_t y = raw_y - handle->config.min_y;
+    // LOG DEBUG - valores RAW antes do mapeamento
+    ESP_LOGI(TAG, "RAW Touch Values: X=%d, Y=%d", raw_x, raw_y);
+    ESP_LOGI(TAG, "Config Range: X[%d-%d], Y[%d-%d]", 
+             handle->config.min_x, handle->config.max_x, 
+             handle->config.min_y, handle->config.max_y);
     
-    x = x * handle->config.screen_width / (handle->config.max_x - handle->config.min_x);
-    y = y * handle->config.screen_height / (handle->config.max_y - handle->config.min_y);
+    // IMPORTANTE: No ESP32-2432S028R, o XPT2046 reporta:
+    // - raw_x com valores fixos (~600-750) que na verdade representam Y da tela
+    // - raw_y com valores variáveis (240-3800) que na verdade representam X da tela
+    // Então precisamos trocar!
+
+    // Map raw coordinates to screen coordinates
+    // TROCANDO X e Y porque o hardware reporta invertido!
+    int32_t x = raw_y - handle->config.min_y;  // Usar raw_y para X da tela
+    int32_t y = raw_x - handle->config.min_x;  // Usar raw_x para Y da tela
+    
+    x = x * handle->config.screen_width / (handle->config.max_y - handle->config.min_y);
+    y = y * handle->config.screen_height / (handle->config.max_x - handle->config.min_x);
     
     // Clamp to screen bounds
     if (x < 0) x = 0;
@@ -344,14 +356,20 @@ static esp_err_t xpt2046_map_coordinates(xpt2046_handle_t handle, uint16_t raw_x
     if (y < 0) y = 0;
     if (y >= handle->config.screen_height) y = handle->config.screen_height - 1;
     
+    ESP_LOGI(TAG, "Mapped (before rotation): X=%ld, Y=%ld (screen: %dx%d)", 
+             x, y, handle->config.screen_width, handle->config.screen_height);
+    
     // Apply rotation
     uint16_t screen_x = x;
     uint16_t screen_y = y;
     
     switch (handle->config.rotation) {
-        case 1:  // 90 degrees
-            screen_x = handle->config.screen_height - 1 - y;
-            screen_y = x;
+        case 1:  // 90 degrees - Para ESP32-2432S028R landscape
+            // Sem rotação - usar coordenadas mapeadas diretamente
+            screen_x = x;
+            screen_y = y;
+            ESP_LOGI(TAG, "Rotação 1 SEM ROTAÇÃO: Mapped(%d,%d) -> Screen(%d,%d)", 
+                     (int)x, (int)y, screen_x, screen_y);
             break;
         case 2:  // 180 degrees
             screen_x = handle->config.screen_width - 1 - x;
@@ -367,6 +385,8 @@ static esp_err_t xpt2046_map_coordinates(xpt2046_handle_t handle, uint16_t raw_x
     
     touch->x = screen_x;
     touch->y = screen_y;
+    
+    ESP_LOGI(TAG, "Final Touch: X=%d, Y=%d", touch->x, touch->y);
     
     return ESP_OK;
 }

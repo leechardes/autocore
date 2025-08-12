@@ -69,10 +69,13 @@
 #define TOUCH_SPI_FREQ 2500000       // 2.5 MHz
 
 // Touch Calibration (ESP32-2432S028R specific)
-#define TOUCH_MIN_X 200
-#define TOUCH_MAX_X 3700
-#define TOUCH_MIN_Y 240
-#define TOUCH_MAX_Y 3800
+// Ajustado baseado nos logs reais do touch
+// RAW X ~700-775 para coluna esquerda, expandindo range para capturar toda tela
+// RAW Y parece estar OK (240-3800)
+#define TOUCH_MIN_X 300    // Valor RAW mínimo do touch X (borda esquerda)
+#define TOUCH_MAX_X 3900   // Valor RAW máximo do touch X (borda direita)
+#define TOUCH_MIN_Y 240    // Valor RAW mínimo do touch Y
+#define TOUCH_MAX_Y 3800   // Valor RAW máximo do touch Y
 #define TOUCH_PRESSURE_MIN 200
 #define TOUCH_PRESSURE_MAX 3000
 

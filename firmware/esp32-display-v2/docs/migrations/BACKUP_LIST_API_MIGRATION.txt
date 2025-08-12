@@ -1,0 +1,7 @@
+# Lista de Backups - Migração MQTT para API REST
+# Formato: [TIMESTAMP] [ARQUIVO_ORIGINAL] -> [ARQUIVO_BACKUP]
+# =====================================================================
+[20250812_100807] include/communication/ConfigReceiver.h -> include/communication/ConfigReceiver.h.backup_api_migration_20250812_100807
+[20250812_101009] src/communication/ConfigReceiver.cpp -> src/communication/ConfigReceiver.cpp.backup_api_migration_20250812_101009
+[20250812_101201] src/main.cpp -> src/main.cpp.backup_api_migration_20250812_101201
+[20250812_101939] platformio.ini -> platformio.ini.backup_api_migration_20250812_101939

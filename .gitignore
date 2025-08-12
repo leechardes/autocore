@@ -142,6 +142,18 @@ raspberry-pi/userconf.txt
 raspberry-pi/wpa_supplicant.conf
 raspberry-pi/ssh
 
+# ESP32 build artifacts
+firmware/esp32-relay-esp-idf/build/
+firmware/esp32-relay-esp-idf/sdkconfig.old
+firmware/esp32-display-esp-idf/build/
+firmware/esp32-display-esp-idf/sdkconfig.old
+
+# PlatformIO build artifacts
+.pio/
+**/.pio/
+firmware/*/.pio/
+firmware/**/.pio/
+
 # Keep these
 !.gitkeep
 !requirements.txt

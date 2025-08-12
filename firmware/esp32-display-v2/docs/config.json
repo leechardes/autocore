@@ -1,0 +1,982 @@
+{
+  "timestamp": "2025-08-05T00:52:03.327144",
+  "request_id": "",
+  "device_id": "hmi_display_1",
+  "type": "config_response",
+  "config": {
+    "version": "2.0.0",
+    "metadata": {
+      "created_at": "2025-08-04T00:00:00Z",
+      "updated_at": "2025-08-04T22:10:00.000000",
+      "author": "AutoTech Team",
+      "description": "Configura\u00e7\u00e3o completa do sistema AutoTech com todas as funcionalidades"
+    },
+    "system": {
+      "name": "AutoTech Control System",
+      "language": "pt-BR",
+      "theme": "dark",
+      "display": {
+        "width": 320,
+        "height": 240,
+        "backlight": 100,
+        "items_per_page": 6
+      }
+    },
+    "screens": {
+      "home": {
+        "type": "menu",
+        "title": "Menu Principal",
+        "description": "Tela principal do sistema com acesso a todas as funcionalidades",
+        "items": [
+          {
+            "id": "nav_lighting",
+            "type": "navigation",
+            "icon": "light",
+            "label": "Ilumina\u00e7\u00e3o",
+            "target": "screen_2c77b42f"
+          },
+          {
+            "id": "nav_quick_actions",
+            "type": "navigation",
+            "icon": "lightning",
+            "label": "A\u00e7\u00f5es R\u00e1pidas",
+            "target": "quick_actions"
+          },
+          {
+            "id": "nav_winch",
+            "type": "navigation",
+            "icon": "winch",
+            "label": "Guincho",
+            "target": "winch"
+          },
+          {
+            "id": "nav_traction",
+            "type": "navigation",
+            "icon": "traction",
+            "label": "Tra\u00e7\u00e3o",
+            "target": "traction"
+          },
+          {
+            "id": "nav_auxiliary",
+            "type": "navigation",
+            "icon": "tools",
+            "label": "Auxiliar",
+            "target": "auxiliary"
+          }
+        ]
+      },
+      "screen_2c77b42f": {
+        "type": "control",
+        "title": "Ilumina\u00e7\u00e3o",
+        "description": "Controle completo do sistema de ilumina\u00e7\u00e3o do ve\u00edculo",
+        "items": [
+          {
+            "id": "light_high",
+            "type": "relay",
+            "icon": "light_high",
+            "label": "Luz Alta",
+            "device": "relay_board_1",
+            "channel": 1,
+            "mode": "toggle"
+          },
+          {
+            "id": "light_low",
+            "type": "relay",
+            "icon": "light_low",
+            "label": "Luz Baixa",
+            "device": "relay_board_1",
+            "channel": 2,
+            "mode": "toggle"
+          },
+          {
+            "id": "brake_light",
+            "type": "relay",
+            "icon": "brake",
+            "label": "Luz de Freio",
+            "device": "relay_board_1",
+            "channel": 5,
+            "mode": "momentary"
+          },
+          {
+            "id": "turn_left",
+            "type": "relay",
+            "icon": "turn_left",
+            "label": "Pisca Esquerdo",
+            "device": "relay_board_1",
+            "channel": 3,
+            "mode": "toggle"
+          },
+          {
+            "id": "turn_right",
+            "type": "relay",
+            "icon": "turn_right",
+            "label": "Pisca Direito",
+            "device": "relay_board_1",
+            "channel": 4,
+            "mode": "toggle"
+          },
+          {
+            "id": "reverse_light",
+            "type": "relay",
+            "icon": "reverse",
+            "label": "Luz de R\u00e9",
+            "device": "relay_board_1",
+            "channel": 6,
+            "mode": "momentary"
+          },
+          {
+            "id": "parking_light",
+            "type": "relay",
+            "icon": "parking",
+            "label": "Luz Estacionamento",
+            "device": "relay_board_1",
+            "channel": 7,
+            "mode": "toggle"
+          },
+          {
+            "id": "led_front",
+            "type": "relay",
+            "icon": "led_front",
+            "label": "LED Dianteiro",
+            "device": "relay_board_1",
+            "channel": 8,
+            "mode": "toggle"
+          },
+          {
+            "id": "led_rear",
+            "type": "relay",
+            "icon": "led_rear",
+            "label": "LED Traseiro",
+            "device": "relay_board_1",
+            "channel": 9,
+            "mode": "toggle"
+          },
+          {
+            "id": "led_hood",
+            "type": "relay",
+            "icon": "led_hood",
+            "label": "LED Cap\u00f4",
+            "device": "relay_board_1",
+            "channel": 10,
+            "mode": "toggle"
+          },
+          {
+            "id": "led_bar",
+            "type": "relay",
+            "icon": "led_bar",
+            "label": "Barra LED",
+            "device": "relay_board_1",
+            "channel": 11,
+            "mode": "toggle"
+          }
+        ]
+      },
+      "quick_actions": {
+        "type": "actions",
+        "title": "A\u00e7\u00f5es R\u00e1pidas",
+        "description": "Presets e a\u00e7\u00f5es especiais para situa\u00e7\u00f5es espec\u00edficas",
+        "items": [
+          {
+            "id": "all_lights",
+            "type": "action",
+            "icon": "star",
+            "label": "Todas Luzes",
+            "action_type": "preset",
+            "preset": "all_lights"
+          },
+          {
+            "id": "emergency",
+            "type": "action",
+            "icon": "emergency",
+            "label": "Emerg\u00eancia",
+            "action_type": "preset",
+            "preset": "emergency"
+          },
+          {
+            "id": "camping",
+            "type": "action",
+            "icon": "camping",
+            "label": "Camping",
+            "action_type": "preset",
+            "preset": "camping"
+          },
+          {
+            "id": "all_off",
+            "type": "action",
+            "icon": "power_off",
+            "label": "Desligar Tudo",
+            "action_type": "preset",
+            "preset": "all_off"
+          },
+          {
+            "id": "light_show",
+            "type": "action",
+            "icon": "show",
+            "label": "Show de Luzes",
+            "action_type": "preset",
+            "preset": "light_show"
+          }
+        ]
+      },
+      "winch": {
+        "type": "control",
+        "title": "Guincho",
+        "description": "Controle do sistema de guincho com seguran\u00e7a integrada",
+        "items": [
+          {
+            "id": "winch_in",
+            "type": "relay",
+            "icon": "winch_in",
+            "label": "Guincho IN",
+            "device": "relay_board_1",
+            "channel": 12,
+            "mode": "momentary"
+          },
+          {
+            "id": "winch_out",
+            "type": "relay",
+            "icon": "winch_out",
+            "label": "Guincho OUT",
+            "device": "relay_board_1",
+            "channel": 13,
+            "mode": "momentary"
+          }
+        ]
+      },
+      "traction": {
+        "type": "mode_selector",
+        "title": "Tra\u00e7\u00e3o",
+        "description": "Sele\u00e7\u00e3o do modo de tra\u00e7\u00e3o 4x4",
+        "items": [
+          {
+            "id": "mode_4x2",
+            "type": "mode",
+            "icon": "4x2",
+            "label": "4x2",
+            "mode": "4x2"
+          },
+          {
+            "id": "mode_4x4",
+            "type": "mode",
+            "icon": "4x4",
+            "label": "4x4",
+            "mode": "4x4"
+          },
+          {
+            "id": "mode_4x4_low",
+            "type": "mode",
+            "icon": "4x4_low",
+            "label": "4x4 Low",
+            "mode": "4x4_low"
+          }
+        ]
+      },
+      "auxiliary": {
+        "type": "control",
+        "title": "Auxiliar",
+        "description": "Controles auxiliares e acess\u00f3rios diversos",
+        "items": [
+          {
+            "id": "aux_1",
+            "type": "relay",
+            "icon": "aux",
+            "label": "Aux 1",
+            "device": "relay_board_1",
+            "channel": 14,
+            "mode": "toggle"
+          },
+          {
+            "id": "aux_2",
+            "type": "relay",
+            "icon": "aux",
+            "label": "Aux 2",
+            "device": "relay_board_1",
+            "channel": 15,
+            "mode": "toggle"
+          },
+          {
+            "id": "horn",
+            "type": "relay",
+            "icon": "horn",
+            "label": "Buzina",
+            "device": "relay_board_1",
+            "channel": 16,
+            "mode": "momentary"
+          }
+        ]
+      }
+    },
+    "devices": {
+      "relay_board_1": {
+        "type": "relay_board",
+        "name": "Placa de Rel\u00e9s Principal",
+        "channels": 16,
+        "initial_state": "all_off",
+        "interlocks": {
+          "1": [
+            2
+          ],
+          "2": [
+            1
+          ],
+          "12": [
+            13
+          ],
+          "13": [
+            12
+          ]
+        },
+        "safety": {
+          "winch_timeout": 30000,
+          "horn_timeout": 5000
+        }
+      },
+      "hmi_display_1": {
+        "type": "hmi_display",
+        "name": "Display HMI TFT",
+        "model": "ESP32-2432S028R",
+        "resolution": "320x240",
+        "backlight": 100,
+        "current_screen": "home"
+      },
+      "sensor_board_1": {
+        "type": "sensor_board",
+        "name": "Placa de Sensores",
+        "sensors": {
+          "voltage": {
+            "value": 12.8,
+            "unit": "V",
+            "min": 11.0,
+            "max": 14.5
+          },
+          "current": {
+            "value": 5.2,
+            "unit": "A",
+            "min": 0.0,
+            "max": 50.0
+          },
+          "temperature": {
+            "value": 25.0,
+            "unit": "\u00b0C",
+            "min": -20.0,
+            "max": 80.0
+          }
+        }
+      }
+    },
+    "presets": {
+      "all_lights": {
+        "name": "Todas Luzes",
+        "description": "Liga/desliga todas as luzes",
+        "type": "toggle",
+        "targets": [
+          {
+            "device": "relay_board_1",
+            "channels": [
+              1,
+              2,
+              7,
+              8,
+              9,
+              10,
+              11
+            ]
+          }
+        ]
+      },
+      "emergency": {
+        "name": "Emerg\u00eancia",
+        "description": "Ativa pisca alerta",
+        "type": "toggle",
+        "sequence": [
+          {
+            "device": "relay_board_1",
+            "channels": [
+              3,
+              4
+            ],
+            "pattern": "blink",
+            "interval": 500
+          }
+        ]
+      },
+      "camping": {
+        "name": "Camping",
+        "description": "Modo camping - luzes suaves",
+        "type": "toggle",
+        "targets": [
+          {
+            "device": "relay_board_1",
+            "channels": [
+              7,
+              10
+            ]
+          }
+        ]
+      },
+      "all_off": {
+        "name": "Desligar Tudo",
+        "description": "Desliga todos os dispositivos",
+        "type": "action",
+        "targets": [
+          {
+            "device": "relay_board_1",
+            "channels": "all",
+            "state": "OFF"
+          }
+        ]
+      },
+      "light_show": {
+        "name": "Show de Luzes",
+        "description": "Sequ\u00eancia de luzes",
+        "type": "toggle",
+        "sequence": [
+          {
+            "device": "relay_board_1",
+            "channels": [
+              8,
+              9,
+              10,
+              11
+            ],
+            "pattern": "wave",
+            "interval": 200
+          }
+        ]
+      }
+    },
+    "fourWheelDrive": {
+      "current_mode": "4x2",
+      "modes": {
+        "4x2": {
+          "name": "4x2",
+          "description": "Tra\u00e7\u00e3o traseira",
+          "icon": "4x2"
+        },
+        "4x4": {
+          "name": "4x4",
+          "description": "Tra\u00e7\u00e3o integral",
+          "icon": "4x4"
+        },
+        "4x4_low": {
+          "name": "4x4 Low",
+          "description": "Tra\u00e7\u00e3o integral reduzida",
+          "icon": "4x4_low"
+        }
+      }
+    },
+    "mqtt": {
+      "broker": "localhost",
+      "port": 1883,
+      "websocket_port": 8083,
+      "username": "",
+      "password": "",
+      "topics": {
+        "prefix": "autotech",
+        "command": "autotech/+/command",
+        "status": "autotech/+/status",
+        "telemetry": "autotech/+/telemetry",
+        "config_request": "autotech/gateway/config/request",
+        "config_response": "autotech/gateway/config/response"
+      }
+    },
+    "simulation": {
+      "auto_publish_interval": 5,
+      "enable_random_values": true,
+      "enable_logging": true
+    }
+  }
+}...
+
+Mensagem recebida:
+Tópico: autotech/gateway/config/response
+Tamanho: 7483 bytes
+Payload: {
+  "timestamp": "2025-08-05T00:52:05.694463",
+  "request_id": "",
+  "device_id": "hmi_display_1",
+  "type": "config_response",
+  "config": {
+    "version": "2.0.0",
+    "metadata": {
+      "created_at": "2025-08-04T00:00:00Z",
+      "updated_at": "2025-08-04T22:10:00.000000",
+      "author": "AutoTech Team",
+      "description": "Configura\u00e7\u00e3o completa do sistema AutoTech com todas as funcionalidades"
+    },
+    "system": {
+      "name": "AutoTech Control System",
+      "language": "pt-BR",
+      "theme": "dark",
+      "display": {
+        "width": 320,
+        "height": 240,
+        "backlight": 100,
+        "items_per_page": 6
+      }
+    },
+    "screens": {
+      "home": {
+        "type": "menu",
+        "title": "Menu Principal",
+        "description": "Tela principal do sistema com acesso a todas as funcionalidades",
+        "items": [
+          {
+            "id": "nav_lighting",
+            "type": "navigation",
+            "icon": "light",
+            "label": "Ilumina\u00e7\u00e3o",
+            "target": "screen_2c77b42f"
+          },
+          {
+            "id": "nav_quick_actions",
+            "type": "navigation",
+            "icon": "lightning",
+            "label": "A\u00e7\u00f5es R\u00e1pidas",
+            "target": "quick_actions"
+          },
+          {
+            "id": "nav_winch",
+            "type": "navigation",
+            "icon": "winch",
+            "label": "Guincho",
+            "target": "winch"
+          },
+          {
+            "id": "nav_traction",
+            "type": "navigation",
+            "icon": "traction",
+            "label": "Tra\u00e7\u00e3o",
+            "target": "traction"
+          },
+          {
+            "id": "nav_auxiliary",
+            "type": "navigation",
+            "icon": "tools",
+            "label": "Auxiliar",
+            "target": "auxiliary"
+          }
+        ]
+      },
+      "screen_2c77b42f": {
+        "type": "control",
+        "title": "Ilumina\u00e7\u00e3o",
+        "description": "Controle completo do sistema de ilumina\u00e7\u00e3o do ve\u00edculo",
+        "items": [
+          {
+            "id": "light_high",
+            "type": "relay",
+            "icon": "light_high",
+            "label": "Luz Alta",
+            "device": "relay_board_1",
+            "channel": 1,
+            "mode": "toggle"
+          },
+          {
+            "id": "light_low",
+            "type": "relay",
+            "icon": "light_low",
+            "label": "Luz Baixa",
+            "device": "relay_board_1",
+            "channel": 2,
+            "mode": "toggle"
+          },
+          {
+            "id": "brake_light",
+            "type": "relay",
+            "icon": "brake",
+            "label": "Luz de Freio",
+            "device": "relay_board_1",
+            "channel": 5,
+            "mode": "momentary"
+          },
+          {
+            "id": "turn_left",
+            "type": "relay",
+            "icon": "turn_left",
+            "label": "Pisca Esquerdo",
+            "device": "relay_board_1",
+            "channel": 3,
+            "mode": "toggle"
+          },
+          {
+            "id": "turn_right",
+            "type": "relay",
+            "icon": "turn_right",
+            "label": "Pisca Direito",
+            "device": "relay_board_1",
+            "channel": 4,
+            "mode": "toggle"
+          },
+          {
+            "id": "reverse_light",
+            "type": "relay",
+            "icon": "reverse",
+            "label": "Luz de R\u00e9",
+            "device": "relay_board_1",
+            "channel": 6,
+            "mode": "momentary"
+          },
+          {
+            "id": "parking_light",
+            "type": "relay",
+            "icon": "parking",
+            "label": "Luz Estacionamento",
+            "device": "relay_board_1",
+            "channel": 7,
+            "mode": "toggle"
+          },
+          {
+            "id": "led_front",
+            "type": "relay",
+            "icon": "led_front",
+            "label": "LED Dianteiro",
+            "device": "relay_board_1",
+            "channel": 8,
+            "mode": "toggle"
+          },
+          {
+            "id": "led_rear",
+            "type": "relay",
+            "icon": "led_rear",
+            "label": "LED Traseiro",
+            "device": "relay_board_1",
+            "channel": 9,
+            "mode": "toggle"
+          },
+          {
+            "id": "led_hood",
+            "type": "relay",
+            "icon": "led_hood",
+            "label": "LED Cap\u00f4",
+            "device": "relay_board_1",
+            "channel": 10,
+            "mode": "toggle"
+          },
+          {
+            "id": "led_bar",
+            "type": "relay",
+            "icon": "led_bar",
+            "label": "Barra LED",
+            "device": "relay_board_1",
+            "channel": 11,
+            "mode": "toggle"
+          }
+        ]
+      },
+      "quick_actions": {
+        "type": "actions",
+        "title": "A\u00e7\u00f5es R\u00e1pidas",
+        "description": "Presets e a\u00e7\u00f5es especiais para situa\u00e7\u00f5es espec\u00edficas",
+        "items": [
+          {
+            "id": "all_lights",
+            "type": "action",
+            "icon": "star",
+            "label": "Todas Luzes",
+            "action_type": "preset",
+            "preset": "all_lights"
+          },
+          {
+            "id": "emergency",
+            "type": "action",
+            "icon": "emergency",
+            "label": "Emerg\u00eancia",
+            "action_type": "preset",
+            "preset": "emergency"
+          },
+          {
+            "id": "camping",
+            "type": "action",
+            "icon": "camping",
+            "label": "Camping",
+            "action_type": "preset",
+            "preset": "camping"
+          },
+          {
+            "id": "all_off",
+            "type": "action",
+            "icon": "power_off",
+            "label": "Desligar Tudo",
+            "action_type": "preset",
+            "preset": "all_off"
+          },
+          {
+            "id": "light_show",
+            "type": "action",
+            "icon": "show",
+            "label": "Show de Luzes",
+            "action_type": "preset",
+            "preset": "light_show"
+          }
+        ]
+      },
+      "winch": {
+        "type": "control",
+        "title": "Guincho",
+        "description": "Controle do sistema de guincho com seguran\u00e7a integrada",
+        "items": [
+          {
+            "id": "winch_in",
+            "type": "relay",
+            "icon": "winch_in",
+            "label": "Guincho IN",
+            "device": "relay_board_1",
+            "channel": 12,
+            "mode": "momentary"
+          },
+          {
+            "id": "winch_out",
+            "type": "relay",
+            "icon": "winch_out",
+            "label": "Guincho OUT",
+            "device": "relay_board_1",
+            "channel": 13,
+            "mode": "momentary"
+          }
+        ]
+      },
+      "traction": {
+        "type": "mode_selector",
+        "title": "Tra\u00e7\u00e3o",
+        "description": "Sele\u00e7\u00e3o do modo de tra\u00e7\u00e3o 4x4",
+        "items": [
+          {
+            "id": "mode_4x2",
+            "type": "mode",
+            "icon": "4x2",
+            "label": "4x2",
+            "mode": "4x2"
+          },
+          {
+            "id": "mode_4x4",
+            "type": "mode",
+            "icon": "4x4",
+            "label": "4x4",
+            "mode": "4x4"
+          },
+          {
+            "id": "mode_4x4_low",
+            "type": "mode",
+            "icon": "4x4_low",
+            "label": "4x4 Low",
+            "mode": "4x4_low"
+          }
+        ]
+      },
+      "auxiliary": {
+        "type": "control",
+        "title": "Auxiliar",
+        "description": "Controles auxiliares e acess\u00f3rios diversos",
+        "items": [
+          {
+            "id": "aux_1",
+            "type": "relay",
+            "icon": "aux",
+            "label": "Aux 1",
+            "device": "relay_board_1",
+            "channel": 14,
+            "mode": "toggle"
+          },
+          {
+            "id": "aux_2",
+            "type": "relay",
+            "icon": "aux",
+            "label": "Aux 2",
+            "device": "relay_board_1",
+            "channel": 15,
+            "mode": "toggle"
+          },
+          {
+            "id": "horn",
+            "type": "relay",
+            "icon": "horn",
+            "label": "Buzina",
+            "device": "relay_board_1",
+            "channel": 16,
+            "mode": "momentary"
+          }
+        ]
+      }
+    },
+    "devices": {
+      "relay_board_1": {
+        "type": "relay_board",
+        "name": "Placa de Rel\u00e9s Principal",
+        "channels": 16,
+        "initial_state": "all_off",
+        "interlocks": {
+          "1": [
+            2
+          ],
+          "2": [
+            1
+          ],
+          "12": [
+            13
+          ],
+          "13": [
+            12
+          ]
+        },
+        "safety": {
+          "winch_timeout": 30000,
+          "horn_timeout": 5000
+        }
+      },
+      "hmi_display_1": {
+        "type": "hmi_display",
+        "name": "Display HMI TFT",
+        "model": "ESP32-2432S028R",
+        "resolution": "320x240",
+        "backlight": 100,
+        "current_screen": "home"
+      },
+      "sensor_board_1": {
+        "type": "sensor_board",
+        "name": "Placa de Sensores",
+        "sensors": {
+          "voltage": {
+            "value": 12.8,
+            "unit": "V",
+            "min": 11.0,
+            "max": 14.5
+          },
+          "current": {
+            "value": 5.2,
+            "unit": "A",
+            "min": 0.0,
+            "max": 50.0
+          },
+          "temperature": {
+            "value": 25.0,
+            "unit": "\u00b0C",
+            "min": -20.0,
+            "max": 80.0
+          }
+        }
+      }
+    },
+    "presets": {
+      "all_lights": {
+        "name": "Todas Luzes",
+        "description": "Liga/desliga todas as luzes",
+        "type": "toggle",
+        "targets": [
+          {
+            "device": "relay_board_1",
+            "channels": [
+              1,
+              2,
+              7,
+              8,
+              9,
+              10,
+              11
+            ]
+          }
+        ]
+      },
+      "emergency": {
+        "name": "Emerg\u00eancia",
+        "description": "Ativa pisca alerta",
+        "type": "toggle",
+        "sequence": [
+          {
+            "device": "relay_board_1",
+            "channels": [
+              3,
+              4
+            ],
+            "pattern": "blink",
+            "interval": 500
+          }
+        ]
+      },
+      "camping": {
+        "name": "Camping",
+        "description": "Modo camping - luzes suaves",
+        "type": "toggle",
+        "targets": [
+          {
+            "device": "relay_board_1",
+            "channels": [
+              7,
+              10
+            ]
+          }
+        ]
+      },
+      "all_off": {
+        "name": "Desligar Tudo",
+        "description": "Desliga todos os dispositivos",
+        "type": "action",
+        "targets": [
+          {
+            "device": "relay_board_1",
+            "channels": "all",
+            "state": "OFF"
+          }
+        ]
+      },
+      "light_show": {
+        "name": "Show de Luzes",
+        "description": "Sequ\u00eancia de luzes",
+        "type": "toggle",
+        "sequence": [
+          {
+            "device": "relay_board_1",
+            "channels": [
+              8,
+              9,
+              10,
+              11
+            ],
+            "pattern": "wave",
+            "interval": 200
+          }
+        ]
+      }
+    },
+    "fourWheelDrive": {
+      "current_mode": "4x2",
+      "modes": {
+        "4x2": {
+          "name": "4x2",
+          "description": "Tra\u00e7\u00e3o traseira",
+          "icon": "4x2"
+        },
+        "4x4": {
+          "name": "4x4",
+          "description": "Tra\u00e7\u00e3o integral",
+          "icon": "4x4"
+        },
+        "4x4_low": {
+          "name": "4x4 Low",
+          "description": "Tra\u00e7\u00e3o integral reduzida",
+          "icon": "4x4_low"
+        }
+      }
+    },
+    "mqtt": {
+      "broker": "localhost",
+      "port": 1883,
+      "websocket_port": 8083,
+      "username": "",
+      "password": "",
+      "topics": {
+        "prefix": "autotech",
+        "command": "autotech/+/command",
+        "status": "autotech/+/status",
+        "telemetry": "autotech/+/telemetry",
+        "config_request": "autotech/gateway/config/request",
+        "config_response": "autotech/gateway/config/response"
+      }
+    },
+    "simulation": {
+      "auto_publish_interval": 5,
+      "enable_random_values": true,
+      "enable_logging": true
+    }
+  }
+}

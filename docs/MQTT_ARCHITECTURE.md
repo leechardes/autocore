@@ -4,6 +4,8 @@
 
 O AutoCore utiliza MQTT como protocolo principal de comunicação entre todos os componentes do sistema. O Mosquitto atua como broker central, coordenando mensagens entre dispositivos ESP32, aplicações web, mobile e o gateway.
 
+> **📌 Nota Importante:** A partir da versão 2.0, toda configuração de dispositivos é feita via **API REST**. O MQTT é usado exclusivamente para telemetria, comandos, status e heartbeat em tempo real.
+
 ## 🏗️ Componentes do Sistema
 
 ### 1. Mosquitto Broker
@@ -106,13 +108,13 @@ O AutoCore utiliza MQTT como protocolo principal de comunicação entre todos os
 
 | Componente | Publica | Subscreve | Heartbeat | Responsabilidade Principal |
 |------------|---------|-----------|-----------|---------------------------|
-| **ESP32 Relay** | - Estado dos relés<br>- Telemetria<br>- Safety events | - Comandos de controle<br>- Heartbeats<br>- Configurações | **RECEBE** e monitora | Executar comandos com segurança |
-| **ESP32 Display** | - Touch events<br>- Comandos relé<br>- Heartbeats | - Estado dos relés<br>- Telemetria CAN<br>- Configurações | **ENVIA** continuamente | Interface local no veículo |
+| **ESP32 Relay** | - Estado dos relés<br>- Telemetria<br>- Safety events | - Comandos de controle<br>- Heartbeats | **RECEBE** e monitora | Executar comandos com segurança |
+| **ESP32 Display** | - Touch events<br>- Comandos relé<br>- Heartbeats | - Estado dos relés<br>- Telemetria CAN | **ENVIA** continuamente | Interface local no veículo |
 | **Flutter App** | - Comandos relé<br>- Heartbeats<br>- Requisições | - Estado dos relés<br>- Telemetria<br>- Notificações | **ENVIA** continuamente | Controle remoto completo |
-| **Config App** | - Comandos teste<br>- Configurações | - Todos (monitor)<br>- Estados | Não necessário | Configuração e debug |
+| **Config App** | - Comandos teste | - Todos (monitor)<br>- Estados | Não necessário | Configuração via API e debug |
 | **Gateway** | - Roteamento<br>- Agregações<br>- Comandos | - Tudo (broker) | Não aplicável | Coordenação e persistência |
-| **ESP32 CAN** | - Telemetria CAN<br>- Status | - Configurações | Não aplicável | Bridge CAN→MQTT |
-| **ESP32 Sensor** | - Dados sensores<br>- Status | - Configurações<br>- Calibração | Não aplicável | Aquisição de dados |
+| **ESP32 CAN** | - Telemetria CAN<br>- Status | - Comandos | Não aplicável | Bridge CAN→MQTT |
+| **ESP32 Sensor** | - Dados sensores<br>- Status | - Comandos<br>- Calibração | Não aplicável | Aquisição de dados |
 
 ## 📊 Estrutura de Tópicos MQTT
 
@@ -128,11 +130,11 @@ autocore/{categoria}/{device_uuid}/{recurso}/{ação}
 # Status do dispositivo
 autocore/devices/{uuid}/status
 autocore/devices/{uuid}/announce
-autocore/devices/{uuid}/config
 
 # Recursos específicos por tipo
 autocore/devices/{uuid}/relays/state
 autocore/devices/{uuid}/relays/set
+autocore/devices/{uuid}/relays/heartbeat
 autocore/devices/{uuid}/display/screen
 autocore/devices/{uuid}/display/touch
 autocore/devices/{uuid}/sensors/data
@@ -144,6 +146,10 @@ autocore/devices/{uuid}/sensors/data
 autocore/telemetry/sensors/{sensor_id}
 autocore/telemetry/can/{signal_name}
 autocore/telemetry/calculated/{metric}
+
+# Telemetria de dispositivos
+autocore/telemetry/relays
+autocore/telemetry/displays
 
 # Agregações
 autocore/telemetry/summary/minute
@@ -174,13 +180,6 @@ autocore/commands/group/{group_id}/{action}
 autocore/commands/device/{uuid}/{action}
 ```
 
-#### 5. Configuração (`config`)
-```
-# Push de configurações
-autocore/config/device/{uuid}/update
-autocore/config/screen/{screen_id}/update
-autocore/config/theme/update
-```
 
 ## 🔄 Fluxos de Comunicação
 
@@ -190,8 +189,7 @@ sequenceDiagram
     ESP32->>Broker: PUBLISH autocore/discovery/announce
     Gateway->>Broker: SUBSCRIBE autocore/discovery/+
     Gateway->>Database: Registrar dispositivo
-    Gateway->>Broker: PUBLISH autocore/devices/{uuid}/config
-    ESP32->>Broker: SUBSCRIBE autocore/devices/{uuid}/config
+    ESP32->>API: GET /api/config/{uuid}
     ESP32->>Broker: PUBLISH autocore/devices/{uuid}/status
 ```
 
@@ -215,22 +213,22 @@ sequenceDiagram
     participant Relay as ESP32 Relay
     
     User->>Client: Press & Hold
-    Client->>Broker: PUBLISH /relays/set {state: true, momentary: true}
-    Relay->>Broker: SUBSCRIBE /relays/set
+    Client->>Broker: PUBLISH autocore/devices/{uuid}/relays/set {state: true, momentary: true}
+    Relay->>Broker: SUBSCRIBE autocore/devices/{uuid}/relays/set
     Relay->>Relay: Liga relé + Inicia monitor timeout
     
     loop Enquanto pressionado (cada 500ms)
-        Client->>Broker: PUBLISH /relays/heartbeat {channel: 1}
+        Client->>Broker: PUBLISH autocore/devices/{uuid}/relays/heartbeat {channel: 1}
         Relay->>Relay: Reset timeout counter
     end
     
     User->>Client: Release
-    Client->>Broker: PUBLISH /relays/set {state: false}
+    Client->>Broker: PUBLISH autocore/devices/{uuid}/relays/set {state: false}
     Relay->>Relay: Desliga relé
     
     Note over Relay: Se timeout > 1s sem heartbeat
     Relay->>Relay: DESLIGA AUTOMATICAMENTE
-    Relay->>Broker: PUBLISH /telemetry {event: "safety_shutoff"}
+    Relay->>Broker: PUBLISH autocore/telemetry/relays {uuid: "esp32-relay-001", event: "safety_shutoff"}
 ```
 
 ### 3. Telemetria CAN
@@ -313,14 +311,31 @@ sequenceDiagram
 ```json
 {
   "channel": 1,
+  "source_uuid": "esp32-display-001",
+  "target_uuid": "esp32-relay-001",
   "timestamp": "2025-08-08T10:30:00Z",
   "sequence": 42
+}
+```
+
+### Telemetria de Relay (Evento de Mudança)
+```json
+{
+  "uuid": "esp32-relay-001",
+  "board_id": 1,
+  "timestamp": "2025-08-12T12:46:34.914991",
+  "event": "relay_change",
+  "channel": 2,
+  "state": false,
+  "trigger": "simulator"
 }
 ```
 
 ### Evento de Safety Shutoff
 ```json
 {
+  "uuid": "esp32-relay-001",
+  "board_id": 1,
   "event": "safety_shutoff",
   "channel": 1,
   "reason": "heartbeat_timeout",
@@ -368,26 +383,6 @@ sequenceDiagram
 }
 ```
 
-### Configuração de Tela
-```json
-{
-  "screen_id": 1,
-  "name": "Dashboard Principal",
-  "refresh_rate": 100,
-  "items": [
-    {
-      "id": 1,
-      "type": "gauge",
-      "position": {"x": 0, "y": 0},
-      "size": {"width": 100, "height": 100},
-      "data_source": "telemetry/can/RPM",
-      "min": 0,
-      "max": 8000,
-      "unit": "RPM"
-    }
-  ]
-}
-```
 
 ## 🔒 Segurança
 
@@ -446,12 +441,12 @@ Relés momentâneos (buzina, guincho, partida) devem desligar automaticamente se
 
 ### QoS 1 - At Least Once
 - Comandos de relés
-- Configurações
 - Alertas
+- Heartbeats
 
 ### QoS 2 - Exactly Once
 - Atualizações de firmware
-- Configurações críticas de segurança
+- Comandos críticos de segurança
 - Comandos financeiros (futuro)
 
 ## 🔄 Retained Messages
@@ -460,7 +455,6 @@ Mensagens que devem ser retidas:
 - `autocore/devices/{uuid}/status` - Último status conhecido
 - `autocore/devices/{uuid}/relays/state` - Estado atual dos relés
 - `autocore/gateway/status` - Status do gateway
-- `autocore/config/+` - Configurações ativas
 
 ## 📊 Métricas e Monitoramento
 
@@ -562,11 +556,13 @@ mosquitto_sub -h localhost -t "$SYS/#" -v
 
 ---
 
-**Última Atualização:** 08 de Agosto de 2025  
-**Versão:** 2.0.0  
+**Última Atualização:** 12 de Agosto de 2025  
+**Versão:** 2.1.0  
 **Maintainer:** AutoCore Team
 
 ### Changelog
+- v2.1.0 - Removida configuração via MQTT (migrado para API REST)
+- v2.1.0 - Atualizada estrutura de tópicos e fluxos
 - v2.0.0 - Adicionado sistema de heartbeat para relés momentâneos
 - v2.0.0 - Documentado papel específico de cada componente
 - v2.0.0 - Adicionada matriz de responsabilidades

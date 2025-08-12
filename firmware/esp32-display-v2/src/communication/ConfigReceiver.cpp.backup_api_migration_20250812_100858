@@ -1,0 +1,230 @@
+/**
+ * @file ConfigReceiver.cpp
+ * @brief Implementation of configuration receiver
+ */
+
+#include "communication/ConfigReceiver.h"
+#include "core/Logger.h"
+#include <ArduinoJson.h>
+
+extern Logger* logger;
+
+ConfigReceiver* ConfigReceiver::instance = nullptr;
+
+ConfigReceiver::ConfigReceiver(MQTTClient* mqtt, ConfigManager* config) 
+    : mqttClient(mqtt), configManager(config), waitingForConfig(false), requestTime(0),
+      onConfigUpdateCallback(nullptr) {
+    
+    instance = this;
+    
+    // Setup topics
+    String deviceId = mqttClient->getDeviceId();
+    configTopic = "autotech/" + deviceId + "/config";
+    requestTopic = "autotech/gateway/config/request";  // Gateway escuta aqui
+    responseTopic = "autotech/gateway/config/response"; // Gateway responde aqui
+    updateTopic = "autotech/config/update";  // Broadcast topic for updates
+}
+
+ConfigReceiver::~ConfigReceiver() {
+    instance = nullptr;
+}
+
+void ConfigReceiver::begin() {
+    logger->info("ConfigReceiver: Starting...");
+    
+    // Subscribe to config topic (device specific)
+    mqttClient->subscribe(configTopic, onConfigReceived);
+    
+    // Subscribe to gateway response topic
+    mqttClient->subscribe(responseTopic, onConfigReceived);
+    
+    // Subscribe to update topic for hot reload
+    mqttClient->subscribe(updateTopic, onConfigUpdate);
+    
+    logger->info("ConfigReceiver: Subscribed to " + configTopic);
+    logger->info("ConfigReceiver: Subscribed to " + responseTopic);
+    logger->info("ConfigReceiver: Hot reload enabled on " + updateTopic);
+}
+
+void ConfigReceiver::requestConfig() {
+    logger->info("Requesting configuration from gateway...");
+    logger->info("Request topic: " + requestTopic);
+    
+    // Create request message (formato esperado pelo gateway)
+    JsonDocument doc;
+    doc["device_id"] = mqttClient->getDeviceId();
+    doc["request"] = "full_config";  // Gateway espera este campo
+    doc["timestamp"] = millis();
+    
+    String payload;
+    serializeJson(doc, payload);
+    
+    logger->info("Request payload: " + payload);
+    
+    // Publish request
+    if (mqttClient->publish(requestTopic, payload)) {
+        waitingForConfig = true;
+        requestTime = millis();
+        logger->info("Config request sent successfully to topic: " + requestTopic);
+    } else {
+        logger->error("Failed to send config request");
+    }
+}
+
+void ConfigReceiver::onConfigReceived(const String& topic, const String& payload) {
+    if (!instance) return;
+    
+    logger->info("ConfigReceiver: Message received on topic: " + topic);
+    logger->info("ConfigReceiver: Payload size: " + String(payload.length()) + " bytes");
+    logger->debug("ConfigReceiver: Payload preview: " + payload.substring(0, 100) + (payload.length() > 100 ? "..." : ""));
+    instance->handleConfigMessage(payload);
+}
+
+void ConfigReceiver::onConfigUpdate(const String& topic, const String& payload) {
+    if (!instance) return;
+    
+    logger->info("ConfigReceiver: Hot reload update received");
+    instance->handleConfigUpdate(payload);
+}
+
+void ConfigReceiver::handleConfigMessage(const String& payload) {
+    logger->info("Received configuration message");
+    
+    // Parse response to extract config
+    JsonDocument doc;
+    DeserializationError error = deserializeJson(doc, payload);
+    
+    if (error) {
+        logger->error("Failed to parse config response: " + String(error.c_str()));
+        return;
+    }
+    
+    // Log what we received
+    logger->info("Response has following fields:");
+    for (JsonPair kv : doc.as<JsonObject>()) {
+        logger->info("  - " + String(kv.key().c_str()));
+    }
+    
+    // Gateway sends config inside a "config" field
+    String configStr;
+    if (doc["config"].is<JsonObject>()) {
+        logger->info("Found config object, extracting...");
+        serializeJson(doc["config"], configStr);
+        
+        // Log config structure
+        JsonObject configObj = doc["config"].as<JsonObject>();
+        logger->info("Config object has following fields:");
+        for (JsonPair kv : configObj) {
+            logger->info("  - " + String(kv.key().c_str()));
+        }
+    } else {
+        logger->info("No config field found, using entire payload");
+        configStr = payload;
+    }
+    
+    logger->info("Config string size: " + String(configStr.length()) + " bytes");
+    
+    // Try to load configuration
+    if (configManager->loadConfig(configStr)) {
+        logger->info("Configuration loaded successfully!");
+        waitingForConfig = false;
+        
+        // Send acknowledgment
+        JsonDocument ack;
+        ack["device_id"] = mqttClient->getDeviceId();
+        ack["type"] = "config_ack";
+        ack["version"] = configManager->getVersion();
+        ack["timestamp"] = millis();
+        
+        String ackPayload;
+        serializeJson(ack, ackPayload);
+        
+        String ackTopic = "autotech/config/ack";
+        mqttClient->publish(ackTopic, ackPayload);
+        
+    } else {
+        logger->error("Failed to load configuration");
+        
+        // Send error response
+        JsonDocument error;
+        error["device_id"] = mqttClient->getDeviceId();
+        error["type"] = "config_error";
+        error["error"] = "Invalid configuration";
+        error["timestamp"] = millis();
+        
+        String errorPayload;
+        serializeJson(error, errorPayload);
+        
+        String errorTopic = "autotech/config/error";
+        mqttClient->publish(errorTopic, errorPayload);
+    }
+}
+
+void ConfigReceiver::enableHotReload(std::function<void()> callback) {
+    onConfigUpdateCallback = callback;
+    logger->info("Hot reload callback registered");
+}
+
+void ConfigReceiver::handleConfigUpdate(const String& payload) {
+    // Parse update message
+    JsonDocument doc;
+    DeserializationError error = deserializeJson(doc, payload);
+    
+    if (error) {
+        logger->error("Failed to parse update message: " + String(error.c_str()));
+        return;
+    }
+    
+    // Check if update is for this device or all devices
+    if (doc["target"].is<JsonVariant>()) {
+        String target = doc["target"].as<String>();
+        if (target != "all" && target != mqttClient->getDeviceId()) {
+            logger->debug("Update not for this device, ignoring");
+            return;
+        }
+    }
+    
+    // Check if it's a full config or partial update
+    if (doc["config"].is<JsonVariant>()) {
+        // Full configuration update
+        String configStr;
+        serializeJson(doc["config"], configStr);
+        
+        logger->info("Applying hot reload configuration update...");
+        
+        if (configManager->loadConfig(configStr)) {
+            logger->info("Configuration updated successfully via hot reload!");
+            
+            // Call the update callback if registered
+            if (onConfigUpdateCallback) {
+                onConfigUpdateCallback();
+            }
+            
+            // Send acknowledgment
+            JsonDocument ack;
+            ack["device_id"] = mqttClient->getDeviceId();
+            ack["type"] = "config_update_ack";
+            ack["version"] = configManager->getVersion();
+            ack["timestamp"] = millis();
+            
+            String ackPayload;
+            serializeJson(ack, ackPayload);
+            
+            String ackTopic = "autotech/config/update/ack";
+            mqttClient->publish(ackTopic, ackPayload);
+        }
+    } else if (doc["command"].is<JsonVariant>()) {
+        // Handle specific commands
+        String command = doc["command"].as<String>();
+        
+        if (command == "reload") {
+            // Request fresh config
+            logger->info("Reload command received, requesting new config...");
+            requestConfig();
+        } else if (command == "reset") {
+            // Reset to defaults (would need implementation)
+            logger->info("Reset command received");
+            // TODO: Implement reset functionality
+        }
+    }
+}

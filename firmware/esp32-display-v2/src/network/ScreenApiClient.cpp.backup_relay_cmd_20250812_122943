@@ -1,0 +1,343 @@
+/**
+ * @file ScreenApiClient.cpp
+ * @brief Implementação do cliente API REST para configurações de telas
+ * 
+ * @author Sistema AutoTech
+ * @version 2.0.0  
+ * @date 2025-08-12
+ */
+
+#include "network/ScreenApiClient.h"
+#include "core/Logger.h"
+
+// Logger global declarado em main.cpp
+extern Logger* logger;
+
+ScreenApiClient::ScreenApiClient() {
+    // Construir URL base das configurações
+    baseUrl = String(API_PROTOCOL) + "://" + 
+              String(API_SERVER) + ":" + 
+              String(API_PORT) + 
+              String(API_BASE_PATH);
+              
+    // Configurações de cache e timeout
+    cacheTimeout = API_CACHE_TTL;
+    cacheTimestamp = 0;
+    lastHttpCode = 0;
+    
+    if (logger) {
+        logger->info("ScreenApiClient: Initialized with base URL: " + baseUrl);
+    }
+}
+
+ScreenApiClient::~ScreenApiClient() {
+    // Cleanup HTTP client
+    httpClient.end();
+}
+
+bool ScreenApiClient::begin() {
+    // Configurar HTTPClient
+    httpClient.setTimeout(API_TIMEOUT);
+    httpClient.setReuse(true);
+    httpClient.setUserAgent("AutoTech-HMI-v2.0.0");
+    
+    if (logger) {
+        logger->info("ScreenApiClient: HTTP client configured");
+    }
+    
+    // Testar conectividade inicial
+    return testConnection();
+}
+
+bool ScreenApiClient::testConnection() {
+    String url = buildUrl("/screens");
+    
+    if (logger) {
+        logger->debug("ScreenApiClient: Testing connection to " + url);
+    }
+    
+    httpClient.begin(url);
+    
+    // Adicionar headers de autenticação se habilitado
+    if (API_USE_AUTH) {
+        httpClient.addHeader("Authorization", "Bearer " + String(API_AUTH_TOKEN));
+    }
+    
+    // Adicionar headers padrão
+    httpClient.addHeader("Accept", "application/json");
+    httpClient.addHeader("Content-Type", "application/json");
+    
+    lastHttpCode = httpClient.GET();
+    httpClient.end();
+    
+    if (lastHttpCode == 200) {
+        if (logger) {
+            logger->info("ScreenApiClient: Connection test successful");
+        }
+        return true;
+    }
+    
+    lastError = "Connection test failed. HTTP Code: " + String(lastHttpCode);
+    if (logger) {
+        logger->error("ScreenApiClient: " + lastError);
+    }
+    return false;
+}
+
+bool ScreenApiClient::loadConfiguration(JsonDocument& config) {
+    if (logger) {
+        logger->info("ScreenApiClient: Loading configuration...");
+    }
+    
+    // Verificar cache primeiro
+    if (isCacheValid() && !cachedConfig.isEmpty()) {
+        DeserializationError error = deserializeJson(config, cachedConfig);
+        if (error == DeserializationError::Ok) {
+            if (logger) {
+                logger->info("ScreenApiClient: Using cached configuration");
+            }
+            return true;
+        } else {
+            if (logger) {
+                logger->warning("ScreenApiClient: Cache corrupted, clearing...");
+            }
+            clearCache();
+        }
+    }
+    
+    // Carregar fresh data da API
+    DynamicJsonDocument screensDoc(8192);
+    JsonArray screensArray = screensDoc.to<JsonArray>();
+    
+    if (!getScreens(screensArray)) {
+        lastError = "Failed to load screens from API";
+        if (logger) {
+            logger->error("ScreenApiClient: " + lastError);
+        }
+        return false;
+    }
+    
+    // Para cada tela, carregar seus itens
+    for (JsonObject screen : screensArray) {
+        int screenId = screen["id"];
+        String screenTitle = screen["title"].as<String>();
+        JsonArray items = screen.createNestedArray("screen_items");
+        
+        if (logger) {
+            logger->info("ScreenApiClient: Loading items for screen " + String(screenId) + " (" + screenTitle + ")");
+        }
+        
+        if (!getScreenItems(screenId, items)) {
+            if (logger) {
+                logger->warning("ScreenApiClient: Failed to load items for screen " + String(screenId));
+            }
+            // Continuar com tela vazia ao invés de falhar completamente
+        } else {
+            if (logger) {
+                logger->info("ScreenApiClient: Loaded " + String(items.size()) + " items for screen " + String(screenId));
+            }
+        }
+    }
+    
+    // Construir configuração final no formato esperado
+    config["version"] = "2.0.0";
+    config["screens"] = screensArray;
+    config["source"] = "api";
+    config["timestamp"] = millis();
+    
+    // Fazer cache do resultado
+    cachedConfig.clear();
+    serializeJson(config, cachedConfig);
+    cacheTimestamp = millis();
+    
+    if (logger) {
+        logger->info("ScreenApiClient: Configuration loaded successfully from API");
+    }
+    return true;
+}
+
+bool ScreenApiClient::getScreens(JsonArray& screens) {
+    String response;
+    
+    for (int attempt = 1; attempt <= API_RETRY_COUNT; attempt++) {
+        if (makeHttpRequest("/screens", response)) {
+            // Parse JSON response
+            DynamicJsonDocument doc(4096);
+            DeserializationError error = deserializeJson(doc, response);
+            
+            if (error == DeserializationError::Ok) {
+                // Verificar se é um array
+                if (doc.is<JsonArray>()) {
+                    // Copiar elementos para o array fornecido
+                    for (JsonVariant v : doc.as<JsonArray>()) {
+                        screens.add(v);
+                    }
+                    return true;
+                } else {
+                    lastError = "API response is not an array";
+                }
+            } else {
+                lastError = "JSON parse error: " + String(error.c_str());
+            }
+        }
+        
+        if (logger) {
+            logger->warning("ScreenApiClient: getScreens attempt " + String(attempt) + " failed: " + lastError);
+        }
+        
+        if (attempt < API_RETRY_COUNT) {
+            delay(API_RETRY_DELAY * attempt); // Exponential backoff
+        }
+    }
+    
+    return false;
+}
+
+bool ScreenApiClient::getScreenItems(int screenId, JsonArray& items) {
+    String endpoint = "/screens/" + String(screenId) + "/items";
+    String response;
+    
+    if (logger) {
+        logger->debug("ScreenApiClient: Fetching items from endpoint: " + endpoint);
+    }
+    
+    if (makeHttpRequest(endpoint, response)) {
+        if (logger) {
+            logger->debug("ScreenApiClient: Response received (" + String(response.length()) + " bytes)");
+            // Log first 200 chars for debugging
+            String preview = response.substring(0, 200);
+            if (response.length() > 200) preview += "...";
+            logger->debug("ScreenApiClient: Response preview: " + preview);
+        }
+        
+        // Parse JSON response
+        DynamicJsonDocument doc(4096);
+        DeserializationError error = deserializeJson(doc, response);
+        
+        if (error == DeserializationError::Ok) {
+            // Verificar se é um array
+            if (doc.is<JsonArray>()) {
+                int itemCount = 0;
+                // Copiar elementos para o array fornecido
+                for (JsonVariant v : doc.as<JsonArray>()) {
+                    items.add(v);
+                    itemCount++;
+                    
+                    // Log primeiro item para debug
+                    if (itemCount == 1 && logger) {
+                        JsonObject firstItem = v.as<JsonObject>();
+                        logger->debug("ScreenApiClient: First item - type: " + firstItem["item_type"].as<String>() + ", name: " + firstItem["name"].as<String>());
+                    }
+                }
+                
+                if (logger) {
+                    logger->info("ScreenApiClient: Successfully parsed " + String(itemCount) + " items for screen " + String(screenId));
+                }
+                return true;
+            } else {
+                lastError = "Screen items response is not an array";
+                if (logger) {
+                    logger->error("ScreenApiClient: Response is not an array, got: " + String(doc.as<String>()));
+                }
+            }
+        } else {
+            lastError = "JSON parse error for screen items: " + String(error.c_str());
+            if (logger) {
+                logger->error("ScreenApiClient: JSON parse error: " + lastError);
+            }
+        }
+    }
+    
+    if (logger) {
+        logger->error("ScreenApiClient: Failed to load items for screen " + String(screenId) + ": " + lastError);
+    }
+    return false;
+}
+
+bool ScreenApiClient::makeHttpRequest(const String& endpoint, String& response) {
+    String url = buildUrl(endpoint);
+    
+    if (logger) {
+        logger->debug("ScreenApiClient: Making request to " + url);
+    }
+    
+    httpClient.begin(url);
+    
+    // Headers de autenticação se habilitado
+    if (API_USE_AUTH) {
+        httpClient.addHeader("Authorization", "Bearer " + String(API_AUTH_TOKEN));
+    }
+    
+    // Headers padrão
+    httpClient.addHeader("Accept", "application/json");
+    httpClient.addHeader("Content-Type", "application/json");
+    httpClient.addHeader("User-Agent", "AutoTech-HMI-v2.0.0");
+    
+    lastHttpCode = httpClient.GET();
+    
+    if (lastHttpCode == 200) {
+        response = httpClient.getString();
+        httpClient.end();
+        
+        if (logger) {
+            logger->debug("ScreenApiClient: Request successful, response size: " + String(response.length()) + " bytes");
+        }
+        return true;
+    } else {
+        httpClient.end();
+        lastError = "HTTP error: " + String(lastHttpCode);
+        
+        // Logs mais detalhados para diferentes códigos de erro
+        switch (lastHttpCode) {
+            case -1:
+                lastError += " (Connection failed)";
+                break;
+            case 404:
+                lastError += " (Not Found)";
+                break;
+            case 500:
+                lastError += " (Internal Server Error)";
+                break;
+            case 503:
+                lastError += " (Service Unavailable)";
+                break;
+        }
+        
+        if (logger) {
+            logger->debug("ScreenApiClient: Request failed: " + lastError);
+        }
+    }
+    
+    return false;
+}
+
+bool ScreenApiClient::isCacheValid() {
+    if (cacheTimestamp == 0) return false;
+    return (millis() - cacheTimestamp) < cacheTimeout;
+}
+
+void ScreenApiClient::clearCache() {
+    cachedConfig.clear();
+    cacheTimestamp = 0;
+    if (logger) {
+        logger->debug("ScreenApiClient: Cache cleared");
+    }
+}
+
+String ScreenApiClient::buildUrl(const String& endpoint) {
+    return baseUrl + endpoint;
+}
+
+void ScreenApiClient::setTimeout(unsigned long timeout) {
+    httpClient.setTimeout(timeout);
+    if (logger) {
+        logger->debug("ScreenApiClient: Timeout set to " + String(timeout) + "ms");
+    }
+}
+
+void ScreenApiClient::setCacheTTL(unsigned long ttl) {
+    cacheTimeout = ttl;
+    if (logger) {
+        logger->debug("ScreenApiClient: Cache TTL set to " + String(ttl) + "ms");
+    }
+}
