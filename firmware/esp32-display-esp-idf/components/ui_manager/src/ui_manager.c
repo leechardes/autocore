@@ -285,7 +285,7 @@ esp_err_t ui_manager_draw(void) {
         return ESP_ERR_INVALID_STATE;
     }
     
-    ESP_LOGI(TAG, "Drawing orientation test screen...");
+    ESP_LOGI(TAG, "Drawing touch test screen with buttons...");
     
     // Clear entire screen to black first
     display_clear(ui.display, COLOR_BLACK);
@@ -301,41 +301,41 @@ esp_err_t ui_manager_draw(void) {
     // Bottom third - BLUE (160 to 240)
     display_fill_rect(ui.display, 0, 160, 320, 80, COLOR_BLUE);
     
-    // Draw RIGHT arrow in the top (white) section
-    // Arrow shaft - horizontal line
-    for(int i = -5; i <= 5; i++) {
-        display_draw_line(ui.display, 140, 40 + i, 180, 40 + i, COLOR_BLACK);
+    // Desenhar 9 botões (3x3 grid)
+    // Cada botão tem 80x60 pixels com espaçamento
+    int button_width = 80;
+    int button_height = 60;
+    int spacing_x = 20;
+    int spacing_y = 10;
+    int start_x = (320 - (3 * button_width + 2 * spacing_x)) / 2;
+    
+    for (int row = 0; row < 3; row++) {
+        int y_pos = row * 80 + (80 - button_height) / 2;
+        
+        for (int col = 0; col < 3; col++) {
+            int button_num = row * 3 + col + 1;
+            int x_pos = start_x + col * (button_width + spacing_x);
+            
+            // Desenhar botão (borda preta)
+            display_fill_rect(ui.display, x_pos, y_pos, button_width, button_height, COLOR_GRAY);
+            display_draw_rect(ui.display, x_pos, y_pos, button_width, button_height, COLOR_BLACK);
+            display_draw_rect(ui.display, x_pos + 1, y_pos + 1, button_width - 2, button_height - 2, COLOR_BLACK);
+            
+            // Desenhar número do botão (centralizado)
+            char btn_text[4];
+            snprintf(btn_text, sizeof(btn_text), "%d", button_num);
+            
+            // Texto grande no centro do botão
+            int text_x = x_pos + (button_width / 2) - 12;  // Centralizar aproximadamente
+            int text_y = y_pos + (button_height / 2) - 14;  // Centralizar aproximadamente
+            draw_string(text_x, text_y, btn_text, COLOR_BLACK, COLOR_GRAY, 4);
+            
+            ESP_LOGI(TAG, "Button %d at (%d, %d, %d, %d)", button_num, x_pos, y_pos, 
+                     x_pos + button_width, y_pos + button_height);
+        }
     }
     
-    // Arrow head (pointing right) - draw > shape
-    for(int i = 0; i < 20; i++) {
-        display_draw_pixel(ui.display, 180 - i, 40 - i, COLOR_BLACK);
-        display_draw_pixel(ui.display, 180 - i, 40 + i, COLOR_BLACK);
-        // Make arrow thicker
-        display_draw_pixel(ui.display, 180 - i - 1, 40 - i, COLOR_BLACK);
-        display_draw_pixel(ui.display, 180 - i - 1, 40 + i, COLOR_BLACK);
-        display_draw_pixel(ui.display, 180 - i, 40 - i - 1, COLOR_BLACK);
-        display_draw_pixel(ui.display, 180 - i, 40 + i + 1, COLOR_BLACK);
-    }
-    
-    // Draw UP arrow in the middle (green) section
-    // Arrow shaft - vertical line
-    for(int i = -5; i <= 5; i++) {
-        display_draw_line(ui.display, 160 + i, 140, 160 + i, 100, COLOR_BLACK);
-    }
-    
-    // Arrow head (pointing up) - draw V shape
-    for(int i = 0; i < 20; i++) {
-        display_draw_pixel(ui.display, 160 - i, 100 + i, COLOR_BLACK);
-        display_draw_pixel(ui.display, 160 + i, 100 + i, COLOR_BLACK);
-        // Make arrow thicker
-        display_draw_pixel(ui.display, 160 - i - 1, 100 + i, COLOR_BLACK);
-        display_draw_pixel(ui.display, 160 + i + 1, 100 + i, COLOR_BLACK);
-        display_draw_pixel(ui.display, 160 - i, 100 + i + 1, COLOR_BLACK);
-        display_draw_pixel(ui.display, 160 + i, 100 + i + 1, COLOR_BLACK);
-    }
-    
-    ESP_LOGI(TAG, "Orientation test screen drawn");
+    ESP_LOGI(TAG, "Touch test screen with 9 buttons drawn");
     
     return ESP_OK;
 }
@@ -380,29 +380,59 @@ esp_err_t ui_manager_handle_touch(uint16_t x, uint16_t y, bool pressed) {
     if (pressed) {
         ui.total_touches++;
         
-        // Check which button was pressed
-        for (int i = 0; i < NUM_BUTTONS; i++) {
-            button_t *btn = &ui.buttons[i];
+        // Configuração dos botões (mesmo layout do draw)
+        int button_width = 80;
+        int button_height = 60;
+        int spacing_x = 20;
+        int start_x = (320 - (3 * button_width + 2 * spacing_x)) / 2;
+        
+        // Verificar qual botão foi pressionado
+        for (int row = 0; row < 3; row++) {
+            int y_pos = row * 80 + (80 - button_height) / 2;
             
-            // Check if touch is within button bounds
-            if (x >= btn->x && x < (btn->x + btn->width) &&
-                y >= btn->y && y < (btn->y + btn->height)) {
+            for (int col = 0; col < 3; col++) {
+                int button_num = row * 3 + col + 1;
+                int x_pos = start_x + col * (button_width + spacing_x);
                 
-                // Button pressed
-                btn->state = BUTTON_STATE_PRESSED;
-                btn->press_count++;
-                draw_button(btn);
-                
-                // Call callback if set
-                if (btn->callback) {
-                    btn->callback(i);
+                // Verificar se o toque está dentro dos limites do botão
+                if (x >= x_pos && x < (x_pos + button_width) &&
+                    y >= y_pos && y < (y_pos + button_height)) {
+                    
+                    // Botão pressionado!
+                    const char* cor_fundo = (row == 0) ? "BRANCO" : 
+                                           (row == 1) ? "VERDE" : "AZUL";
+                    
+                    ESP_LOGI(TAG, "========================================");
+                    ESP_LOGI(TAG, "BOTÃO %d PRESSIONADO!", button_num);
+                    ESP_LOGI(TAG, "Posição do toque: (%d, %d)", x, y);
+                    ESP_LOGI(TAG, "Fundo: %s", cor_fundo);
+                    ESP_LOGI(TAG, "Linha: %d, Coluna: %d", row + 1, col + 1);
+                    ESP_LOGI(TAG, "========================================");
+                    
+                    // Feedback visual - inverter cor do botão temporariamente
+                    display_fill_rect(ui.display, x_pos + 2, y_pos + 2, 
+                                    button_width - 4, button_height - 4, COLOR_DARK_GRAY);
+                    
+                    // Redesenhar número
+                    char btn_text[4];
+                    snprintf(btn_text, sizeof(btn_text), "%d", button_num);
+                    int text_x = x_pos + (button_width / 2) - 12;
+                    int text_y = y_pos + (button_height / 2) - 14;
+                    draw_string(text_x, text_y, btn_text, COLOR_WHITE, COLOR_DARK_GRAY, 4);
+                    
+                    // Aguardar um pouco e restaurar cor original
+                    vTaskDelay(pdMS_TO_TICKS(100));
+                    display_fill_rect(ui.display, x_pos + 2, y_pos + 2, 
+                                    button_width - 4, button_height - 4, COLOR_GRAY);
+                    draw_string(text_x, text_y, btn_text, COLOR_BLACK, COLOR_GRAY, 4);
+                    
+                    return ESP_OK;
                 }
-                
-                ESP_LOGI(TAG, "Button %d pressed at (%d, %d), count: %lu", 
-                        i, x, y, btn->press_count);
-                break;
             }
         }
+        
+        // Se chegou aqui, o toque foi fora dos botões
+        ESP_LOGI(TAG, "Toque detectado em (%d, %d) - fora dos botões", x, y);
     }
     
     return ESP_OK;
