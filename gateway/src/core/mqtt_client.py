@@ -1,6 +1,7 @@
 """
 Cliente MQTT Assíncrono para AutoCore Gateway
 Gerencia conexão e comunicação MQTT com dispositivos ESP32
+Conformidade MQTT v2.2.0
 """
 import asyncio
 import json
@@ -11,6 +12,17 @@ from datetime import datetime
 import paho.mqtt.client as mqtt
 from paho.mqtt.properties import Properties
 from paho.mqtt.packettypes import PacketTypes
+
+# Importações para v2.2.0
+from ..mqtt.protocol import (
+    MQTT_PROTOCOL_VERSION,
+    create_gateway_status_payload,
+    create_lwt_payload,
+    serialize_payload,
+    get_topic_pattern
+)
+from ..mqtt.error_handler import ErrorHandler
+from ..mqtt.rate_limiter import RateLimiter
 
 logger = logging.getLogger(__name__)
 
@@ -27,12 +39,22 @@ class MQTTClient:
         self.message_queue = asyncio.Queue()
         self.loop = None  # Referência ao event loop principal
         
-        # Estatísticas
+        # UUID do gateway para identificação
+        self.gateway_uuid = self.config.MQTT_CLIENT_ID
+        
+        # Componentes v2.2.0
+        self.error_handler = None  # Será inicializado após conectar
+        self.rate_limiter = RateLimiter(max_messages_per_second=100)
+        
+        # Estatísticas expandidas
         self.stats = {
             'messages_received': 0,
             'messages_sent': 0,
+            'messages_blocked': 0,
             'connection_time': None,
-            'last_message_time': None
+            'last_message_time': None,
+            'protocol_version': MQTT_PROTOCOL_VERSION,
+            'uptime_start': datetime.utcnow()
         }
     
     async def connect(self):
@@ -66,14 +88,16 @@ class MQTTClient:
                     self.config.MQTT_PASSWORD
                 )
             
-            # Configurar Last Will Testament
+            # Configurar Last Will Testament v2.2.0
+            lwt_payload = create_lwt_payload(
+                gateway_uuid=self.gateway_uuid,
+                reason='unexpected_disconnect'
+            )
+            lwt_topic = get_topic_pattern('gateway_status')
+            
             self.client.will_set(
-                topic='autocore/gateway/status',
-                payload=json.dumps({
-                    'timestamp': datetime.now().isoformat(),
-                    'status': 'offline',
-                    'reason': 'unexpected_disconnect'
-                }),
+                topic=lwt_topic,
+                payload=serialize_payload(lwt_payload),
                 qos=1,
                 retain=True
             )
@@ -114,7 +138,14 @@ class MQTTClient:
         if rc == 0:
             self.connected = True
             self.reconnect_attempts = 0
-            self.stats['connection_time'] = datetime.now()
+            self.stats['connection_time'] = datetime.utcnow()
+            
+            # Inicializar error handler após conexão
+            self.error_handler = ErrorHandler(self, self.gateway_uuid)
+            
+            # Definir error_handler no message_handler se possível
+            if hasattr(self.message_handler, 'set_error_handler'):
+                self.message_handler.set_error_handler(self.error_handler)
             
             logger.info("✅ MQTT conectado com sucesso")
             
@@ -124,6 +155,9 @@ class MQTTClient:
                 logger.debug(f"📥 Subscrito em {topic}")
             
             logger.info("📡 Subscrito em todos os tópicos")
+            
+            # Publicar status online v2.2.0
+            self._publish_online_status()
             
         else:
             logger.error(f"❌ Falha conexão MQTT: {rc}")
@@ -142,7 +176,7 @@ class MQTTClient:
         """Callback de mensagem recebida - roda em thread do Paho MQTT"""
         try:
             self.stats['messages_received'] += 1
-            self.stats['last_message_time'] = datetime.now()
+            self.stats['last_message_time'] = datetime.utcnow()
             
             # Decodificar payload
             try:
@@ -159,7 +193,7 @@ class MQTTClient:
                 try:
                     # run_coroutine_threadsafe é a forma correta quando em thread diferente
                     future = asyncio.run_coroutine_threadsafe(
-                        self._handle_message(message.topic, payload, message.qos),
+                        self._handle_message_with_validation(message.topic, payload, message.qos),
                         self.loop
                     )
                     # Não precisamos esperar o resultado
@@ -173,6 +207,108 @@ class MQTTClient:
             
         except Exception as e:
             logger.error(f"❌ Erro processar mensagem: {e}")
+    
+    def _publish_online_status(self):
+        """Publica status online inicial do gateway"""
+        try:
+            uptime_seconds = (datetime.utcnow() - self.stats['uptime_start']).total_seconds()
+            
+            status_payload = create_gateway_status_payload(
+                gateway_uuid=self.gateway_uuid,
+                uptime=uptime_seconds,
+                connected_devices=0,  # Será atualizado pelo device_manager
+                messages_processed=self.stats['messages_received']
+            )
+            
+            topic = get_topic_pattern('gateway_status')
+            
+            result = self.client.publish(
+                topic=topic,
+                payload=serialize_payload(status_payload),
+                qos=1,
+                retain=True
+            )
+            
+            if result.rc == mqtt.MQTT_ERR_SUCCESS:
+                logger.info("📡 Status online publicado")
+            else:
+                logger.error(f"❌ Erro ao publicar status online: {result.rc}")
+                
+        except Exception as e:
+            logger.error(f"❌ Erro ao publicar status online: {e}")
+    
+    async def _handle_message_with_validation(self, topic: str, payload: str, qos: int):
+        """Processa mensagem com validação v2.2.0"""
+        try:
+            # Importar aqui para evitar importação circular
+            from ..mqtt.protocol import extract_device_uuid_from_topic, deserialize_payload, validate_protocol_version
+            
+            # Extrair UUID do dispositivo do tópico
+            device_uuid = extract_device_uuid_from_topic(topic)
+            
+            # Aplicar rate limiting se temos UUID do dispositivo
+            if device_uuid:
+                allowed = await self.rate_limiter.check_rate(device_uuid)
+                if not allowed:
+                    self.stats['messages_blocked'] += 1
+                    logger.warning(f"⛔ Mensagem bloqueada por rate limit: {device_uuid}")
+                    
+                    # Publicar erro de rate limit
+                    if self.error_handler:
+                        await self.error_handler.publish_error(
+                            error_code=self.error_handler.ErrorCode.ERR_005,  # DEVICE_BUSY
+                            message=f"Rate limit exceeded for device {device_uuid}",
+                            device_uuid=device_uuid,
+                            context={'topic': topic, 'current_rate': self.rate_limiter.get_device_rate(device_uuid)}
+                        )
+                    
+                    return
+            
+            # Tentar deserializar payload para validação
+            try:
+                payload_data = deserialize_payload(payload)
+            except Exception:
+                # Se não conseguir deserializar, passa adiante (pode ser payload simples)
+                payload_data = {}
+            
+            # Validar protocol version se disponível
+            if payload_data and not validate_protocol_version(payload_data):
+                logger.warning(f"⚠️ Protocol version incompatível: {topic}")
+                
+                # Publicar erro de protocolo
+                if self.error_handler:
+                    received_version = payload_data.get('protocol_version', 'unknown')
+                    await self.error_handler.publish_protocol_error(
+                        received_version=received_version,
+                        expected_version=MQTT_PROTOCOL_VERSION,
+                        device_uuid=device_uuid
+                    )
+                
+                # Ainda processa a mensagem para backward compatibility
+                # mas logga o problema
+            
+            # Validar tópico
+            if not self.config.is_valid_device_topic(topic):
+                logger.warning(f"⚠️ Tópico inválido: {topic}")
+                return
+            
+            # Log da mensagem (debug)
+            logger.debug(f"📨 Validado: {topic} | {payload[:100]}")
+            
+            # Enviar para handler específico
+            await self.message_handler.handle_message(topic, payload, qos)
+            
+        except Exception as e:
+            logger.error(f"❌ Erro ao processar mensagem validada {topic}: {e}")
+            
+            # Publicar erro se possível
+            if self.error_handler:
+                await self.error_handler.publish_error(
+                    error_code=self.error_handler.ErrorCode.ERR_002,  # INVALID_PAYLOAD
+                    message=f"Message processing error: {str(e)}",
+                    device_uuid=device_uuid,
+                    context={'topic': topic, 'error': str(e)}
+                )
     
     def _handle_message_sync(self, topic: str, payload: str, qos: int):
         """Processa mensagem de forma síncrona (fallback)"""
@@ -264,24 +400,38 @@ class MQTTClient:
             return False
     
     async def send_command_to_device(self, device_uuid: str, command: Dict[str, Any]) -> bool:
-        """Envia comando para dispositivo específico"""
-        topic = self.config.get_device_topic(device_uuid, 'command')
-        payload = json.dumps({
-            **command,
-            'timestamp': datetime.now().isoformat(),
-            'gateway_id': self.config.MQTT_CLIENT_ID
-        })
+        """Envia comando para dispositivo específico v2.2.0"""
+        from ..mqtt.protocol import create_base_payload, get_message_qos, MessageType
         
-        return await self.publish(topic, payload, qos=2)  # QoS 2 para comandos
+        topic = self.config.get_device_topic(device_uuid, 'command')
+        
+        # Criar payload v2.2.0
+        payload_data = create_base_payload(
+            device_uuid=self.gateway_uuid,  # Comando vem do gateway
+            message_type=MessageType.COMMAND_RESPONSE.value,
+            target_device=device_uuid,
+            command=command
+        )
+        
+        payload = serialize_payload(payload_data)
+        qos = get_message_qos(MessageType.COMMAND_RESPONSE.value)
+        
+        return await self.publish(topic, payload, qos=qos)
     
     async def broadcast_message(self, message: Dict[str, Any]) -> bool:
-        """Envia mensagem broadcast para todos os dispositivos"""
+        """Envia mensagem broadcast para todos os dispositivos v2.2.0"""
+        from ..mqtt.protocol import create_base_payload
+        
         topic = self.config.mqtt_topics['system_broadcast']
-        payload = json.dumps({
-            **message,
-            'timestamp': datetime.now().isoformat(),
-            'gateway_id': self.config.MQTT_CLIENT_ID
-        })
+        
+        # Criar payload v2.2.0
+        payload_data = create_base_payload(
+            device_uuid=self.gateway_uuid,
+            message_type='system_broadcast',
+            broadcast_message=message
+        )
+        
+        payload = serialize_payload(payload_data)
         
         return await self.publish(topic, payload, qos=1, retain=True)
     
@@ -313,9 +463,50 @@ class MQTTClient:
             self.connected = False
     
     def get_stats(self) -> Dict[str, Any]:
-        """Retorna estatísticas do cliente MQTT"""
-        return {
+        """Retorna estatísticas do cliente MQTT v2.2.0"""
+        uptime_seconds = (datetime.utcnow() - self.stats['uptime_start']).total_seconds()
+        
+        base_stats = {
             **self.stats,
             'connected': self.connected,
-            'reconnect_attempts': self.reconnect_attempts
+            'reconnect_attempts': self.reconnect_attempts,
+            'uptime_seconds': uptime_seconds,
+            'gateway_uuid': self.gateway_uuid
         }
+        
+        # Adicionar stats do rate limiter se disponível
+        if self.rate_limiter:
+            base_stats['rate_limiter'] = self.rate_limiter.get_global_stats()
+        
+        # Adicionar stats do error handler se disponível
+        if self.error_handler:
+            base_stats['error_handler'] = self.error_handler.get_error_stats()
+        
+        return base_stats
+    
+    async def publish_gateway_status(self):
+        """Publica status atualizado do gateway"""
+        try:
+            uptime_seconds = (datetime.utcnow() - self.stats['uptime_start']).total_seconds()
+            
+            status_payload = create_gateway_status_payload(
+                gateway_uuid=self.gateway_uuid,
+                uptime=uptime_seconds,
+                connected_devices=0,  # Atualizado externamente
+                messages_processed=self.stats['messages_received'],
+                messages_sent=self.stats['messages_sent'],
+                messages_blocked=self.stats['messages_blocked']
+            )
+            
+            topic = get_topic_pattern('gateway_status')
+            
+            return await self.publish(
+                topic=topic,
+                payload=serialize_payload(status_payload),
+                qos=1,
+                retain=True
+            )
+            
+        except Exception as e:
+            logger.error(f"❌ Erro ao publicar status do gateway: {e}")
+            return False

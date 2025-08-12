@@ -1,6 +1,7 @@
 """
 Message Handler para AutoCore Gateway
 Processa mensagens MQTT recebidas dos dispositivos ESP32
+Conformidade MQTT v2.2.0
 """
 import asyncio
 import json
@@ -9,24 +10,38 @@ from typing import Dict, Any, Optional
 from datetime import datetime
 from dataclasses import dataclass
 
+# Importações v2.2.0
+from ..mqtt.protocol import (
+    validate_protocol_version,
+    parse_topic_structure,
+    deserialize_payload,
+    MQTT_PROTOCOL_VERSION
+)
+
 logger = logging.getLogger(__name__)
 
 @dataclass
 class MessageContext:
-    """Contexto da mensagem recebida"""
+    """Contexto da mensagem recebida v2.2.0"""
     topic: str
     payload: str
     qos: int
     device_uuid: Optional[str] = None
     message_type: Optional[str] = None
     timestamp: Optional[datetime] = None
+    # Novos campos v2.2.0
+    protocol_version: Optional[str] = None
+    payload_data: Optional[Dict[str, Any]] = None
+    topic_structure: Optional[Dict[str, str]] = None
+    is_valid_protocol: bool = False
 
 class MessageHandler:
-    """Handler principal para mensagens MQTT"""
+    """Handler principal para mensagens MQTT v2.2.0"""
     
-    def __init__(self, device_manager, telemetry_service):
+    def __init__(self, device_manager, telemetry_service, error_handler=None):
         self.device_manager = device_manager
         self.telemetry_service = telemetry_service
+        self.error_handler = error_handler  # Será definido pelo mqtt_client
         self.message_processors = {
             'announce': self._handle_device_announce,
             'status': self._handle_device_status,
@@ -40,21 +55,37 @@ class MessageHandler:
         }
     
     async def handle_message(self, topic: str, payload: str, qos: int):
-        """Entry point para processamento de mensagens"""
+        """Entry point para processamento de mensagens v2.2.0"""
         try:
-            # Criar contexto da mensagem
-            context = self._create_message_context(topic, payload, qos)
+            # Criar contexto da mensagem com validação v2.2.0
+            context = self._create_message_context_v2(topic, payload, qos)
             
-            if not context.device_uuid and context.message_type != 'discovery':
+            if not context.device_uuid and context.message_type not in ['discovery', 'gateway_status']:
                 logger.warning(f"⚠️ UUID de dispositivo não encontrado: {topic}")
                 return
             
-            # Decodificar payload JSON
-            try:
-                data = json.loads(payload) if payload else {}
-            except json.JSONDecodeError as e:
-                logger.error(f"❌ JSON inválido em {topic}: {e}")
-                return
+            # Usar payload já deserializado do contexto
+            data = context.payload_data or {}
+            
+            # Validar protocol version se disponível
+            if not context.is_valid_protocol and data:
+                logger.warning(f"⚠️ Protocol version incompatível: {topic}")
+                
+                # Publicar erro se temos error_handler
+                if self.error_handler and context.device_uuid:
+                    from ..mqtt.error_handler import ErrorCode
+                    await self.error_handler.publish_error(
+                        error_code=ErrorCode.ERR_008,
+                        message=f"Protocol version mismatch in topic {topic}",
+                        device_uuid=context.device_uuid,
+                        context={
+                            'topic': topic,
+                            'received_version': context.protocol_version,
+                            'expected_version': MQTT_PROTOCOL_VERSION
+                        }
+                    )
+                
+                # Continuar processando para backward compatibility
             
             # Log da mensagem recebida (debug)
             logger.debug(f"📨 {context.message_type} de {context.device_uuid}: {str(data)[:200]}")
@@ -65,9 +96,78 @@ class MessageHandler:
                 await processor(context, data)
             else:
                 logger.warning(f"⚠️ Tipo de mensagem desconhecido: {context.message_type}")
+                
+                # Publicar erro de payload inválido
+                if self.error_handler and context.device_uuid:
+                    from ..mqtt.error_handler import ErrorCode
+                    await self.error_handler.publish_error(
+                        error_code=ErrorCode.ERR_002,
+                        message=f"Unknown message type: {context.message_type}",
+                        device_uuid=context.device_uuid,
+                        context={'topic': topic, 'message_type': context.message_type}
+                    )
             
         except Exception as e:
             logger.error(f"❌ Erro ao processar mensagem {topic}: {e}")
+            
+            # Publicar erro genérico se possível
+            if self.error_handler:
+                from ..mqtt.error_handler import ErrorCode
+                # Tentar extrair UUID do tópico para erro
+                try:
+                    from ..mqtt.protocol import extract_device_uuid_from_topic
+                    device_uuid = extract_device_uuid_from_topic(topic)
+                    await self.error_handler.publish_error(
+                        error_code=ErrorCode.ERR_002,
+                        message=f"Message processing failed: {str(e)}",
+                        device_uuid=device_uuid,
+                        context={'topic': topic, 'error': str(e)}
+                    )
+                except:
+                    pass  # Se não conseguir, apenas loga
+    
+    def _create_message_context_v2(self, topic: str, payload: str, qos: int) -> MessageContext:
+        """Cria contexto da mensagem v2.2.0 com validação completa"""
+        try:
+            # Analisar estrutura do tópico usando v2.2.0
+            topic_structure = parse_topic_structure(topic)
+            
+            # Tentar deserializar payload
+            payload_data = {}
+            if payload:
+                try:
+                    payload_data = deserialize_payload(payload)
+                except Exception as e:
+                    logger.debug(f"Não foi possível deserializar payload: {e}")
+            
+            # Validar protocol version
+            is_valid_protocol = False
+            protocol_version = None
+            if payload_data:
+                is_valid_protocol = validate_protocol_version(payload_data)
+                protocol_version = payload_data.get('protocol_version')
+            
+            return MessageContext(
+                topic=topic,
+                payload=payload,
+                qos=qos,
+                device_uuid=topic_structure.get('uuid'),
+                message_type=topic_structure.get('message_type'),
+                timestamp=datetime.utcnow(),
+                protocol_version=protocol_version,
+                payload_data=payload_data,
+                topic_structure=topic_structure,
+                is_valid_protocol=is_valid_protocol
+            )
+            
+        except Exception as e:
+            logger.error(f"Erro ao criar contexto v2.2.0 para {topic}: {e}")
+            # Fallback para método antigo
+            return self._create_message_context(topic, payload, qos)
+    
+    def set_error_handler(self, error_handler):
+        """Define o error handler (chamado pelo mqtt_client após inicialização)"""
+        self.error_handler = error_handler
     
     def _create_message_context(self, topic: str, payload: str, qos: int) -> MessageContext:
         """Cria contexto da mensagem com base no tópico"""

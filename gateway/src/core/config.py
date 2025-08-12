@@ -53,7 +53,7 @@ class Config:
     
     @property
     def mqtt_topics(self) -> dict:
-        """Tópicos MQTT do sistema"""
+        """Tópicos MQTT do sistema - Conformidade v2.2.0"""
         return {
             # Device Management
             'device_announce': 'autocore/devices/+/announce',
@@ -61,31 +61,40 @@ class Config:
             'device_command': 'autocore/devices/+/command',
             'device_response': 'autocore/devices/+/response',
             
-            # Telemetry
-            'telemetry_data': 'autocore/devices/+/telemetry',
+            # Telemetry (v2.2.0 - sem UUID no tópico)
+            'telemetry_data': 'autocore/telemetry/relays/data',
             
-            # Relay Control  
-            'relay_command': 'autocore/devices/+/relay/command',
-            'relay_status': 'autocore/devices/+/relay/status',
+            # Relay Control (v2.2.0 - novos tópicos)
+            'relay_command': 'autocore/devices/+/relays/set',
+            'relay_status': 'autocore/devices/+/relays/state',
             
             # System
             'gateway_status': 'autocore/gateway/status',
+            'gateway_commands': 'autocore/gateway/commands/+',
             'system_broadcast': 'autocore/system/broadcast',
             
-            # Discovery
-            'device_discovery': 'autocore/discovery/+',
+            # Discovery (v2.2.0)
+            'device_discovery': 'autocore/discovery/announce',
+            'discovery': 'autocore/discovery/+',
+            
+            # Errors (v2.2.0)
+            'errors': 'autocore/errors/+/+',
         }
     
     @property
     def SUBSCRIPTION_TOPICS(self) -> list:
-        """Lista de tópicos para subscrição"""
+        """Lista de tópicos para subscrição - Conformidade v2.2.0"""
         return [
             'autocore/devices/+/announce',
             'autocore/devices/+/status',
             'autocore/devices/+/telemetry',
             'autocore/devices/+/response',
-            'autocore/devices/+/relay/status',
+            # v2.2.0 - Novos tópicos de relé
+            'autocore/devices/+/relays/state',
             'autocore/discovery/+',
+            # v2.2.0 - Novos tópicos
+            'autocore/gateway/commands/+',
+            'autocore/errors/+/+',
             # Comandos de macros/sistema
             'autocore/relay/+/command',  # Comandos para relés
             'autocore/system/+',  # Comandos do sistema
@@ -93,13 +102,14 @@ class Config:
         ]
     
     def get_device_topic(self, device_uuid: str, topic_type: str) -> str:
-        """Gera tópico específico para um dispositivo"""
+        """Gera tópico específico para um dispositivo - Conformidade v2.2.0"""
         topic_patterns = {
             'command': f'autocore/devices/{device_uuid}/command',
             'status': f'autocore/devices/{device_uuid}/status',
             'telemetry': f'autocore/devices/{device_uuid}/telemetry',
-            'relay_command': f'autocore/devices/{device_uuid}/relay/command',
-            'relay_status': f'autocore/devices/{device_uuid}/relay/status',
+            # v2.2.0 - Novos tópicos de relé
+            'relay_command': f'autocore/devices/{device_uuid}/relays/set',
+            'relay_status': f'autocore/devices/{device_uuid}/relays/state',
             'response': f'autocore/devices/{device_uuid}/response',
         }
         
@@ -116,14 +126,16 @@ class Config:
         if len(parts) < 2 or parts[0] != 'autocore':
             return False
         
-        # Tipos de tópicos aceitos
+        # Tipos de tópicos aceitos - v2.2.0
         valid_prefixes = [
             'devices',     # Dispositivos ESP32
             'discovery',   # Descoberta de dispositivos
             'relay',       # Comandos de relés (macros)
             'system',      # Comandos do sistema
             'macro',       # Status de macros
-            'gateway',     # Status do gateway
+            'gateway',     # Status e comandos do gateway
+            'telemetry',   # Telemetria centralizada (v2.2.0)
+            'errors',      # Tratamento de erros (v2.2.0)
         ]
         
         return parts[1] in valid_prefixes
