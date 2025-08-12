@@ -1,0 +1,49 @@
+# Build files
+build/
+*.bin
+*.elf
+*.map
+
+# ESP-IDF files
+sdkconfig
+sdkconfig.old
+*.svd
+
+# IDE files
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# Python
+__pycache__/
+*.pyc
+.venv/
+venv/
+
+# MacOS
+.DS_Store
+
+# Logs
+*.log
+
+# Temporary files
+*.tmp
+*.bak
+
+# Certificates and keys
+*.pem
+*.key
+*.crt
+
+# Environment files (keep .env for reference)
+.env.local
+.env.production
+
+# Core dumps
+core
+
+# Dependencies
+dependencies.lock
+managed_components/

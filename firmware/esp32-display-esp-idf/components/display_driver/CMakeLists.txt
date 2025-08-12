@@ -1,0 +1,13 @@
+idf_component_register(
+    SRCS 
+        "src/ili9341.c"
+    INCLUDE_DIRS 
+        "include"
+    PRIV_INCLUDE_DIRS 
+        "src"
+    REQUIRES 
+        driver
+        esp_timer
+        spi_flash
+        freertos
+)

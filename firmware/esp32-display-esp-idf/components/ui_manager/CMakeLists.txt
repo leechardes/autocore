@@ -1,0 +1,13 @@
+idf_component_register(
+    SRCS 
+        "src/ui_manager.c"
+    INCLUDE_DIRS 
+        "include"
+    PRIV_INCLUDE_DIRS 
+        "src"
+    REQUIRES 
+        display_driver
+        touch_driver
+        freertos
+        esp_timer
+)
