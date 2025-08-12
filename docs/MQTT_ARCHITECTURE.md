@@ -16,7 +16,7 @@ O AutoCore utiliza MQTT como protocolo principal de comunicação entre todos os
   - Mensagens retidas para status
   - QoS 0 para telemetria (performance)
   - QoS 1 para comandos (garantia de entrega)
-  - QoS 2 para configurações críticas (exatamente uma vez)
+  - QoS 2 para comandos críticos de segurança (exatamente uma vez)
 
 ### 2. AutoCore Gateway
 - **Função**: Coordenador central e bridge
@@ -74,13 +74,6 @@ O AutoCore utiliza MQTT como protocolo principal de comunicação entre todos os
   - Proteção por senha/confirmação
   - Estado persistente em caso de reset
 
-#### ESP32 Display
-- **Função**: Interface visual no veículo
-- **Características**:
-  - Telas configuráveis (2.4" a 7")
-  - Touch screen opcional
-  - Renderização de telemetria em tempo real
-
 #### ESP32 CAN
 - **Função**: Interface com ECU do veículo
 - **Características**:
@@ -123,6 +116,16 @@ O AutoCore utiliza MQTT como protocolo principal de comunicação entre todos os
 autocore/{categoria}/{device_uuid}/{recurso}/{ação}
 ```
 
+### Padrão de UUID
+```
+{tipo}-{função}-{número}
+```
+Exemplos:
+- `esp32-relay-001` - Primeiro módulo de relés
+- `esp32-display-001` - Primeiro display
+- `esp32-can-001` - Primeiro módulo CAN
+- `gateway-main-001` - Gateway principal
+
 ### Categorias Principais
 
 #### 1. Dispositivos (`devices`)
@@ -147,9 +150,9 @@ autocore/telemetry/sensors/{sensor_id}
 autocore/telemetry/can/{signal_name}
 autocore/telemetry/calculated/{metric}
 
-# Telemetria de dispositivos
-autocore/telemetry/relays
-autocore/telemetry/displays
+# Telemetria de dispositivos (UUID no payload, não no tópico)
+autocore/telemetry/relays/data
+autocore/telemetry/displays/data
 
 # Agregações
 autocore/telemetry/summary/minute
@@ -161,6 +164,7 @@ autocore/telemetry/summary/hour
 # Gateway
 autocore/gateway/status
 autocore/gateway/stats
+autocore/gateway/commands/{action}
 
 # Descoberta
 autocore/discovery/announce
@@ -184,9 +188,29 @@ autocore/commands/device/{uuid}/{action}
 ## 🔄 Fluxos de Comunicação
 
 ### 1. Descoberta de Dispositivo
+
+#### Descoberta Inicial
+Dispositivos descobrem o broker através de:
+1. **mDNS/Bonjour**: Busca por `_mqtt._tcp.local`
+2. **IP Fixo**: Configurado em firmware (fallback)
+3. **DHCP Option**: Opção customizada 224 com IP do broker
+
+#### Anúncio de Dispositivo
+```json
+{
+  "protocol_version": "2.1.0",
+  "uuid": "esp32-relay-001",
+  "type": "esp32_relay",
+  "firmware_version": "1.0.0",
+  "capabilities": ["relay_control", "telemetry", "ota"],
+  "mac_address": "AA:BB:CC:DD:EE:FF",
+  "ip_address": "192.168.1.100"
+}
+```
+
 ```mermaid
 sequenceDiagram
-    ESP32->>Broker: PUBLISH autocore/discovery/announce
+    ESP32->>Broker: PUBLISH autocore/discovery/announce {device_info}
     Gateway->>Broker: SUBSCRIBE autocore/discovery/+
     Gateway->>Database: Registrar dispositivo
     ESP32->>API: GET /api/config/{uuid}
@@ -254,9 +278,20 @@ sequenceDiagram
 
 ## 📦 Formato de Mensagens (Payloads)
 
+### Versionamento de Protocolo
+Todos os payloads devem incluir versão do protocolo para compatibilidade:
+```json
+{
+  "protocol_version": "2.1.0",
+  "uuid": "esp32-relay-001",
+  ...
+}
+```
+
 ### Status do Dispositivo
 ```json
 {
+  "protocol_version": "2.1.0",
   "uuid": "esp32-relay-001",
   "type": "esp32_relay",
   "status": "online",
@@ -272,6 +307,7 @@ sequenceDiagram
 ### Estado de Relés
 ```json
 {
+  "protocol_version": "2.1.0",
   "uuid": "esp32-relay-001",
   "board_id": 1,
   "timestamp": "2025-08-08T10:30:00Z",
@@ -287,6 +323,7 @@ sequenceDiagram
 ### Comando de Relé Toggle
 ```json
 {
+  "protocol_version": "2.1.0",
   "channel": 1,
   "state": true,
   "function_type": "toggle",
@@ -298,6 +335,7 @@ sequenceDiagram
 ### Comando de Relé Momentâneo
 ```json
 {
+  "protocol_version": "2.1.0",
   "channel": 1,
   "state": true,
   "function_type": "momentary",
@@ -310,6 +348,7 @@ sequenceDiagram
 ### Heartbeat de Relé Momentâneo
 ```json
 {
+  "protocol_version": "2.1.0",
   "channel": 1,
   "source_uuid": "esp32-display-001",
   "target_uuid": "esp32-relay-001",
@@ -321,6 +360,7 @@ sequenceDiagram
 ### Telemetria de Relay (Evento de Mudança)
 ```json
 {
+  "protocol_version": "2.1.0",
   "uuid": "esp32-relay-001",
   "board_id": 1,
   "timestamp": "2025-08-12T12:46:34.914991",
@@ -334,6 +374,7 @@ sequenceDiagram
 ### Evento de Safety Shutoff
 ```json
 {
+  "protocol_version": "2.1.0",
   "uuid": "esp32-relay-001",
   "board_id": 1,
   "event": "safety_shutoff",
@@ -348,6 +389,8 @@ sequenceDiagram
 ### Telemetria CAN
 ```json
 {
+  "protocol_version": "2.1.0",
+  "uuid": "esp32-can-001",
   "timestamp": "2025-08-08T10:30:00Z",
   "signals": {
     "RPM": {
@@ -372,6 +415,8 @@ sequenceDiagram
 ### Evento Touch
 ```json
 {
+  "protocol_version": "2.1.0",
+  "uuid": "esp32-display-001",
   "screen_id": 1,
   "item_id": 5,
   "action": "tap",
@@ -456,6 +501,27 @@ Mensagens que devem ser retidas:
 - `autocore/devices/{uuid}/relays/state` - Estado atual dos relés
 - `autocore/gateway/status` - Status do gateway
 
+## 📝 Last Will Testament (LWT)
+
+Configuração obrigatória para todos os dispositivos:
+
+### Formato do LWT
+```json
+{
+  "uuid": "{device-uuid}",
+  "status": "offline",
+  "timestamp": "2025-08-08T10:30:00Z",
+  "reason": "unexpected_disconnect",
+  "last_seen": "2025-08-08T10:29:55Z"
+}
+```
+
+### Configuração
+- **Tópico**: `autocore/devices/{uuid}/status`
+- **QoS**: 1
+- **Retain**: true
+- **Enviado quando**: Conexão perdida inesperadamente
+
 ## 📊 Métricas e Monitoramento
 
 ### Métricas Coletadas
@@ -473,6 +539,58 @@ autocore/metrics/average_latency
 autocore/metrics/error_rate
 ```
 
+## 🔢 Limites do Sistema
+
+### Limites Operacionais
+- **Tamanho máximo de payload**: 256KB (recomendado: < 64KB)
+- **Taxa máxima de mensagens**: 100 msgs/segundo por dispositivo
+- **Número máximo de dispositivos**: 100 simultâneos
+- **Timeout de conexão**: 30 segundos
+- **Tempo máximo de reconexão**: 5 minutos com backoff exponencial
+
+### Prioridade de Mensagens
+Ordem de processamento em caso de fila:
+1. **Safety/Emergency** - Comandos de segurança, shutoff
+2. **Commands** - Comandos de controle
+3. **Status** - Atualizações de estado
+4. **Telemetry** - Dados de sensores
+
+## ❌ Tratamento de Erros
+
+### Formato de Mensagem de Erro
+```json
+{
+  "protocol_version": "2.1.0",
+  "uuid": "esp32-relay-001",
+  "error_code": "ERR_001",
+  "error_type": "COMMAND_FAILED",
+  "error_message": "Relay channel 5 not available",
+  "timestamp": "2025-08-08T10:30:00Z",
+  "context": {
+    "command": "set",
+    "channel": 5,
+    "requested_state": true
+  }
+}
+```
+
+### Tópico de Erros
+```
+autocore/errors/{uuid}/{error_type}
+```
+
+### Códigos de Erro Padronizados
+| Código | Tipo | Descrição |
+|--------|------|-----------|
+| ERR_001 | COMMAND_FAILED | Comando não pode ser executado |
+| ERR_002 | INVALID_PAYLOAD | Formato de payload inválido |
+| ERR_003 | TIMEOUT | Timeout de operação |
+| ERR_004 | UNAUTHORIZED | Não autorizado |
+| ERR_005 | DEVICE_BUSY | Dispositivo ocupado |
+| ERR_006 | HARDWARE_FAULT | Falha de hardware |
+| ERR_007 | NETWORK_ERROR | Erro de rede |
+| ERR_008 | PROTOCOL_MISMATCH | Versão de protocolo incompatível |
+
 ## 🚀 Otimizações
 
 ### Para Raspberry Pi Zero 2W
@@ -484,7 +602,7 @@ autocore/metrics/error_rate
 
 ### Para ESP32
 1. **Buffer de mensagens** - Queue para reconexão
-2. **Heartbeat otimizado** - 30 segundos
+2. **Heartbeat de status** - 30 segundos (não confundir com heartbeat momentâneo de 500ms)
 3. **Payload mínimo** - Apenas campos alterados
 4. **Sleep mode** - Entre transmissões
 
@@ -526,7 +644,7 @@ autocore/metrics/error_rate
 
 ### Conexão
 - Reconnect automático com backoff
-- Last Will Testament configurado
+- Last Will Testament configurado (ver seção LWT)
 - Client ID único e persistente
 - Clean session = false para QoS > 0
 
@@ -557,10 +675,19 @@ mosquitto_sub -h localhost -t "$SYS/#" -v
 ---
 
 **Última Atualização:** 12 de Agosto de 2025  
-**Versão:** 2.1.0  
+**Versão:** 2.2.0  
 **Maintainer:** AutoCore Team
 
 ### Changelog
+- v2.2.0 - Adicionado versionamento de protocolo em todos os payloads
+- v2.2.0 - Definido padrão de UUID ({tipo}-{função}-{número})
+- v2.2.0 - Adicionada seção de Last Will Testament (LWT)
+- v2.2.0 - Adicionados limites operacionais do sistema
+- v2.2.0 - Adicionado tratamento de erros e códigos padronizados
+- v2.2.0 - Esclarecido processo de descoberta de dispositivos
+- v2.2.0 - Corrigido tópicos de telemetria (UUID apenas no payload)
+- v2.2.0 - Removida duplicação de ESP32 Display
+- v2.2.0 - Corrigido QoS 2 (apenas para comandos críticos, não configuração)
 - v2.1.0 - Removida configuração via MQTT (migrado para API REST)
 - v2.1.0 - Atualizada estrutura de tópicos e fluxos
 - v2.0.0 - Adicionado sistema de heartbeat para relés momentâneos
