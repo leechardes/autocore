@@ -385,10 +385,11 @@ esp_err_t display_driver_init(const display_config_t *config, display_handle_t *
             madctl = MADCTL_MY | MADCTL_MX;
             break;
         case 1:  // Landscape 90 graus (320x240) 
-            // ESP32-2432S028R: MADCTL = 0x00 funciona perfeitamente
+            // ESP32-2432S028R: Configuração final correta
+            // - MY (0x80) para orientação correta
             // - RGB mode (sem BGR) para cores corretas
-            // - Sem bits de rotação para orientação correta
-            madctl = 0x00;
+            // - Sem MX (sem espelhamento horizontal)
+            madctl = 0x80;  // MY apenas - configuração perfeita
             break;
         case 2:  // Portrait inverted (240x320)
             madctl = 0x00;
@@ -611,7 +612,7 @@ esp_err_t display_set_rotation(display_handle_t handle, display_rotation_t rotat
             madctl = MADCTL_MY | MADCTL_MX;
             break;
         case 1:  // Landscape 90 graus (320x240)
-            madctl = 0x00;  // Configuração correta para ESP32-2432S028R
+            madctl = 0x80;  // MY apenas
             break;
         case 2:  // Portrait inverted (240x320)
             madctl = 0x00;

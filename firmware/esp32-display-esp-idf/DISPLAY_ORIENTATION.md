@@ -40,11 +40,12 @@ O registro MADCTL (0x36) controla como os dados são escritos na memória do dis
 Para o ESP32-2432S028R em modo landscape (320x240):
 
 ```c
-MADCTL = 0x00  // Sem rotação, modo RGB
+MADCTL = 0x80  // MY (Row Address Order) apenas, modo RGB
 ```
 
 Esta configuração resulta em:
-- ✅ Orientação correta (seta apontando para cima)
+- ✅ Orientação correta (sem inversão vertical)
+- ✅ Sem espelhamento horizontal
 - ✅ Cores corretas (RGB ao invés de BGR)
 - ✅ Display em landscape (320x240)
 
@@ -57,7 +58,7 @@ switch(rotation) {
         break;
         
     case 1:  // Landscape 90° (320x240) - PADRÃO
-        madctl = 0x00;  // Configuração funcional
+        madctl = 0x80;  // MY apenas - Configuração correta para ESP32-2432S028R
         break;
         
     case 2:  // Portrait invertido (240x320)
@@ -86,7 +87,10 @@ switch(rotation) {
 | 0xA0   | 1010 0000 | MY + MV     | Cores OK, seta para esquerda |
 | 0x60   | 0110 0000 | MX + MV     | Cores OK, seta para direita |
 | 0xE0   | 1110 0000 | MY+MX+MV    | Cores OK, seta para esquerda |
-| 0x00   | 0000 0000 | Nenhum      | **Cores OK, seta para cima ✓** |
+| 0x00   | 0000 0000 | Nenhum      | Cores OK, orientação OK mas espelhado horizontalmente |
+| 0x40   | 0100 0000 | MX          | Cores OK, sem espelhamento mas de cabeça para baixo |
+| 0xC0   | 1100 0000 | MY + MX     | Cores OK, de cabeça para baixo e espelhado |
+| 0x80   | 1000 0000 | MY          | **Cores OK, orientação perfeita ✓** |
 
 ### 3. Metodologia de Teste
 
@@ -162,8 +166,9 @@ ESP_LOGI(TAG, "MADCTL enviado: 0x%02X", madctl);
 
 ## Histórico de Mudanças
 
-- **2025-01-18**: Configuração inicial corrigida - MADCTL = 0x00 para landscape
-- **2025-01-18**: Documentação criada após debug extensivo de orientação
+- **2025-01-18**: Configuração inicial corrigida - MADCTL = 0x80 (MY apenas) para landscape perfeito
+- **2025-01-18**: Documentação criada e atualizada após debug extensivo de orientação
+- **2025-01-18**: Implementada interface de teste com 9 botões para validação do touch
 
 ---
 
