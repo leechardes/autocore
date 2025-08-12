@@ -166,6 +166,32 @@ Onde `device_uuid` é o identificador único do dispositivo (ex: `esp32-504d3431
 }
 ```
 
+### 4. Sistema de Comandos Unificado
+**Tópico:** `autocore/devices/{uuid}/commands/+`  
+**QoS:** 1  
+
+Todos os comandos seguem a mesma estrutura base, permitindo extensibilidade:
+
+#### Comando com Channel (para relés)
+```json
+{
+  "channel": 1,        // 1-16 ou "all"
+  "command": "on",     // "on" | "off" | "toggle"
+  "source": "api",     // origem do comando
+  "is_momentary": true, // opcional: relé momentâneo
+  "user": "admin"      // opcional: usuário que executou
+}
+```
+
+#### Comando Geral (sistema)
+```json
+{
+  "command": "reset",  // "reset" | "status" | "reboot" | "ota"
+  "type": "all",       // para reset: "all" | "relays" | "config"
+  "delay": 5           // para reboot: segundos de delay
+}
+```
+
 ## 🔄 Fluxos de Comunicação
 
 ### Fluxo de Inicialização
@@ -203,19 +229,51 @@ sequenceDiagram
 ```mermaid
 sequenceDiagram
     participant Backend
-    participant MQTT Broker
+    participant MQTT Broker  
     participant ESP32
+    participant Hardware
     
-    Backend->>MQTT Broker: /relay/command (momentary=true)
+    Backend->>MQTT Broker: /commands/relay (is_momentary=true)
     MQTT Broker->>ESP32: Deliver command
-    ESP32->>ESP32: Start heartbeat monitor
-    loop Every 100ms
+    ESP32->>Hardware: Liga relé
+    ESP32->>ESP32: Start heartbeat monitor (100ms checks)
+    ESP32->>MQTT Broker: Publish /relays/state
+    ESP32->>MQTT Broker: Publish /telemetry (relay_change)
+    
+    loop Manter ativo - Every 100ms or less
         Backend->>MQTT Broker: /relay/heartbeat
         MQTT Broker->>ESP32: Heartbeat received
+        ESP32->>ESP32: Update last_heartbeat timestamp
+        Note over ESP32: Reset inactivity timer
     end
-    Note over ESP32: If no heartbeat for 1s
-    ESP32->>ESP32: Auto shutoff
+    
+    Note over ESP32: Se não receber heartbeat por > 1s
+    ESP32->>Hardware: Desliga relé automaticamente
+    ESP32->>ESP32: Stop monitoring
     ESP32->>MQTT Broker: Publish /telemetry (safety_shutoff)
+    ESP32->>MQTT Broker: Publish /relays/state (updated)
+```
+
+### Fluxo de Safety Shutoff
+```mermaid
+sequenceDiagram
+    participant ESP32
+    participant Hardware
+    participant MQTT Broker
+    participant Backend
+    
+    Note over ESP32: Timer verifica a cada 100ms
+    ESP32->>ESP32: Check heartbeat timeout
+    
+    alt Timeout > 1000ms
+        ESP32->>Hardware: Emergency shutoff
+        ESP32->>ESP32: Stop heartbeat monitoring
+        ESP32->>MQTT Broker: Publish safety_shutoff telemetry
+        ESP32->>MQTT Broker: Publish updated relay state
+        MQTT Broker->>Backend: Notify emergency shutoff
+    else Heartbeat OK
+        ESP32->>ESP32: Continue monitoring
+    end
 ```
 
 ## 🔐 Segurança e Confiabilidade
@@ -274,6 +332,11 @@ sequenceDiagram
 #define MQTT_KEEPALIVE      60    // segundos
 #define MQTT_TIMEOUT        5000  // ms
 #define TELEMETRY_INTERVAL  30    // segundos
+
+// ⚡ Configurações de Relé Momentâneo
+#define MOMENTARY_TIMEOUT_MS        1000  // 1s sem heartbeat = desliga
+#define MOMENTARY_CHECK_INTERVAL_MS 100   // Verifica a cada 100ms
+#define MOMENTARY_MAX_CHANNELS      16    // Máximo de canais momentâneos simultâneos
 ```
 
 ### Broker Settings
@@ -294,14 +357,60 @@ max_queued_messages 1000
 5. **Channel Numbering**: 1-16 (não 0-15)
 6. **State Values**: Booleanos, não inteiros
 
+### ⚡ Implementação de Relés Momentâneos
+
+#### Estrutura de Controle (ESP32)
+```c
+typedef struct {
+    bool active;                    // Se está ativo
+    int channel;                    // Canal do relé (1-16) 
+    int64_t last_heartbeat;         // Timestamp do último heartbeat
+    esp_timer_handle_t timer;       // Timer para verificação
+} momentary_relay_t;
+
+static momentary_relay_t momentary_relays[16];
+static SemaphoreHandle_t momentary_mutex = NULL;
+```
+
+#### Fluxo de Ativação
+1. **Comando recebido**: Parser detecta `is_momentary: true`
+2. **Inicialização**: Liga relé + inicia monitoramento
+3. **Timer**: Verifica heartbeat a cada 100ms
+4. **Heartbeat**: Atualiza `last_heartbeat` timestamp
+5. **Timeout**: Se > 1s sem heartbeat → desliga automaticamente
+
+#### Considerações de Performance
+- **Thread Safety**: Mutex protege acesso a estruturas compartilhadas
+- **Timer Precision**: ESP-IDF high-resolution timers (microsegundos)
+- **Memory Efficiency**: Estruturas estáticas, sem malloc/free
+- **CPU Usage**: Core 1 dedicado para MQTT + timers
+
 ## 🔄 Versionamento
 
-- **Protocolo Version**: 1.0.0
+- **Protocolo Version**: 1.1.0
 - **Compatibilidade**: Backward compatible
 - **Breaking Changes**: Anunciados com 30 dias de antecedência
+
+### Changelog do Protocolo
+
+#### v1.1.0 (2025-08-11)
+- ✅ **NEW**: Sistema de relés momentâneos com heartbeat
+- ✅ **NEW**: Safety shutoff automático (1s timeout)
+- ✅ **NEW**: Estrutura unificada de comandos
+- ✅ **NEW**: Telemetria de eventos de segurança
+- 🔧 **IMPROVED**: Performance de parsing (ESP-IDF native)
+- 🔧 **IMPROVED**: Thread safety com mutexes
+- 🔧 **IMPROVED**: Timer precision (microsegundos)
+
+#### v1.0.0 (2025-08-08)
+- 🚀 **INITIAL**: Protocolo base definido
+- 🚀 **INITIAL**: Estrutura de tópicos AutoCore
+- 🚀 **INITIAL**: Comandos básicos de relé
+- 🚀 **INITIAL**: Telemetria e status
 
 ---
 
 **Última Atualização:** 11 de Agosto de 2025  
-**Versão do Protocolo:** 1.0.0  
+**Versão do Protocolo:** 1.1.0  
+**Implementação:** ESP-IDF v2.0.0  
 **Maintainer:** AutoCore Team

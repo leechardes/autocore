@@ -1,9 +1,63 @@
 # 🚀 ESP32 Relay ESP-IDF - High Performance C Implementation
 
+[![ESP-IDF](https://img.shields.io/badge/ESP--IDF-v5.0+-blue.svg)](https://github.com/espressif/esp-idf)
+[![Versão](https://img.shields.io/badge/Versão-2.0.0-brightgreen.svg)](./main/version.h)
+[![Licença](https://img.shields.io/badge/Licença-MIT-yellow.svg)](LICENSE)
+[![Status](https://img.shields.io/badge/Status-Produção-success.svg)](https://github.com/AutoCore)
+[![Platform](https://img.shields.io/badge/Platform-ESP32-red.svg)](https://www.espressif.com/en/products/socs/esp32)
+
+[![Boot Time](https://img.shields.io/badge/Boot-<1s-brightgreen.svg)](#-benchmarks-e-performance)
+[![HTTP Response](https://img.shields.io/badge/HTTP-<10ms-brightgreen.svg)](#-benchmarks-e-performance)
+[![MQTT Latency](https://img.shields.io/badge/MQTT-<50ms-brightgreen.svg)](#-benchmarks-e-performance)
+[![RAM Usage](https://img.shields.io/badge/RAM-<50KB-brightgreen.svg)](#-benchmarks-e-performance)
+
 **Versão**: 2.0.0 ESP-IDF  
 **Migrado de**: MicroPython para ESP-IDF  
 **Performance**: Boot < 1s, HTTP < 10ms, MQTT < 50ms  
 **RAM Usage**: < 50KB  
+
+## ⚡ Quick Start
+
+```bash
+# 1. Setup ESP-IDF
+. $HOME/esp/esp-idf/export.sh
+
+# 2. Configure project
+cd esp32-relay-esp-idf
+idf.py set-target esp32
+
+# 3. Build and flash
+idf.py build flash monitor
+
+# 4. Configure via web interface
+# Connect to ESP32-Relay-XXXXXX WiFi (password: 12345678)
+# Open http://192.168.4.1 in browser
+```
+
+🚀 **Sistema pronto para produção em menos de 5 minutos!**
+
+## 📖 Índice
+
+- [🎯 Visão Geral](#-visão-geral)
+- [📋 Pré-requisitos](#-pré-requisitos)
+- [🛠️ Instalação e Build](#%EF%B8%8F-instalação-e-build)
+- [⚙️ Configuração](#%EF%B8%8F-configuração)
+- [🌐 Interface Web](#-interface-web)
+- [📡 Integração MQTT](#-integração-mqtt)
+- [🔧 Desenvolvimento](#-desenvolvimento)
+- [📊 Benchmarks e Performance](#-benchmarks-e-performance)
+- [🚨 Troubleshooting](#-troubleshooting)
+- [📚 Documentação](#-documentação)
+
+**📁 Documentação Adicional:**
+- [📡 Protocolo MQTT](docs/MQTT_PROTOCOL.md) - Especificação completa do protocolo
+- [🏗️ Arquitetura](docs/ARCHITECTURE.md) - Arquitetura técnica detalhada  
+- [🔧 API Reference](docs/API.md) - Documentação das APIs
+- [⚙️ Configuração](docs/CONFIGURATION.md) - Guia de configuração completo
+- [🚀 Deployment](docs/DEPLOYMENT.md) - Instruções de produção
+- [🛠️ Development](docs/DEVELOPMENT.md) - Guia para desenvolvedores
+- [🔒 Security](docs/SECURITY.md) - Considerações de segurança
+- [💾 Hardware](docs/HARDWARE.md) - Especificações de hardware
 
 ## 🎯 Visão Geral
 
@@ -22,13 +76,15 @@ Sistema de controle de relés de alta performance baseado em ESP-IDF, desenvolvi
 ### ✨ Funcionalidades Principais
 
 - **🔌 Controle de Relés**: 16 canais GPIO com persistência de estado
+- **⚡ Relés Momentâneos**: Sistema de heartbeat com safety shutoff automático (1s)
 - **🌐 Interface Web**: Dashboard responsivo para configuração
 - **📡 MQTT Client**: Comunicação bidirecional com backend AutoCore  
 - **📶 WiFi Manager**: Dual mode (Station + Access Point) com fallback
 - **💾 Configuração NVS**: Armazenamento persistente otimizado
 - **🔄 Auto-Registro**: Integração automática com backend
 - **📊 Telemetria**: Métricas em tempo real a cada 30 segundos
-- **⚡ Alta Performance**: Dual-core optimization
+- **🛡️ Sistema de Segurança**: Timers de alta precisão + thread-safe operations
+- **⚡ Alta Performance**: Dual-core optimization + hardware timers
 
 ## 📋 Pré-requisitos
 
@@ -233,6 +289,21 @@ mosquitto_pub -h 192.168.1.100 \
 mosquitto_pub -h 192.168.1.100 \
   -t "autocore/devices/esp32_relay_93ce30/command" \
   -m '{"command":"reboot"}'
+```
+
+#### Relé Momentâneo (Novo!)
+```bash
+# Ativar relé momentâneo no canal 3
+mosquitto_pub -h 192.168.1.100 \
+  -t "autocore/devices/esp32_relay_93ce30/command" \
+  -m '{"channel":3,"command":"on","is_momentary":true}'
+
+# Manter ativo com heartbeat (enviar a cada 100ms)
+mosquitto_pub -h 192.168.1.100 \
+  -t "autocore/devices/esp32_relay_93ce30/relay/heartbeat" \
+  -m '{"channel":3,"timestamp":'$(date +%s)'}'
+
+# Se parar de enviar heartbeat > 1s = desliga automaticamente
 ```
 
 ### Monitorar Telemetria
