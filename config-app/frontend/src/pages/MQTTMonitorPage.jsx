@@ -249,16 +249,26 @@ const MQTTMonitorPage = () => {
           const msg = data.data;
           
           // Garantir que a mensagem tem todos os campos necessários
+          // Extrair protocol_version do payload se não estiver no nível superior
+          let parsedPayload = msg.payload;
+          if (typeof msg.payload === 'string') {
+            try {
+              parsedPayload = JSON.parse(msg.payload);
+            } catch (e) {
+              parsedPayload = msg.payload;
+            }
+          }
+          
           const processedMsg = {
             ...msg,
             timestamp: msg.timestamp || new Date().toISOString(),
             topic: msg.topic || 'unknown',
-            payload: msg.payload || {},
+            payload: parsedPayload || {},
             message_type: msg.message_type || msg.type || 'message',
             direction: msg.direction || 'received',
             qos: msg.qos !== undefined ? msg.qos : 0,
-            protocol_version: msg.protocol_version,
-            device_uuid: mqttService.extractDeviceUuid(msg.topic, typeof msg.payload === 'string' ? JSON.parse(msg.payload) : msg.payload)
+            protocol_version: msg.protocol_version || (parsedPayload && parsedPayload.protocol_version) || null,
+            device_uuid: mqttService.extractDeviceUuid(msg.topic, parsedPayload)
           };
           
           setMessages(prev => {
