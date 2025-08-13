@@ -36,6 +36,7 @@ class MQTTMessage:
     direction: str = "received"  # received/sent
     device_uuid: Optional[str] = None
     message_type: Optional[str] = None
+    protocol_version: Optional[str] = None
     
     def to_dict(self) -> dict:
         return asdict(self)
@@ -64,17 +65,17 @@ class MQTTMonitor:
         self.message_history: List[MQTTMessage] = []
         self.max_history = 1000
         self.subscriptions = [
-            "autocore/devices/+/announce",
-            "autocore/devices/+/status", 
-            "autocore/devices/+/telemetry",
-            "autocore/devices/+/command",
-            "autocore/devices/+/response",
-            "autocore/devices/+/relay/status",
-            "autocore/devices/+/relays/state",  # Estado dos relés
-            "autocore/devices/+/relays/set",    # Comandos para relés
-            "autocore/devices/+/commands/+",    # Comandos gerais
-            "autocore/discovery/+",
-            "autocore/gateway/status",
+            "autocore/devices/+/status",
+            "autocore/telemetry/relays/data",      # Sem UUID no tópico
+            "autocore/telemetry/displays/data",    # Sem UUID no tópico
+            "autocore/telemetry/sensors/+",        # Sensor específico
+            "autocore/telemetry/can/+",            # Sinal CAN específico
+            "autocore/devices/+/relays/state",     # Corrigido relay→relays
+            "autocore/devices/+/relays/set",       # Comandos para relés
+            "autocore/devices/+/relays/heartbeat", # Heartbeats de relés
+            "autocore/discovery/announce",         # Mais específico
+            "autocore/errors/+/+",                 # Monitorar erros
+            "autocore/gateway/status",             # Status do gateway
             "autocore/#",  # Captura TUDO para debug
         ]
         
@@ -157,6 +158,34 @@ class MQTTMonitor:
         except Exception as e:
             logger.error(f"❌ Erro ao processar mensagem MQTT: {e}")
             
+    def parse_telemetry(self, topic, payload):
+        """
+        Parser atualizado para extrair UUID do payload
+        não mais do tópico
+        """
+        try:
+            data = json.loads(payload)
+        except:
+            logger.error(f"Payload de telemetria não é JSON válido: {payload}")
+            return None
+        
+        # Validar protocol_version
+        if 'protocol_version' not in data:
+            logger.warning(f"Telemetria sem protocol_version: {payload}")
+            return None
+            
+        device_uuid = data.get('uuid')
+        if not device_uuid:
+            logger.error(f"Telemetria sem UUID no payload: {payload}")
+            return None
+        
+        return {
+            'uuid': device_uuid,
+            'timestamp': data.get('timestamp'),
+            'data': data,
+            'protocol_version': data.get('protocol_version')
+        }
+        
     def _parse_message(self, message) -> MQTTMessage:
         """Parse mensagem MQTT"""
         topic = message.topic
@@ -194,11 +223,27 @@ class MQTTMonitor:
         # Extrair device_uuid e tipo do tópico
         device_uuid = None
         message_type = None
+        protocol_version = None
+        
+        # Tentar extrair protocol_version do payload se for JSON
+        try:
+            payload_json = json.loads(payload)
+            protocol_version = payload_json.get('protocol_version')
+        except:
+            pass
         
         parts = topic.split('/')
         if len(parts) >= 2 and parts[0] == 'autocore':
-            # Só considerar device_uuid se for realmente um dispositivo ESP32
-            if parts[1] == 'devices' and len(parts) >= 4:
+            # Para telemetria, UUID vem do payload, não do tópico
+            if parts[1] == 'telemetry':
+                # autocore/telemetry/{tipo}/data
+                parsed_telemetry = self.parse_telemetry(topic, payload)
+                if parsed_telemetry:
+                    device_uuid = parsed_telemetry['uuid']
+                    protocol_version = parsed_telemetry['protocol_version']
+                message_type = f"telemetry_{parts[2]}" if len(parts) > 2 else 'telemetry'
+            # Para dispositivos, UUID vem do tópico
+            elif parts[1] == 'devices' and len(parts) >= 4:
                 # Formato: autocore/devices/{uuid}/...
                 # Este é um dispositivo real (ESP32)
                 device_uuid = parts[2]
@@ -247,7 +292,8 @@ class MQTTMonitor:
             qos=message.qos,
             timestamp=datetime.now().isoformat(),
             device_uuid=device_uuid,
-            message_type=message_type
+            message_type=message_type,
+            protocol_version=protocol_version
         )
         
     def _add_to_history(self, message: MQTTMessage):

@@ -31,6 +31,7 @@ from services.mqtt_monitor import mqtt_monitor
 
 # Import Routes  
 from api.routes import simulators, macros
+from api import mqtt_routes, protocol_routes
 
 # ====================================
 # CONFIGURAÇÃO
@@ -1422,6 +1423,8 @@ async def get_mqtt_topics():
 # Registrar routers
 app.include_router(simulators.router)
 app.include_router(macros.router)
+app.include_router(mqtt_routes.router)
+app.include_router(protocol_routes.router)
 
 # ====================================
 # MAIN
