@@ -22,6 +22,7 @@ from core.device_manager import DeviceManager
 from services.telemetry_service import TelemetryService
 from core.config import Config
 from shared.repositories import devices, telemetry, events
+from mqtt.protocol import create_gateway_status_payload, get_topic_pattern, serialize_payload
 
 # Configuração de logging
 logging.basicConfig(
@@ -45,6 +46,8 @@ class AutoCoreGateway:
         self.message_handler = None
         self.device_manager = None
         self.telemetry_service = None
+        self.gateway_uuid = self.config.MQTT_CLIENT_ID
+        self.start_time = datetime.now()
         
     async def initialize(self):
         """Inicializa todos os componentes do gateway"""
@@ -143,18 +146,21 @@ class AutoCoreGateway:
     async def _heartbeat(self):
         """Envia heartbeat do gateway"""
         try:
-            payload = {
-                'timestamp': datetime.now().isoformat(),
-                'status': 'online',
-                'uptime': self._get_uptime(),
-                'devices_online': len(devices.get_online_devices()),
-                'memory_usage': self._get_memory_usage()
-            }
+            # Criar payload v2.2.0 conforme protocolo
+            payload_data = create_gateway_status_payload(
+                gateway_uuid=self.gateway_uuid,
+                uptime=self._get_uptime(),
+                devices_online=len(devices.get_online_devices()),
+                memory_usage=self._get_memory_usage()
+            )
+            
+            # Obter tópico correto v2.2.0
+            topic = get_topic_pattern('gateway_status', uuid=self.gateway_uuid)
             
             await self.mqtt_client.publish(
-                'autocore/gateway/status',
-                json.dumps(payload),
-                qos=0,
+                topic,
+                serialize_payload(payload_data),
+                qos=1,
                 retain=True
             )
             
@@ -163,8 +169,6 @@ class AutoCoreGateway:
     
     def _get_uptime(self) -> int:
         """Retorna uptime em segundos"""
-        if not hasattr(self, 'start_time'):
-            self.start_time = datetime.now()
         return int((datetime.now() - self.start_time).total_seconds())
     
     def _get_memory_usage(self) -> Dict[str, Any]:
@@ -191,15 +195,23 @@ class AutoCoreGateway:
             logger.info("📴 Parando AutoCore Gateway...")
             self.running = False
             
-            # Publicar status offline
+            # Publicar status offline v2.2.0
             if self.mqtt_client:
+                from mqtt.protocol import create_base_payload
+                payload_data = create_base_payload(
+                    device_uuid=self.gateway_uuid,
+                    message_type='gateway_status',
+                    status='offline',
+                    device_type='gateway',
+                    reason='shutdown'
+                )
+                
+                topic = get_topic_pattern('gateway_status', uuid=self.gateway_uuid)
+                
                 await self.mqtt_client.publish(
-                    'autocore/gateway/status',
-                    json.dumps({
-                        'timestamp': datetime.now().isoformat(),
-                        'status': 'offline'
-                    }),
-                    qos=0,
+                    topic,
+                    serialize_payload(payload_data),
+                    qos=1,
                     retain=True
                 )
             

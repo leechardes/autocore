@@ -15,6 +15,7 @@ sys.path.append(str(Path(__file__).parent.parent.parent.parent / "database"))
 
 from src.models.models import get_session, Macro
 from shared.repositories import events
+from ..mqtt.protocol import TOPIC_MACRO_EXECUTE, TOPIC_MACRO_STOP, TOPIC_MACRO_EMERGENCY_STOP, TOPIC_MACRO_STATUS, TOPIC_MACRO_EVENTS
 
 logger = logging.getLogger(__name__)
 
@@ -48,6 +49,48 @@ class MacroEngine:
         self.saved_states: Dict[str, Dict] = {}  # Estados salvos para restauração
         self.heartbeat_tasks: Dict[int, asyncio.Task] = {}
         self.session = get_session()
+        self._setup_mqtt_subscriptions()
+    
+    def _setup_mqtt_subscriptions(self):
+        """Configura subscrições MQTT para comandos de macro"""
+        if not self.mqtt_client:
+            return
+            
+        # Subscrever aos tópicos de comando de macro
+        topics = [
+            TOPIC_MACRO_EXECUTE,
+            TOPIC_MACRO_STOP,
+            TOPIC_MACRO_EMERGENCY_STOP
+        ]
+        
+        for topic in topics:
+            self.mqtt_client.subscribe(topic, self._handle_mqtt_message)
+            logger.info(f"Subscrito ao tópico: {topic}")
+    
+    async def _handle_mqtt_message(self, topic: str, payload: Dict):
+        """Processa mensagens MQTT recebidas"""
+        try:
+            if topic == TOPIC_MACRO_EXECUTE:
+                macro_id = payload.get('macro_id')
+                if macro_id:
+                    result = await self.start_macro(macro_id, payload)
+                    logger.info(f"Comando execute para macro {macro_id}: {result}")
+            
+            elif topic == TOPIC_MACRO_STOP:
+                macro_id = payload.get('macro_id')
+                if macro_id:
+                    result = await self.stop_macro(macro_id)
+                    logger.info(f"Comando stop para macro {macro_id}: {result}")
+            
+            elif topic == TOPIC_MACRO_EMERGENCY_STOP:
+                result = await self.handle_emergency_stop(payload)
+                logger.warning(f"Comando emergency stop executado: {result}")
+            
+            else:
+                logger.warning(f"Tópico MQTT não reconhecido: {topic}")
+                
+        except Exception as e:
+            logger.error(f"Erro processando mensagem MQTT {topic}: {e}")
         
     async def start_macro(self, macro_id: int, context: Dict = None) -> Dict:
         """Inicia execução de uma macro"""
@@ -115,7 +158,7 @@ class MacroEngine:
             logger.error(f"Erro iniciando macro {macro_id}: {e}")
             return {"error": str(e)}
     
-    async def stop_macro(self, macro_id: int, restore_state: bool = True) -> Dict:
+    async def stop_macro(self, macro_id: int, restore_state: bool = True, reason: str = "user_requested") -> Dict:
         """Para execução de uma macro"""
         try:
             if macro_id not in self.running_macros:
@@ -137,6 +180,7 @@ class MacroEngine:
             # Atualizar estado
             macro_state["state"] = MacroState.STOPPED
             macro_state["stopped_at"] = datetime.now()
+            macro_state["stop_reason"] = reason
             
             # Publicar status
             await self._publish_status(macro_id, "stopped")
@@ -144,8 +188,8 @@ class MacroEngine:
             # Remover dos ativos
             del self.running_macros[macro_id]
             
-            logger.info(f"Macro {macro_id} parada")
-            return {"status": "stopped", "macro_id": macro_id}
+            logger.info(f"Macro {macro_id} parada (motivo: {reason})")
+            return {"status": "stopped", "macro_id": macro_id, "reason": reason}
             
         except Exception as e:
             logger.error(f"Erro parando macro {macro_id}: {e}")
@@ -308,7 +352,11 @@ class MacroEngine:
             logger.warning("Cliente MQTT não configurado")
             return
         
+        # Garantir conformidade com protocolo v2.2.0
         if isinstance(payload, dict):
+            payload['protocol_version'] = '2.2.0'
+            payload['uuid'] = 'gateway-main-001'
+            payload['timestamp'] = datetime.now().isoformat() + 'Z'
             payload = json.dumps(payload)
         
         self.mqtt_client.publish(topic, payload)
@@ -319,16 +367,29 @@ class MacroEngine:
         payload = {
             "macro_id": macro_id,
             "status": status,
-            "timestamp": datetime.now().isoformat()
         }
         
         if error:
             payload["error"] = error
         
         if macro_id in self.running_macros:
-            payload["name"] = self.running_macros[macro_id]["name"]
+            macro_state = self.running_macros[macro_id]
+            payload["name"] = macro_state["name"]
+            payload["current_action"] = macro_state.get("current_action", 0)
+            payload["started_at"] = macro_state["started_at"].isoformat() + 'Z'
+            
+            # Calcular total de ações se disponível
+            if status in ["running", "completed"]:
+                try:
+                    macro = self.session.query(Macro).filter_by(id=macro_id).first()
+                    if macro:
+                        actions = json.loads(macro.action_sequence)
+                        payload["total_actions"] = len(actions)
+                except Exception as e:
+                    logger.warning(f"Erro ao obter total de ações para macro {macro_id}: {e}")
         
-        topic = f"autocore/macros/{macro_id}/status"
+        # Usar tópico correto conforme MQTT_ARCHITECTURE.md
+        topic = TOPIC_MACRO_STATUS.format(macro_id)
         await self._publish_mqtt(topic, payload)
         
         # Registrar evento
@@ -387,6 +448,36 @@ class MacroEngine:
             "requires_heartbeat": state.get("requires_heartbeat", False),
             "preserve_state": state.get("preserve_state", False)
         }
+    
+    async def handle_emergency_stop(self, payload: Dict = None):
+        """Para todas as macros em execução imediatamente"""
+        logger.warning("EMERGENCY STOP - Parando todas as macros")
+        
+        # Contar macros ativas antes de parar
+        macros_count = len(self.running_macros)
+        active_macro_ids = list(self.running_macros.keys())
+        
+        # Parar todas as macros em execução
+        for macro_id in active_macro_ids:
+            await self.stop_macro(macro_id, reason="emergency_stop")
+        
+        # Parar todos os heartbeat tasks
+        for macro_id, task in list(self.heartbeat_tasks.items()):
+            task.cancel()
+            del self.heartbeat_tasks[macro_id]
+        
+        # Publicar evento de emergency stop
+        event = {
+            "event": "emergency_stop_executed",
+            "macros_stopped": macros_count,
+            "stopped_macro_ids": active_macro_ids,
+            "reason": payload.get("reason", "user_requested") if payload else "user_requested"
+        }
+        
+        await self._publish_mqtt(TOPIC_MACRO_EVENTS, event)
+        
+        logger.info(f"Emergency stop executado - {macros_count} macros paradas")
+        return {"status": "emergency_stop_executed", "macros_stopped": macros_count}
 
 # Instância global
 macro_engine = MacroEngine()

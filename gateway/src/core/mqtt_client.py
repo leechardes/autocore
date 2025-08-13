@@ -14,15 +14,15 @@ from paho.mqtt.properties import Properties
 from paho.mqtt.packettypes import PacketTypes
 
 # Importações para v2.2.0
-from ..mqtt.protocol import (
+from mqtt.protocol import (
     MQTT_PROTOCOL_VERSION,
     create_gateway_status_payload,
     create_lwt_payload,
     serialize_payload,
     get_topic_pattern
 )
-from ..mqtt.error_handler import ErrorHandler
-from ..mqtt.rate_limiter import RateLimiter
+from mqtt.error_handler import ErrorHandler
+from mqtt.rate_limiter import RateLimiter
 
 logger = logging.getLogger(__name__)
 
@@ -40,7 +40,7 @@ class MQTTClient:
         self.loop = None  # Referência ao event loop principal
         
         # UUID do gateway para identificação
-        self.gateway_uuid = self.config.MQTT_CLIENT_ID
+        self.gateway_uuid = "autocore-gateway"
         
         # Componentes v2.2.0
         self.error_handler = None  # Será inicializado após conectar
@@ -68,9 +68,8 @@ class MQTTClient:
             except RuntimeError:
                 self.loop = asyncio.get_event_loop()
             
-            # Criar cliente MQTT
+            # Criar cliente MQTT (client_id será gerado automaticamente)
             self.client = mqtt.Client(
-                client_id=self.config.MQTT_CLIENT_ID,
                 protocol=mqtt.MQTTv5
             )
             
@@ -93,7 +92,7 @@ class MQTTClient:
                 gateway_uuid=self.gateway_uuid,
                 reason='unexpected_disconnect'
             )
-            lwt_topic = get_topic_pattern('gateway_status')
+            lwt_topic = get_topic_pattern('gateway_status', uuid=self.gateway_uuid)
             
             self.client.will_set(
                 topic=lwt_topic,
@@ -220,7 +219,7 @@ class MQTTClient:
                 messages_processed=self.stats['messages_received']
             )
             
-            topic = get_topic_pattern('gateway_status')
+            topic = get_topic_pattern('gateway_status', uuid=self.gateway_uuid)
             
             result = self.client.publish(
                 topic=topic,
@@ -241,7 +240,7 @@ class MQTTClient:
         """Processa mensagem com validação v2.2.0"""
         try:
             # Importar aqui para evitar importação circular
-            from ..mqtt.protocol import extract_device_uuid_from_topic, deserialize_payload, validate_protocol_version
+            from mqtt.protocol import extract_device_uuid_from_topic, deserialize_payload, validate_protocol_version
             
             # Extrair UUID do dispositivo do tópico
             device_uuid = extract_device_uuid_from_topic(topic)
@@ -401,7 +400,7 @@ class MQTTClient:
     
     async def send_command_to_device(self, device_uuid: str, command: Dict[str, Any]) -> bool:
         """Envia comando para dispositivo específico v2.2.0"""
-        from ..mqtt.protocol import create_base_payload, get_message_qos, MessageType
+        from mqtt.protocol import create_base_payload, get_message_qos, MessageType
         
         topic = self.config.get_device_topic(device_uuid, 'command')
         
@@ -420,7 +419,7 @@ class MQTTClient:
     
     async def broadcast_message(self, message: Dict[str, Any]) -> bool:
         """Envia mensagem broadcast para todos os dispositivos v2.2.0"""
-        from ..mqtt.protocol import create_base_payload
+        from mqtt.protocol import create_base_payload
         
         topic = self.config.mqtt_topics['system_broadcast']
         
@@ -498,7 +497,7 @@ class MQTTClient:
                 messages_blocked=self.stats['messages_blocked']
             )
             
-            topic = get_topic_pattern('gateway_status')
+            topic = get_topic_pattern('gateway_status', uuid=self.gateway_uuid)
             
             return await self.publish(
                 topic=topic,

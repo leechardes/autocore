@@ -102,10 +102,10 @@ O AutoCore utiliza MQTT como protocolo principal de comunicação entre todos os
 | Componente | Publica | Subscreve | Heartbeat | Responsabilidade Principal |
 |------------|---------|-----------|-----------|---------------------------|
 | **ESP32 Relay** | - Estado dos relés<br>- Telemetria<br>- Safety events | - Comandos de controle<br>- Heartbeats | **RECEBE** e monitora | Executar comandos com segurança |
-| **ESP32 Display** | - Touch events<br>- Comandos relé<br>- Heartbeats | - Estado dos relés<br>- Telemetria CAN | **ENVIA** continuamente | Interface local no veículo |
-| **Flutter App** | - Comandos relé<br>- Heartbeats<br>- Requisições | - Estado dos relés<br>- Telemetria<br>- Notificações | **ENVIA** continuamente | Controle remoto completo |
-| **Config App** | - Comandos teste | - Todos (monitor)<br>- Estados | Não necessário | Configuração via API e debug |
-| **Gateway** | - Roteamento<br>- Agregações<br>- Comandos | - Tudo (broker) | Não aplicável | Coordenação e persistência |
+| **ESP32 Display** | - Touch events<br>- Comandos relé<br>- Heartbeats<br>- Comandos macro | - Estado dos relés<br>- Telemetria CAN<br>- Status de macros | **ENVIA** continuamente | Interface local no veículo |
+| **Flutter App** | - Comandos relé<br>- Heartbeats<br>- Comandos macro | - Estado dos relés<br>- Telemetria<br>- Status de macros | **ENVIA** continuamente | Controle remoto completo |
+| **Config App** | - Comandos teste<br>- Comandos macro | - Todos (monitor)<br>- Estados<br>- Status de macros | Não necessário | Configuração via API e debug |
+| **Gateway** | - Roteamento<br>- Agregações<br>- Comandos<br>- Status de macros | - Tudo (broker)<br>- Comandos de macro | Não aplicável | Coordenação, persistência e **execução de macros** |
 | **ESP32 CAN** | - Telemetria CAN<br>- Status | - Comandos | Não aplicável | Bridge CAN→MQTT |
 | **ESP32 Sensor** | - Dados sensores<br>- Status | - Comandos<br>- Calibração | Não aplicável | Aquisição de dados |
 
@@ -182,6 +182,23 @@ autocore/system/update
 autocore/commands/all/{action}
 autocore/commands/group/{group_id}/{action}
 autocore/commands/device/{uuid}/{action}
+```
+
+#### 5. Macros (`macros`)
+```
+# Comandos de macro via gateway
+autocore/gateway/macros/execute
+autocore/gateway/macros/stop
+autocore/gateway/macros/emergency_stop
+
+# Macros específicas por ID
+autocore/macros/{macro_id}/execute
+autocore/macros/{macro_id}/status
+autocore/macros/{macro_id}/stop
+
+# Telemetria e eventos de macros
+autocore/telemetry/macros/events
+autocore/telemetry/macros/status
 ```
 
 
@@ -274,6 +291,54 @@ sequenceDiagram
     Gateway->>Broker: SUBSCRIBE autocore/devices/{uuid}/display/touch
     Gateway->>Broker: PUBLISH autocore/devices/{relay_uuid}/relays/set
     ESP32Relay->>Broker: SUBSCRIBE autocore/devices/{relay_uuid}/relays/set
+```
+
+### 5. Execução de Macro
+```mermaid
+sequenceDiagram
+    participant User
+    participant Client as App/Config
+    participant Broker as Mosquitto
+    participant Gateway
+    participant Devices as ESP32 Devices
+    
+    User->>Client: Executar Macro
+    Client->>Broker: PUBLISH autocore/gateway/macros/execute
+    Gateway->>Broker: SUBSCRIBE autocore/gateway/macros/execute
+    Gateway->>Gateway: Processar ações da macro
+    
+    loop Para cada ação
+        Gateway->>Broker: PUBLISH autocore/devices/{uuid}/relays/set
+        Devices->>Broker: SUBSCRIBE autocore/devices/{uuid}/relays/set
+        Devices->>Devices: Executar comando
+        Devices->>Broker: PUBLISH autocore/devices/{uuid}/relays/state
+        
+        Note over Gateway: Aguarda delay se configurado
+        
+        Gateway->>Broker: PUBLISH autocore/macros/{id}/status
+        Client->>Broker: SUBSCRIBE autocore/macros/{id}/status
+    end
+    
+    Gateway->>Broker: PUBLISH autocore/telemetry/macros/events {completed}
+    Client->>Client: Atualizar UI com conclusão
+```
+
+### 6. Parada de Emergência de Macros
+```mermaid
+sequenceDiagram
+    participant User
+    participant Client as App/Config
+    participant Broker as Mosquitto
+    participant Gateway
+    
+    User->>Client: Botão de Emergência
+    Client->>Broker: PUBLISH autocore/gateway/macros/emergency_stop
+    Gateway->>Broker: SUBSCRIBE autocore/gateway/macros/emergency_stop
+    Gateway->>Gateway: Interromper todas as macros
+    Gateway->>Broker: PUBLISH autocore/telemetry/macros/events {emergency_stopped}
+    
+    Note over Gateway: Restaurar estado seguro
+    Gateway->>Broker: PUBLISH autocore/devices/+/relays/set {safe_state}
 ```
 
 ## 📦 Formato de Mensagens (Payloads)
@@ -428,6 +493,65 @@ Todos os payloads devem incluir versão do protocolo para compatibilidade:
 }
 ```
 
+### Comando de Execução de Macro
+```json
+{
+  "protocol_version": "2.2.0",
+  "uuid": "config-app-001",
+  "macro_id": 1,
+  "macro_name": "Ligar Faróis e Pisca",
+  "command": "execute",
+  "timestamp": "2025-08-08T10:30:00Z",
+  "source": "web_interface",
+  "user": "operator"
+}
+```
+
+### Status de Macro
+```json
+{
+  "protocol_version": "2.2.0",
+  "uuid": "gateway-main-001",
+  "macro_id": 1,
+  "macro_name": "Ligar Faróis e Pisca",
+  "status": "running",
+  "current_action": 3,
+  "total_actions": 5,
+  "started_at": "2025-08-08T10:30:00Z",
+  "timestamp": "2025-08-08T10:30:02Z"
+}
+```
+
+### Evento de Conclusão de Macro
+```json
+{
+  "protocol_version": "2.2.0",
+  "uuid": "gateway-main-001",
+  "macro_id": 1,
+  "macro_name": "Ligar Faróis e Pisca",
+  "event": "completed",
+  "started_at": "2025-08-08T10:30:00Z",
+  "completed_at": "2025-08-08T10:30:05Z",
+  "duration_ms": 5000,
+  "actions_executed": 5,
+  "result": "success",
+  "timestamp": "2025-08-08T10:30:05Z"
+}
+```
+
+### Comando de Parada de Emergência de Macros
+```json
+{
+  "protocol_version": "2.2.0",
+  "uuid": "mobile-app-001",
+  "command": "emergency_stop",
+  "scope": "all",
+  "reason": "user_requested",
+  "timestamp": "2025-08-08T10:30:00Z",
+  "user": "operator"
+}
+```
+
 
 ## 🔒 Segurança
 
@@ -462,6 +586,31 @@ Relés momentâneos (buzina, guincho, partida) devem desligar automaticamente se
 - **Momentary**: Liga enquanto pressionado (requer heartbeat)
 - **Pulse**: Liga por tempo determinado e desliga
 - **Timed**: Liga com timer configurável
+
+### Sistema de Segurança para Macros
+
+#### Restrições de Canais em Macros
+Macros **NÃO podem** controlar:
+- Canais momentâneos (buzina, guincho, partida)
+- Canais marcados com `allow_in_macro = false`
+- Canais que requerem heartbeat contínuo
+
+#### Comando de Emergência MQTT
+Parada imediata de todas as macros em execução:
+```
+Tópico: autocore/gateway/macros/emergency_stop
+Payload: {
+  "protocol_version": "2.2.0",
+  "command": "emergency_stop",
+  "scope": "all"
+}
+```
+
+#### Monitoramento de Execução
+- Timeout máximo por macro: 60 segundos
+- Limite de ações por macro: 50
+- Delay mínimo entre ações: 100ms
+- Log de auditoria para todas as execuções
 
 ### Desenvolvimento
 - Sem autenticação (rede local isolada)
@@ -674,11 +823,17 @@ mosquitto_sub -h localhost -t "$SYS/#" -v
 
 ---
 
-**Última Atualização:** 12 de Agosto de 2025  
+**Última Atualização:** 13 de Agosto de 2025  
 **Versão:** 2.2.0  
 **Maintainer:** AutoCore Team
 
 ### Changelog
+- v2.2.0 (13/08/2025) - Adicionada documentação completa de Macros via MQTT
+  - Nova seção de tópicos para macros (gateway e específicas por ID)
+  - Payloads padronizados para comandos e status de macros
+  - Fluxos de execução e parada de emergência
+  - Segurança específica para macros (restrições e comando de emergência)
+  - Atualizada matriz de responsabilidades incluindo macros
 - v2.2.0 - Adicionado versionamento de protocolo em todos os payloads
 - v2.2.0 - Definido padrão de UUID ({tipo}-{função}-{número})
 - v2.2.0 - Adicionada seção de Last Will Testament (LWT)

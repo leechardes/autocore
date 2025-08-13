@@ -192,24 +192,27 @@ autocore/{categoria}/{device_uuid}/{tipo}/{subtipo}
 ### 4. System Topics
 
 #### Gateway Status
-**Tópico**: `autocore/gateway/status`
+**Tópico**: `autocore/devices/{gateway_uuid}/status`
 **Direção**: Gateway → Broker
-**QoS**: 0 (At most once)
+**QoS**: 1 (At least once) 
 **Retained**: true
 **Descrição**: Status do Gateway
 
 **Payload**:
 ```json
 {
+  "protocol_version": "2.2.0",
+  "uuid": "gateway-001",
   "timestamp": "2025-01-08T10:30:00Z",
+  "message_type": "gateway_status",
   "status": "online",
+  "device_type": "gateway",
   "uptime": 86400,
   "devices_online": 5,
   "memory_usage": {
     "ram_mb": 45.2,
     "cpu_percent": 12.5
-  },
-  "version": "1.0.0"
+  }
 }
 ```
 
