@@ -9,6 +9,8 @@ import sys
 from pathlib import Path
 from datetime import datetime
 import asyncio
+import paho.mqtt.client as mqtt
+import logging
 
 # Adiciona path para importar database
 sys.path.append(str(Path(__file__).parent.parent.parent.parent.parent / "database"))
@@ -271,6 +273,59 @@ async def stop_macro(macro_id: int):
         }
     except Exception as e:
         raise HTTPException(status_code=400, detail=str(e))
+
+@router.post("/emergency-stop")
+async def emergency_stop_all_macros():
+    """
+    Para todas as macros em execução via comando MQTT de emergência
+    """
+    logger = logging.getLogger(__name__)
+    
+    try:
+        # Criar payload de emergência
+        payload = {
+            "protocol_version": "2.2.0",
+            "uuid": "config-app-001",
+            "command": "emergency_stop",
+            "scope": "all",
+            "reason": "user_requested",
+            "timestamp": datetime.now().isoformat() + 'Z',
+            "user": "config_app"
+        }
+        
+        # Conectar ao MQTT se necessário
+        mqtt_client = mqtt.Client(client_id=f"emergency_stop_{datetime.now().timestamp()}")
+        mqtt_client.connect("localhost", 1883, 60)
+        
+        # Publicar comando de emergência
+        mqtt_client.publish(
+            "autocore/gateway/macros/emergency_stop",
+            json.dumps(payload),
+            qos=2  # QoS 2 para comando crítico
+        )
+        
+        mqtt_client.disconnect()
+        
+        logger.warning("Emergency stop executado pela Config App")
+        
+        # Registrar evento
+        events.log(
+            event_type="macro_emergency_stop",
+            source="config_app",
+            action="emergency_stop",
+            target="all_macros",
+            payload=payload
+        )
+        
+        return {
+            "status": "success",
+            "message": "Comando de parada de emergência enviado",
+            "timestamp": datetime.now().isoformat()
+        }
+        
+    except Exception as e:
+        logger.error(f"Erro ao executar emergency stop: {str(e)}")
+        raise HTTPException(status_code=500, detail=str(e))
 
 @router.get("/{macro_id}/status")
 async def get_macro_status(macro_id: int):

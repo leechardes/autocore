@@ -200,7 +200,7 @@ class MacroExecutor:
     
     async def _execute_mqtt_action(self, action: Dict):
         """Envia mensagem MQTT customizada"""
-        topic = action.get('topic', 'autocore/system/macros/custom')
+        topic = action.get('topic', 'autocore/gateway/macros/execute')
         payload = action.get('payload', {})
         qos = action.get('qos', 1)
         
@@ -240,14 +240,11 @@ class MacroExecutor:
     
     def _publish_status(self, macro_id: int, status: str, name: str, error: str = None):
         """Publica status da execução da macro"""
-        # TODO: Obter device_uuid correto para o macro
-        device_uuid = "gateway"  # Macros são executados pelo gateway
-        topic = f"autocore/devices/{device_uuid}/macros/status"
+        topic = f"autocore/macros/{macro_id}/status"
         payload = create_mqtt_payload(
-            uuid=device_uuid,
-            device_type="gateway",
+            uuid="gateway-main-001",
             macro_id=macro_id,
-            name=name,
+            macro_name=name,
             status=status
         )
         
