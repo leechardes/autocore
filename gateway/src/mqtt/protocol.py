@@ -53,7 +53,7 @@ def create_gateway_status_payload(gateway_uuid: str, **kwargs) -> Dict[str, Any]
         device_uuid=gateway_uuid,
         message_type=MessageType.GATEWAY_STATUS.value,
         status='online',
-        component_type='gateway',
+        device_type='gateway',
         **kwargs
     )
 
@@ -63,7 +63,7 @@ def create_lwt_payload(gateway_uuid: str, reason: str = 'unexpected_disconnect')
         device_uuid=gateway_uuid,
         message_type=MessageType.GATEWAY_STATUS.value,
         status='offline',
-        component_type='gateway',
+        device_type='gateway',
         reason=reason,
         last_seen=datetime.utcnow().isoformat() + 'Z'
     )
@@ -96,6 +96,10 @@ def validate_protocol_version(payload: Dict[str, Any]) -> bool:
     """
     if 'protocol_version' not in payload:
         logger.warning("Payload sem protocol_version, assumindo v1.0.0")
+        logger.warning(f"=== PAYLOAD SEM PROTOCOL_VERSION ===")
+        logger.warning(f"Payload completo: {payload}")
+        logger.warning(f"Chaves no payload: {list(payload.keys())}")
+        logger.warning(f"=====================================")
         return False
     
     try:
@@ -182,7 +186,7 @@ def parse_topic_structure(topic: str) -> Dict[str, str]:
     if result['category'] == 'devices':
         if result['resource'] == 'relays' and result['action'] == 'state':
             result['message_type'] = MessageType.RELAY_STATE.value
-        elif result['resource'] == 'relays' and result['action'] == 'set':
+        elif result['resource'] == 'relays' and result['action'] in ['set', 'command']:
             result['message_type'] = MessageType.RELAY_COMMAND.value
         elif result['resource'] == 'status':
             result['message_type'] = MessageType.DEVICE_STATUS.value
@@ -192,12 +196,23 @@ def parse_topic_structure(topic: str) -> Dict[str, str]:
             result['message_type'] = MessageType.TELEMETRY.value
         elif result['resource'] == 'response':
             result['message_type'] = MessageType.COMMAND_RESPONSE.value
+    elif result['category'] == 'telemetry':
+        # Tópico de telemetria direto: autocore/telemetry/relays/data
+        result['message_type'] = MessageType.TELEMETRY.value
     elif result['category'] == 'discovery':
         result['message_type'] = MessageType.DISCOVERY.value
     elif result['category'] == 'errors':
         result['message_type'] = MessageType.ERROR.value
     elif result['category'] == 'gateway':
         result['message_type'] = MessageType.GATEWAY_STATUS.value
+    elif result['category'] == 'macros':
+        # Tópicos de macros: autocore/macros/{id}/status
+        result['message_type'] = 'macro_status'
+    elif result['category'] == 'modes':
+        # Tópicos de modos: autocore/modes/parking, autocore/modes/driving, etc
+        result['message_type'] = 'mode_change'
+        # O UUID neste caso é o próprio modo (parking, driving, etc)
+        result['mode'] = result.get('uuid')  # parking, driving, etc
     
     return result
 
@@ -217,6 +232,13 @@ def deserialize_payload(payload_str: str) -> Dict[str, Any]:
         logger.error(f"Erro ao deserializar payload: {e}")
         return {}
 
+# Constantes de tópicos MQTT Macros v2.2.0
+TOPIC_MACRO_EXECUTE = "autocore/gateway/macros/execute"
+TOPIC_MACRO_STOP = "autocore/gateway/macros/stop"
+TOPIC_MACRO_EMERGENCY_STOP = "autocore/gateway/macros/emergency_stop"
+TOPIC_MACRO_STATUS = "autocore/macros/{}/status"
+TOPIC_MACRO_EVENTS = "autocore/telemetry/macros/events"
+
 # Constantes de tópicos v2.2.0
 TOPIC_PATTERNS = {
     'device_status': 'autocore/devices/{uuid}/status',
@@ -224,10 +246,16 @@ TOPIC_PATTERNS = {
     'relay_state': 'autocore/devices/{uuid}/relays/state',
     'relay_command': 'autocore/devices/{uuid}/relays/set',
     'telemetry': 'autocore/telemetry/relays/data',
-    'gateway_status': 'autocore/gateway/status',
+    'gateway_status': 'autocore/devices/{uuid}/status',
     'gateway_commands': 'autocore/gateway/commands/{command}',
     'errors': 'autocore/errors/{uuid}/{error_type}',
-    'discovery': 'autocore/discovery/announce'
+    'discovery': 'autocore/discovery/announce',
+    # Macros topics
+    'macro_execute': 'autocore/gateway/macros/execute',
+    'macro_stop': 'autocore/gateway/macros/stop',
+    'macro_emergency_stop': 'autocore/gateway/macros/emergency_stop',
+    'macro_status': 'autocore/macros/{macro_id}/status',
+    'macro_events': 'autocore/telemetry/macros/events'
 }
 
 def get_topic_pattern(topic_type: str, **kwargs) -> str:

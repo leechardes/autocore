@@ -130,16 +130,26 @@ class MacroExecutor:
             target = [target]
         
         for relay_id in target:
-            # TODO: Obter device_uuid do relé de destino
-            # Por enquanto usando 'relay_board_1' como placeholder
-            device_uuid = "relay_board_1"  # Deve ser obtido da base de dados
-            topic = f"autocore/devices/{device_uuid}/relays/command"
+            # Por enquanto usando UUID fixo do simulador
+            # TODO: Buscar UUID real do banco baseado no board_id
+            device_uuid = "esp32-relay-001"  # UUID do simulador/dispositivo real
+            
+            # Tópico correto conforme MQTT_ARCHITECTURE.md v2.1.0
+            topic = f"autocore/devices/{device_uuid}/relays/set"
+            
+            # Converter command para state conforme padrão documentado
+            state = relay_action == "on" if relay_action in ["on", "off"] else None
+            if relay_action == "toggle":
+                state = None  # Toggle será tratado pelo function_type
+            
+            # Payload conforme MQTT Architecture v2.1.0
             payload = create_mqtt_payload(
+                message_type="relay_command",
                 uuid=device_uuid,
-                device_type="relay",
-                command=relay_action,
-                channel=relay_id,
-                source="macro_executor",
+                channel=relay_id,  # Número do canal (1-16)
+                state=state,
+                function_type="toggle" if relay_action == "toggle" else "normal",
+                user="macro_executor",
                 label=label,
                 test_mode=test_mode
             )
@@ -177,6 +187,9 @@ class MacroExecutor:
         
         topic = "autocore/system/state/save"
         payload = create_mqtt_payload(
+            message_type='state_save',
+            uuid='system',
+            source='macro_executor',
             targets=targets,
             scope=scope
         )
@@ -191,6 +204,9 @@ class MacroExecutor:
         
         topic = "autocore/system/state/restore"
         payload = create_mqtt_payload(
+            message_type='state_restore',
+            uuid='system',
+            source='macro_executor',
             targets=targets,
             scope=scope
         )
@@ -201,8 +217,21 @@ class MacroExecutor:
     async def _execute_mqtt_action(self, action: Dict):
         """Envia mensagem MQTT customizada"""
         topic = action.get('topic', 'autocore/gateway/macros/execute')
-        payload = action.get('payload', {})
+        original_payload = action.get('payload', {})
         qos = action.get('qos', 1)
+        
+        # Garantir conformidade com protocolo v2.2.0
+        if isinstance(original_payload, dict):
+            # Adicionar campos obrigatórios do protocolo
+            payload = create_mqtt_payload(
+                message_type='mode_change' if 'modes' in topic else 'custom',
+                uuid='system',
+                source='macro_executor',
+                **original_payload
+            )
+        else:
+            # Se não for dict, manter como está (pode ser string JSON já formatada)
+            payload = original_payload
         
         if isinstance(payload, dict):
             payload = json.dumps(payload)

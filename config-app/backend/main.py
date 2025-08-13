@@ -387,13 +387,35 @@ async def create_device(device: DeviceBase):
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
-@app.patch("/api/devices/{device_id}", response_model=DeviceResponse, tags=["Devices"])
-async def update_device(device_id: int, update: DeviceUpdate):
-    """Atualiza dispositivo"""
+@app.patch("/api/devices/{device_identifier}", response_model=DeviceResponse, tags=["Devices"])
+async def update_device(device_identifier: str, update: DeviceUpdate):
+    """Atualiza dispositivo - aceita ID numérico ou UUID"""
     try:
-        device = devices.get_by_id(device_id)
+        # Log para debug do registro ESP32
+        logger.info(f"📡 PATCH /api/devices/{device_identifier}")
+        logger.info(f"   Payload recebido: {update.model_dump(exclude_none=True)}")
+        
+        # Tentar primeiro como ID numérico
+        device = None
+        device_id = None
+        
+        try:
+            device_id = int(device_identifier)
+            device = devices.get_by_id(device_id)
+            logger.info(f"   Identificado como ID numérico: {device_id}")
+        except ValueError:
+            # Não é um número, tentar como UUID
+            logger.info(f"   Identificado como UUID: {device_identifier}")
+            device = devices.get_by_uuid(device_identifier)
+            if device:
+                device_id = device.id
+                logger.info(f"   Device encontrado com ID: {device_id}")
+        
         if not device:
-            raise HTTPException(status_code=404, detail="Dispositivo não encontrado")
+            logger.warning(f"⚠️ Dispositivo não encontrado: {device_identifier}")
+            raise HTTPException(status_code=404, detail=f"Dispositivo não encontrado: {device_identifier}")
+        
+        logger.info(f"   Device atual - Status: {device.status}, IP: {device.ip_address}")
         
         # Preparar configuração atualizada
         import json
@@ -401,36 +423,48 @@ async def update_device(device_id: int, update: DeviceUpdate):
         if device.configuration_json:
             try:
                 current_config = json.loads(device.configuration_json)
-            except:
+            except Exception as e:
+                logger.warning(f"   Erro ao parsear configuration_json existente: {e}")
                 current_config = {}
         
         # Atualizar campos no configuration_json
         if update.location is not None:
+            logger.info(f"   Atualizando location: {update.location}")
             current_config['location'] = update.location
         if update.type is not None:
+            logger.info(f"   Atualizando type: {update.type}")
             current_config['device_type'] = update.type
             
         # Adicionar outros campos de configuração
         if update.configuration:
+            logger.info(f"   Atualizando configuration: {update.configuration}")
             current_config.update(update.configuration)
         
         # Salvar configuração atualizada
         if current_config:
+            logger.info(f"   Salvando configuration_json atualizado...")
             devices.update_config(device_id, current_config)
+            logger.info(f"   ✅ Configuração salva")
         
         # Processar e salvar capacidades se fornecidas
         if update.capabilities is not None:
+            logger.info(f"   Atualizando capabilities: {update.capabilities}")
             devices.update_capabilities(device_id, update.capabilities)
+            logger.info(f"   ✅ Capacidades atualizadas")
         
         # Atualizar campos diretos na tabela
         if update.name:
+            logger.info(f"   Atualizando nome: {update.name}")
             # TODO: Adicionar método update_name no repository
             pass
             
         if update.ip_address:
+            logger.info(f"   Atualizando IP: {update.ip_address} e status: {device.status}")
             devices.update_status(device_id, device.status, update.ip_address)
+            logger.info(f"   ✅ Status/IP atualizado")
         
         if update.is_active is not None:
+            logger.info(f"   Atualizando is_active: {update.is_active}")
             # TODO: Adicionar método update_active no repository
             pass
         
@@ -445,6 +479,8 @@ async def update_device(device_id: int, update: DeviceUpdate):
                 location = config.get('location')
             except:
                 pass
+        
+        logger.info(f"   ✅ Device {device_identifier} atualizado com sucesso")
         
         return DeviceResponse(
             id=device.id,
@@ -467,6 +503,9 @@ async def update_device(device_id: int, update: DeviceUpdate):
     except HTTPException:
         raise
     except Exception as e:
+        logger.error(f"❌ Erro ao atualizar device {device_identifier}: {e}")
+        logger.error(f"   Tipo de erro: {type(e).__name__}")
+        logger.error(f"   Detalhes: {str(e)}")
         raise HTTPException(status_code=500, detail=str(e))
 
 @app.delete("/api/devices/{device_id}", tags=["Devices"])

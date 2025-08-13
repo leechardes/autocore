@@ -49,11 +49,11 @@ class RelayBoardSimulator:
             logger.info(f"Simulador conectado ao MQTT: {self.device_uuid}")
             self.is_connected = True
             
-            # Inscrever nos tópicos de comando
-            relay_topic = f"{self.base_topic}/relay/command"
-            client.subscribe(relay_topic)
+            # Inscrever nos tópicos de comando (conforme MQTT Architecture v2.1.0)
+            relay_set_topic = f"{self.base_topic}/relays/set"
+            client.subscribe(relay_set_topic)
             client.subscribe(f"{self.base_topic}/commands/+")
-            logger.info(f"📡 Inscrito em: {relay_topic}")
+            logger.info(f"📡 Inscrito em: {relay_set_topic}")
             
             # Publicar status online
             self.publish_status("online")
@@ -346,11 +346,15 @@ class RelayBoardSimulator:
                     logger.info(f"📨 Processando comando: {topic}")
                     logger.debug(f"Payload: {payload}")
                     
-                    if topic.endswith("/relay/command"):
-                        # Comando de relé do gateway
+                    if topic.endswith("/relays/set"):
+                        # Comando de relé conforme MQTT Architecture v2.1.0
                         channel = payload.get("channel")
-                        command = payload.get("command", "toggle")
-                        source = payload.get("source", "unknown")
+                        state = payload.get("state")  # true/false ao invés de on/off
+                        function_type = payload.get("function_type", "normal")
+                        source = payload.get("user", "unknown")
+                        
+                        # Converter state (true/false) para command (on/off) para compatibilidade
+                        command = "on" if state else "off"
                         
                         logger.info(f"⚡ Comando de relé recebido:")
                         logger.info(f"   📍 Canal: {channel} (tipo: {type(channel)})")

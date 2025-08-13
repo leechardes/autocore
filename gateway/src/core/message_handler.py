@@ -11,7 +11,7 @@ from datetime import datetime
 from dataclasses import dataclass
 
 # Importações v2.2.0
-from ..mqtt.protocol import (
+from mqtt.protocol import (
     validate_protocol_version,
     parse_topic_structure,
     deserialize_payload,
@@ -47,20 +47,33 @@ class MessageHandler:
             'status': self._handle_device_status,
             'telemetry': self._handle_telemetry_data,
             'relay': self._handle_relay_status,
+            'relay_state': self._handle_relay_status,  # Alias para relay
             'response': self._handle_command_response,
             'discovery': self._handle_device_discovery,
             'relay_command': self._handle_relay_command,  # Comandos de macros
             'system_command': self._handle_system_command,  # Comandos do sistema
             'macro_status': self._handle_macro_status,  # Status de macros
+            'error': self._handle_error_message,  # Mensagens de erro
+            'mode_change': self._handle_mode_change,  # Mudança de modo (parking, driving, etc)
         }
     
     async def handle_message(self, topic: str, payload: str, qos: int):
         """Entry point para processamento de mensagens v2.2.0"""
         try:
+            # Log detalhado apenas para debug
+            logger.debug(f"=== MENSAGEM MQTT RECEBIDA ===")
+            logger.debug(f"Tópico: {topic}")
+            logger.debug(f"QoS: {qos}")
+            logger.debug(f"Payload: {payload[:500] if len(payload) > 500 else payload}")
+            logger.debug(f"==============================")
+            
             # Criar contexto da mensagem com validação v2.2.0
             context = self._create_message_context_v2(topic, payload, qos)
             
-            if not context.device_uuid and context.message_type not in ['discovery', 'gateway_status']:
+            # Log do contexto criado
+            logger.debug(f"Contexto criado - UUID: {context.device_uuid}, Type: {context.message_type}")
+            
+            if not context.device_uuid and context.message_type not in ['discovery', 'gateway_status', 'mode_change']:
                 logger.warning(f"⚠️ UUID de dispositivo não encontrado: {topic}")
                 return
             
@@ -73,7 +86,7 @@ class MessageHandler:
                 
                 # Publicar erro se temos error_handler
                 if self.error_handler and context.device_uuid:
-                    from ..mqtt.error_handler import ErrorCode
+                    from mqtt.error_handler import ErrorCode
                     await self.error_handler.publish_error(
                         error_code=ErrorCode.ERR_008,
                         message=f"Protocol version mismatch in topic {topic}",
@@ -96,10 +109,17 @@ class MessageHandler:
                 await processor(context, data)
             else:
                 logger.warning(f"⚠️ Tipo de mensagem desconhecido: {context.message_type}")
+                logger.warning(f"=== DETALHES COMPLETOS DA MENSAGEM ===")
+                logger.warning(f"Tópico: {topic}")
+                logger.warning(f"QoS: {qos}")
+                logger.warning(f"Payload completo: {payload}")
+                logger.warning(f"Contexto: UUID={context.device_uuid}, Type={context.message_type}")
+                logger.warning(f"Estrutura do tópico: {context.topic_structure}")
+                logger.warning(f"====================================")
                 
                 # Publicar erro de payload inválido
                 if self.error_handler and context.device_uuid:
-                    from ..mqtt.error_handler import ErrorCode
+                    from mqtt.error_handler import ErrorCode
                     await self.error_handler.publish_error(
                         error_code=ErrorCode.ERR_002,
                         message=f"Unknown message type: {context.message_type}",
@@ -108,14 +128,21 @@ class MessageHandler:
                     )
             
         except Exception as e:
-            logger.error(f"❌ Erro ao processar mensagem {topic}: {e}")
+            logger.error(f"❌ Erro ao processar mensagem: {e}")
+            logger.error(f"=== DETALHES COMPLETOS DO ERRO ===")
+            logger.error(f"Tópico: {topic}")
+            logger.error(f"QoS: {qos}")
+            logger.error(f"Payload completo: {payload}")
+            logger.error(f"Tipo de erro: {type(e).__name__}")
+            logger.error(f"Detalhes do erro: {str(e)}")
+            logger.error(f"==================================")
             
             # Publicar erro genérico se possível
             if self.error_handler:
-                from ..mqtt.error_handler import ErrorCode
+                from mqtt.error_handler import ErrorCode
                 # Tentar extrair UUID do tópico para erro
                 try:
-                    from ..mqtt.protocol import extract_device_uuid_from_topic
+                    from mqtt.protocol import extract_device_uuid_from_topic
                     device_uuid = extract_device_uuid_from_topic(topic)
                     await self.error_handler.publish_error(
                         error_code=ErrorCode.ERR_002,
@@ -147,12 +174,20 @@ class MessageHandler:
                 is_valid_protocol = validate_protocol_version(payload_data)
                 protocol_version = payload_data.get('protocol_version')
             
+            # Determinar message_type - preferir do payload se disponível
+            message_type = topic_structure.get('message_type')
+            if not message_type and payload_data:
+                # Tentar obter do payload se não conseguiu determinar pelo tópico
+                message_type = payload_data.get('message_type')
+                if message_type:
+                    logger.debug(f"Usando message_type do payload: {message_type}")
+            
             return MessageContext(
                 topic=topic,
                 payload=payload,
                 qos=qos,
-                device_uuid=topic_structure.get('uuid'),
-                message_type=topic_structure.get('message_type'),
+                device_uuid=topic_structure.get('uuid') or payload_data.get('uuid'),
+                message_type=message_type,
                 timestamp=datetime.utcnow(),
                 protocol_version=protocol_version,
                 payload_data=payload_data,
@@ -182,13 +217,18 @@ class MessageHandler:
                 device_uuid = parts[2] if len(parts) > 2 else None
                 if len(parts) >= 4:
                     message_type = parts[3]
-                if len(parts) >= 6 and parts[4] == 'relay':
-                    message_type = 'relay'
+                if len(parts) >= 6 and parts[4] == 'relays':
+                    if parts[5] == 'state':
+                        message_type = 'relay_state'
+                    elif parts[5] == 'set':
+                        message_type = 'relay_command'
+                    else:
+                        message_type = 'relay'
             elif parts[1] == 'discovery':
                 device_uuid = parts[2] if len(parts) > 2 else None
                 message_type = 'discovery'
             elif parts[1] == 'relay' and len(parts) >= 4 and parts[3] == 'command':
-                # autocore/relay/{id}/command - Comandos de macros para relés
+                # autocore/devices/{uuid}/relays/command - Comandos de macros para relés
                 device_uuid = parts[2]  # ID do relé ou "all"
                 message_type = 'relay_command'
             elif parts[1] == 'system':
@@ -332,11 +372,12 @@ class MessageHandler:
     async def _handle_relay_command(self, context: MessageContext, data: Dict[str, Any]):
         """Processa comando de relé vindo de macros"""
         try:
-            relay_id = context.device_uuid  # ID do relé ou "all"
+            relay_id = context.device_uuid  # UUID do dispositivo (relay_board_1)
+            channel = data.get('channel')  # Canal específico do relé (1-16)
             command = data.get('command', 'toggle')
             source = data.get('source', 'unknown')
             
-            logger.info(f"⚡ Comando de relé recebido: {relay_id} -> {command} (de {source})")
+            logger.info(f"⚡ Comando de relé recebido: dispositivo={relay_id}, canal={channel}, comando={command} (de {source})")
             
             # Se for comando para todos os relés
             if relay_id == 'all':
@@ -353,18 +394,22 @@ class MessageHandler:
                 logger.info(f"✅ Comando enviado para {len(relay_devices)} placas de relé")
             else:
                 # Comando para relé específico
-                # Precisamos mapear o ID do relé para o dispositivo correto
                 # Por enquanto, vamos assumir que temos apenas uma placa
                 relay_devices = await self.device_manager.get_devices_by_type('esp32_relay')
                 if relay_devices:
                     device = relay_devices[0]  # Primeira placa encontrada
-                    await self.device_manager.send_relay_command(
-                        device_uuid=device['uuid'],
-                        channel=int(relay_id) if relay_id.isdigit() else relay_id,
-                        command=command,
-                        source=source
-                    )
-                    logger.info(f"✅ Comando enviado para relé {relay_id}")
+                    
+                    # Usar o channel do payload, não o relay_id
+                    if channel is not None:
+                        await self.device_manager.send_relay_command(
+                            device_uuid=device['uuid'],
+                            channel=channel,  # Usar o channel correto do payload
+                            command=command,
+                            source=source
+                        )
+                        logger.info(f"✅ Comando enviado para dispositivo {relay_id}, canal {channel}")
+                    else:
+                        logger.warning(f"⚠️ Canal não especificado no comando para {relay_id}")
                 else:
                     logger.warning(f"⚠️ Nenhuma placa de relé encontrada para processar comando")
             
@@ -397,6 +442,68 @@ class MessageHandler:
             
         except Exception as e:
             logger.error(f"❌ Erro ao processar status de macro: {e}")
+    
+    async def _handle_error_message(self, context: MessageContext, data: Dict[str, Any]):
+        """Processa mensagens de erro (não deve processar próprios erros)"""
+        try:
+            # Log apenas se for erro de dispositivo externo
+            if context.device_uuid and context.device_uuid != 'gateway':
+                error_code = data.get('error_code', 'UNKNOWN')
+                error_message = data.get('message', 'No message')
+                
+                logger.warning(f"🚨 Erro reportado por {context.device_uuid}: {error_code} - {error_message}")
+                
+                # Apenas logar, não reprocessar ou reenviar
+            else:
+                # Ignorar erros do próprio gateway para evitar loop
+                logger.debug(f"🔇 Ignorando erro próprio: {context.topic}")
+                
+        except Exception as e:
+            logger.error(f"❌ Erro ao processar mensagem de erro: {e}")
+    
+    async def _handle_mode_change(self, context: MessageContext, data: Dict[str, Any]):
+        """Processa mudança de modo (parking, driving, etc)"""
+        try:
+            # Extrair modo do contexto ou payload
+            mode = context.topic_structure.get('mode') or data.get('mode')
+            status = data.get('status', 'active')
+            source = data.get('source', 'unknown')
+            
+            logger.info(f"🚗 Mudança de modo recebida: {mode}")
+            logger.info(f"   Status: {status}")
+            logger.info(f"   Fonte: {source}")
+            
+            # Por enquanto, apenas logar e repassar para o device manager
+            # Futuramente, pode ativar configurações específicas do modo
+            if self.device_manager:
+                # Verificar se device_manager tem o método
+                if hasattr(self.device_manager, 'handle_mode_change'):
+                    await self.device_manager.handle_mode_change(
+                        mode=mode,
+                        status=status,
+                        source=source,
+                        timestamp=context.timestamp
+                    )
+                else:
+                    logger.debug(f"Device manager não possui handler para mode_change")
+            
+            # Publicar evento de telemetria sobre mudança de modo
+            if self.telemetry_service:
+                await self.telemetry_service.process_telemetry_data(
+                    device_uuid='system',
+                    telemetry_data={
+                        'event': 'mode_change',
+                        'mode': mode,
+                        'status': status,
+                        'source': source
+                    },
+                    timestamp=context.timestamp
+                )
+            
+            logger.info(f"✅ Modo {mode} processado com sucesso")
+            
+        except Exception as e:
+            logger.error(f"❌ Erro ao processar mudança de modo: {e}")
     
     def get_stats(self) -> Dict[str, Any]:
         """Retorna estatísticas do message handler"""

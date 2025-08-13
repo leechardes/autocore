@@ -85,24 +85,35 @@ class DeviceManager:
         try:
             existing = devices.get_by_uuid("autocore-gateway")
             if not existing:
-                devices.create(
-                    uuid="autocore-gateway",
-                    name="AutoCore Gateway",
-                    type="gateway",
-                    firmware_version="2.2.0",
-                    ip_address="127.0.0.1",
-                    status="online"
-                )
+                gateway_data = {
+                    "uuid": "autocore-gateway",
+                    "name": "AutoCore Gateway", 
+                    "type": "gateway",
+                    "firmware_version": "2.2.0",
+                    "ip_address": "127.0.0.1",
+                    "status": "online"
+                }
+                devices.create(gateway_data)
                 logger.info("🌐 Gateway registrado no banco de dados")
             else:
                 # Atualizar status para online
-                devices.update(
-                    uuid="autocore-gateway",
-                    status="online",
-                    last_seen=datetime.now()
+                devices.update_status(
+                    device_id=existing.id,
+                    status="online"
                 )
         except Exception as e:
             logger.warning(f"⚠️ Não foi possível registrar gateway no banco: {e}")
+            logger.warning(f"=== DETALHES COMPLETOS DO ERRO ===")
+            logger.warning(f"Tipo de erro: {type(e).__name__}")
+            logger.warning(f"Mensagem: {str(e)}")
+            logger.warning(f"Tentando criar gateway com parâmetros:")
+            logger.warning(f"  uuid: 'autocore-gateway'")
+            logger.warning(f"  name: 'AutoCore Gateway'")
+            logger.warning(f"  type: 'gateway'")
+            logger.warning(f"  firmware_version: '2.2.0'")
+            logger.warning(f"  ip_address: '127.0.0.1'")
+            logger.warning(f"  status: 'online'")
+            logger.warning(f"==================================")
         
         logger.info("🌐 Gateway auto-registrado como dispositivo especial")
     
@@ -191,6 +202,11 @@ class DeviceManager:
     async def handle_device_status(self, device_uuid: str, status_data: Dict[str, Any], timestamp: datetime):
         """Processa status do dispositivo"""
         try:
+            # Ignorar gateways antigos ou o próprio gateway
+            if device_uuid.startswith('gateway-') or device_uuid == 'autocore-gateway':
+                logger.debug(f"Ignorando status de gateway: {device_uuid}")
+                return
+                
             if device_uuid not in self.devices:
                 logger.warning(f"⚠️ Status de dispositivo desconhecido: {device_uuid}")
                 return
@@ -325,21 +341,25 @@ class DeviceManager:
             return []
     
     async def send_relay_command(self, device_uuid: str, channel: Any, command: str, source: str = 'gateway'):
-        """Envia comando de relé para dispositivo específico"""
+        """Envia comando de relé para dispositivo específico (conforme MQTT Architecture v2.1.0)"""
         try:
-            # Preparar payload
+            # Converter command (on/off) para state (true/false) conforme documentação
+            state = command == 'on' if command in ['on', 'off'] else (command == 'toggle')
+            
+            # Preparar payload conforme documentação MQTT_ARCHITECTURE.md
             payload = {
+                'protocol_version': '2.1.0',
                 'channel': channel,
-                'command': command,
-                'source': source,
-                'timestamp': datetime.now().isoformat()
+                'state': state,
+                'function_type': 'toggle' if command == 'toggle' else 'normal',
+                'user': source,
+                'timestamp': datetime.now().isoformat() + 'Z'
             }
             
-            # Tópico do dispositivo
-            topic = f'autocore/devices/{device_uuid}/relay/command'
+            # Tópico correto conforme documentação: autocore/devices/{uuid}/relays/set
+            topic = f'autocore/devices/{device_uuid}/relays/set'
             
-            # Publicar comando via MQTT (assumindo que temos acesso ao cliente MQTT)
-            # Precisamos de uma referência ao mqtt_client aqui
+            # Publicar comando via MQTT
             if hasattr(self, 'mqtt_client'):
                 await self.mqtt_client.publish(topic, json.dumps(payload), qos=1)
                 logger.info(f"📤 Comando de relé enviado: {device_uuid} canal {channel} -> {command}")

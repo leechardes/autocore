@@ -3,6 +3,7 @@ Configurações do AutoCore Gateway
 Carrega configurações de variáveis de ambiente
 """
 import os
+import time
 from dataclasses import dataclass
 from typing import Optional
 from pathlib import Path
@@ -17,7 +18,7 @@ class Config:
     MQTT_USERNAME: Optional[str] = os.getenv('MQTT_USERNAME')
     MQTT_PASSWORD: Optional[str] = os.getenv('MQTT_PASSWORD')
     MQTT_CLIENT_ID: str = os.getenv('MQTT_CLIENT_ID', 'autocore-gateway')
-    MQTT_KEEPALIVE: int = int(os.getenv('MQTT_KEEPALIVE', '60'))
+    MQTT_KEEPALIVE: int = int(os.getenv('MQTT_KEEPALIVE', '300'))
     
     # Database Settings
     DATABASE_PATH: str = os.getenv('DATABASE_PATH', str(Path(__file__).parent.parent.parent.parent / 'database' / 'autocore.db'))
@@ -69,7 +70,7 @@ class Config:
             'relay_status': 'autocore/devices/+/relays/state',
             
             # System
-            'gateway_status': 'autocore/gateway/status',
+            'gateway_status': 'autocore/devices/{uuid}/status',
             'gateway_commands': 'autocore/gateway/commands/+',
             'system_broadcast': 'autocore/system/broadcast',
             
@@ -94,11 +95,12 @@ class Config:
             'autocore/discovery/+',
             # v2.2.0 - Novos tópicos
             'autocore/gateway/commands/+',
-            'autocore/errors/+/+',
+            # REMOVIDO: 'autocore/errors/+/+' - Gateway não deve processar próprios erros
             # Comandos de macros/sistema
-            'autocore/relay/+/command',  # Comandos para relés
+            'autocore/devices/+/relays/command',  # Comandos para relés
             'autocore/system/+',  # Comandos do sistema
-            'autocore/macro/+/status',  # Status de macros
+            'autocore/devices/+/macros/status',  # Status de macros
+            'autocore/modes/+',  # Mudanças de modo (parking, driving, etc)
         ]
     
     def get_device_topic(self, device_uuid: str, topic_type: str) -> str:
@@ -136,6 +138,7 @@ class Config:
             'gateway',     # Status e comandos do gateway
             'telemetry',   # Telemetria centralizada (v2.2.0)
             'errors',      # Tratamento de erros (v2.2.0)
+            'modes',       # Mudanças de modo (parking, driving, etc)
         ]
         
         return parts[1] in valid_prefixes
