@@ -17,6 +17,7 @@ import {
 } from 'lucide-react';
 import { toast } from 'sonner';
 import api from '@/lib/api';
+import mqttService from '@/services/mqttService';
 import HelpButtonTest from '@/components/HelpButtonTest';
 
 const MQTTMonitorPage = () => {
@@ -32,6 +33,14 @@ const MQTTMonitorPage = () => {
     received: 0,
     sent: 0,
     devices: new Set()
+  });
+  
+  // Estados para conformidade MQTT v2.2.0
+  const [protocolStats, setProtocolStats] = useState({
+    v2_2_0: 0,
+    legacy: 0,
+    invalid: 0,
+    compliance_rate: 0
   });
   
   // WebSocket
@@ -58,53 +67,8 @@ const MQTTMonitorPage = () => {
     selectedBoardRef.current = selectedBoard;
   }, [selectedBoard]);
   
-  // Quick templates
-  const templates = {
-    deviceAnnounce: {
-      topic: 'autocore/devices/test-esp32/announce',
-      payload: JSON.stringify({
-        device_type: "esp32_relay",
-        firmware_version: "1.0.0",
-        capabilities: ["relay", "telemetry"],
-        ip_address: "192.168.1.100",
-        mac_address: "AA:BB:CC:DD:EE:FF"
-      }, null, 2)
-    },
-    deviceStatus: {
-      topic: 'autocore/devices/test-esp32/status',
-      payload: JSON.stringify({
-        uptime: 3600,
-        free_memory: 45000,
-        cpu_temperature: 42.5,
-        wifi_signal: -65,
-        battery_level: 87.2
-      }, null, 2)
-    },
-    telemetry: {
-      topic: 'autocore/devices/test-esp32/telemetry',
-      payload: JSON.stringify({
-        can_data: {
-          signals: {
-            RPM: { value: 2500, unit: "rpm", can_id: "0x200" },
-            TPS: { value: 45.2, unit: "%", can_id: "0x201" }
-          }
-        },
-        analog_sensors: {
-          fuel_level: 67.8,
-          oil_pressure: 45.2
-        }
-      }, null, 2)
-    },
-    relayCommand: {
-      topic: 'autocore/devices/test-esp32/relay/command',
-      payload: JSON.stringify({
-        command_id: "cmd_12345",
-        relays: [
-          { relay_id: 1, action: "turn_on" }
-        ]
-      }, null, 2)
-    }
-  };
+  // Templates MQTT v2.2.0 conformes
+  const templates = mqttService.getTemplates();
   
   useEffect(() => {
     // Conectar imediatamente
@@ -176,6 +140,46 @@ const MQTTMonitorPage = () => {
     setFilteredMessages(filtered);
   }, [messages, filter, typeFilter, deviceFilter]);
   
+  const updateProtocolStats = (protocolVersion) => {
+    setProtocolStats(prev => {
+      let newStats = { ...prev };
+      
+      if (!protocolVersion) {
+        newStats.invalid += 1;
+      } else if (protocolVersion === '2.2.0') {
+        newStats.v2_2_0 += 1;
+      } else if (protocolVersion.startsWith('2.')) {
+        newStats.legacy += 1;
+      } else {
+        newStats.invalid += 1;
+      }
+      
+      const total = newStats.v2_2_0 + newStats.legacy + newStats.invalid;
+      newStats.compliance_rate = total > 0 ? newStats.v2_2_0 / total : 0;
+      
+      return newStats;
+    });
+  };
+  
+  const validateProtocolVersion = (version) => {
+    if (!version) return false;
+    const [major] = version.split('.');
+    return major === '2';
+  };
+  
+  const renderProtocolBadge = (version, isValid) => {
+    if (!version) {
+      return <Badge variant="destructive">No Version</Badge>;
+    }
+    if (version === '2.2.0') {
+      return <Badge variant="default" className="bg-green-500">v2.2.0 ✓</Badge>;
+    }
+    if (isValid) {
+      return <Badge variant="secondary">{version}</Badge>;
+    }
+    return <Badge variant="destructive">{version} ✗</Badge>;
+  };
+
   const connectWebSocket = () => {
     // Prevenir múltiplas conexões
     if (ws.current && ws.current.readyState === WebSocket.CONNECTING) {
@@ -252,7 +256,9 @@ const MQTTMonitorPage = () => {
             payload: msg.payload || {},
             message_type: msg.message_type || msg.type || 'message',
             direction: msg.direction || 'received',
-            qos: msg.qos !== undefined ? msg.qos : 0
+            qos: msg.qos !== undefined ? msg.qos : 0,
+            protocol_version: msg.protocol_version,
+            device_uuid: mqttService.extractDeviceUuid(msg.topic, typeof msg.payload === 'string' ? JSON.parse(msg.payload) : msg.payload)
           };
           
           setMessages(prev => {
@@ -283,6 +289,9 @@ const MQTTMonitorPage = () => {
               devices: newDevices
             };
           });
+          
+          // Atualizar estatísticas de conformidade
+          updateProtocolStats(processedMsg.protocol_version);
           
           // Atualizar estado dos canais se for mensagem de estado de relé
           if (processedMsg.message_type === 'relay_state' && processedMsg.topic.includes('/relays/state')) {
@@ -355,20 +364,19 @@ const MQTTMonitorPage = () => {
     }
     
     try {
-      const response = await fetch('/api/mqtt/publish', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          topic: publishTopic,
-          payload: publishPayload,
-          qos: parseInt(publishQos)
-        })
-      });
+      let payload;
+      try {
+        payload = JSON.parse(publishPayload);
+      } catch {
+        payload = publishPayload;
+      }
       
-      if (response.ok) {
-        toast.success('Mensagem publicada!');
+      const result = await mqttService.publish(publishTopic, payload, { qos: parseInt(publishQos) });
+      
+      if (result.success) {
+        toast.success('Mensagem publicada com conformidade v2.2.0!');
       } else {
-        toast.error('Erro ao publicar mensagem');
+        toast.error('Erro ao publicar: ' + result.error);
       }
     } catch (error) {
       toast.error('Erro ao publicar: ' + error.message);
@@ -377,8 +385,8 @@ const MQTTMonitorPage = () => {
   
   const loadTemplate = (template) => {
     setPublishTopic(template.topic);
-    setPublishPayload(template.payload);
-    toast.success('Template carregado');
+    setPublishPayload(JSON.stringify(template.payload, null, 2));
+    toast.success('Template v2.2.0 carregado');
   };
   
   const clearMessages = async () => {
@@ -392,6 +400,7 @@ const MQTTMonitorPage = () => {
         setMessages([]);
         setFilteredMessages([]);
         setStats({ total: 0, received: 0, sent: 0, devices: new Set() });
+        setProtocolStats({ v2_2_0: 0, legacy: 0, invalid: 0, compliance_rate: 0 });
         toast.success('Histórico limpo no servidor e localmente');
       }
     } catch (error) {
@@ -400,6 +409,7 @@ const MQTTMonitorPage = () => {
       setMessages([]);
       setFilteredMessages([]);
       setStats({ total: 0, received: 0, sent: 0, devices: new Set() });
+      setProtocolStats({ v2_2_0: 0, legacy: 0, invalid: 0, compliance_rate: 0 });
       toast.warning('Limpo apenas localmente');
     }
   };
@@ -715,13 +725,28 @@ ${payload}
               {uniqueDevices.length} ESP32
             </Badge>
           )}
+          
+          {protocolStats.v2_2_0 > 0 && (
+            <Badge variant="default" className="gap-1 bg-green-500">
+              <CheckCircle2 className="h-3 w-3" />
+              {protocolStats.v2_2_0} v2.2.0
+            </Badge>
+          )}
+          
+          {protocolStats.invalid > 0 && (
+            <Badge variant="destructive" className="gap-1">
+              <XCircle className="h-3 w-3" />
+              {protocolStats.invalid} inválidas
+            </Badge>
+          )}
         </div>
       </div>
       
       <Tabs defaultValue="monitor" className="space-y-4">
-        <TabsList className="grid w-full grid-cols-4">
+        <TabsList className="grid w-full grid-cols-5">
           <TabsTrigger value="monitor">Monitor</TabsTrigger>
           <TabsTrigger value="publish">Publicar</TabsTrigger>
+          <TabsTrigger value="protocol">Protocolo</TabsTrigger>
           <TabsTrigger value="simulators">Simuladores</TabsTrigger>
           <TabsTrigger value="stats">Estatísticas</TabsTrigger>
         </TabsList>
@@ -842,6 +867,8 @@ ${payload}
                             {msg.device_uuid && (
                               <Badge variant="outline" className="text-xs">{msg.device_uuid}</Badge>
                             )}
+                            
+                            {renderProtocolBadge(msg.protocol_version, validateProtocolVersion(msg.protocol_version))}
                           </div>
                           
                           <div className="mt-2">
@@ -965,6 +992,101 @@ ${payload}
                 <Send className="mr-2 h-4 w-4" />
                 Publicar Mensagem
               </Button>
+            </CardContent>
+          </Card>
+        </TabsContent>
+        
+        {/* Protocol Tab */}
+        <TabsContent value="protocol" className="space-y-4">
+          <Card>
+            <CardHeader>
+              <CardTitle>Conformidade MQTT v2.2.0</CardTitle>
+              <CardDescription>
+                Validação e estatísticas de conformidade com o protocolo v2.2.0
+              </CardDescription>
+            </CardHeader>
+            
+            <CardContent className="space-y-4">
+              {/* Protocol Stats */}
+              <div className="grid gap-4 md:grid-cols-4">
+                <div className="text-center p-4 border rounded-lg bg-green-50 dark:bg-green-900/20">
+                  <div className="text-2xl font-bold text-green-600">{protocolStats.v2_2_0}</div>
+                  <div className="text-sm text-green-700">v2.2.0 Conformes</div>
+                </div>
+                <div className="text-center p-4 border rounded-lg bg-yellow-50 dark:bg-yellow-900/20">
+                  <div className="text-2xl font-bold text-yellow-600">{protocolStats.legacy}</div>
+                  <div className="text-sm text-yellow-700">v2.x Legacy</div>
+                </div>
+                <div className="text-center p-4 border rounded-lg bg-red-50 dark:bg-red-900/20">
+                  <div className="text-2xl font-bold text-red-600">{protocolStats.invalid}</div>
+                  <div className="text-sm text-red-700">Inválidas</div>
+                </div>
+                <div className="text-center p-4 border rounded-lg bg-blue-50 dark:bg-blue-900/20">
+                  <div className="text-2xl font-bold text-blue-600">
+                    {Math.round(protocolStats.compliance_rate * 100)}%
+                  </div>
+                  <div className="text-sm text-blue-700">Taxa Conformidade</div>
+                </div>
+              </div>
+              
+              {/* Validation Tools */}
+              <div className="space-y-4">
+                <h3 className="text-lg font-semibold">Ferramentas de Validação</h3>
+                
+                <div className="grid gap-4 md:grid-cols-2">
+                  <div className="space-y-2">
+                    <Label>Templates v2.2.0</Label>
+                    <div className="grid grid-cols-2 gap-2">
+                      {Object.entries(templates).map(([key, template]) => (
+                        <Button
+                          key={key}
+                          variant="outline"
+                          size="sm"
+                          onClick={() => loadTemplate(template)}
+                          className="text-left justify-start"
+                        >
+                          {key.replace(/([A-Z])/g, ' $1').trim()}
+                        </Button>
+                      ))}
+                    </div>
+                  </div>
+                  
+                  <div className="space-y-2">
+                    <Label>Estrutura de Tópicos v2.2.0</Label>
+                    <div className="text-xs space-y-1 font-mono bg-muted p-3 rounded">
+                      <div>✅ autocore/devices/[uuid]/relays/set</div>
+                      <div>✅ autocore/telemetry/relays/data</div>
+                      <div>✅ autocore/discovery/announce</div>
+                      <div>✅ autocore/gateway/status</div>
+                      <div>❌ autocore/devices/[uuid]/telemetry</div>
+                      <div>❌ autocore/devices/[uuid]/relay/command</div>
+                    </div>
+                  </div>
+                </div>
+                
+                <div className="space-y-2">
+                  <Label>Campos Obrigatórios v2.2.0</Label>
+                  <div className="grid gap-2 md:grid-cols-3">
+                    <div className="text-xs bg-muted p-3 rounded">
+                      <div className="font-semibold mb-1">Todos os Payloads:</div>
+                      <div>• protocol_version: "2.2.0"</div>
+                      <div>• timestamp: ISO 8601</div>
+                    </div>
+                    <div className="text-xs bg-muted p-3 rounded">
+                      <div className="font-semibold mb-1">Telemetria:</div>
+                      <div>• uuid: device_uuid</div>
+                      <div>• event: event_type</div>
+                    </div>
+                    <div className="text-xs bg-muted p-3 rounded">
+                      <div className="font-semibold mb-1">Comandos Relé:</div>
+                      <div>• channel: number</div>
+                      <div>• state: boolean</div>
+                      <div>• function_type: string</div>
+                      <div>• user: string</div>
+                    </div>
+                  </div>
+                </div>
+              </div>
             </CardContent>
           </Card>
         </TabsContent>

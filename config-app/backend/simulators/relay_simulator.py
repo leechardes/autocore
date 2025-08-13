@@ -12,6 +12,9 @@ from fastapi import WebSocket
 import threading
 from queue import Queue
 
+# Importar protocolo v2.2.0
+from protocol import create_relay_payload
+
 logger = logging.getLogger(__name__)
 
 class RelayBoardSimulator:
@@ -146,18 +149,16 @@ class RelayBoardSimulator:
             logger.error(f"Erro desconectando simulador: {e}")
     
     def publish_status(self, status: str):
-        """Publica status do dispositivo"""
+        """Publica status do dispositivo conforme v2.2.0"""
         if not self.mqtt_client:
             return
             
-        payload = {
-            "uuid": self.device_uuid,
-            "board_id": self.board_id,
-            "status": status,
-            "timestamp": datetime.now().isoformat(),
-            "type": "esp32_relay",
-            "channels": self.total_channels
-        }
+        payload = create_relay_payload(
+            device_uuid=self.device_uuid,
+            board_id=self.board_id,
+            status=status,
+            channels=self.total_channels
+        )
         
         try:
             self.mqtt_client.publish(
@@ -169,16 +170,15 @@ class RelayBoardSimulator:
             logger.error(f"Erro publicando status: {e}")
     
     def publish_relay_states(self):
-        """Publica estado de todos os relés"""
+        """Publica estado de todos os relés conforme v2.2.0"""
         if not self.mqtt_client:
             return
             
-        payload = {
-            "uuid": self.device_uuid,
-            "board_id": self.board_id,
-            "timestamp": datetime.now().isoformat(),
-            "channels": self.channel_states
-        }
+        payload = create_relay_payload(
+            device_uuid=self.device_uuid,
+            board_id=self.board_id,
+            channels=self.channel_states
+        )
         
         try:
             self.mqtt_client.publish(
@@ -290,16 +290,15 @@ class RelayBoardSimulator:
                         if channel in self.momentary_heartbeats:
                             del self.momentary_heartbeats[channel]
                         
-                        # Notificar via telemetria especial
-                        safety_payload = {
-                            "uuid": self.device_uuid,
-                            "board_id": self.board_id,
-                            "timestamp": datetime.now().isoformat(),
-                            "event": "safety_shutoff",
-                            "channel": channel,
-                            "reason": "heartbeat_timeout",
-                            "timeout": self.momentary_timeout
-                        }
+                        # Notificar via telemetria especial conforme v2.2.0
+                        safety_payload = create_relay_payload(
+                            device_uuid=self.device_uuid,
+                            board_id=self.board_id,
+                            event="safety_shutoff",
+                            channel=channel,
+                            reason="heartbeat_timeout",
+                            timeout=self.momentary_timeout
+                        )
                         
                         if self.mqtt_client:
                             self.mqtt_client.publish(
@@ -315,19 +314,18 @@ class RelayBoardSimulator:
             logger.error(f"Erro no monitoramento de heartbeat: {e}")
     
     def publish_telemetry(self, channel: int, state: bool):
-        """Publica telemetria de mudança de estado"""
+        """Publica telemetria de mudança de estado conforme v2.2.0"""
         if not self.mqtt_client:
             return
             
-        payload = {
-            "uuid": self.device_uuid,
-            "board_id": self.board_id,
-            "timestamp": datetime.now().isoformat(),
-            "event": "relay_change",
-            "channel": channel,
-            "state": state,
-            "trigger": "simulator"
-        }
+        payload = create_relay_payload(
+            device_uuid=self.device_uuid,
+            board_id=self.board_id,
+            event="relay_change",
+            channel=channel,
+            state=state,
+            trigger="simulator"
+        )
         
         try:
             self.mqtt_client.publish(

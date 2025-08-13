@@ -9,6 +9,18 @@ from typing import Dict, List, Any
 from datetime import datetime
 import logging
 
+# Importar protocolo v2.2.0
+from protocol import create_base_payload, MQTT_PROTOCOL_VERSION
+
+def create_mqtt_payload(**kwargs) -> Dict[str, Any]:
+    """Cria payload conforme protocolo v2.2.0"""
+    payload = {
+        'protocol_version': MQTT_PROTOCOL_VERSION,
+        'timestamp': datetime.utcnow().isoformat() + 'Z',
+        **kwargs
+    }
+    return payload
+
 logger = logging.getLogger(__name__)
 
 class MacroExecutor:
@@ -118,14 +130,19 @@ class MacroExecutor:
             target = [target]
         
         for relay_id in target:
-            topic = f"autocore/relay/{relay_id}/command"
-            payload = {
-                "command": relay_action,
-                "channel": relay_id,
-                "source": "macro_executor",
-                "label": label,
-                "test_mode": test_mode
-            }
+            # TODO: Obter device_uuid do relé de destino
+            # Por enquanto usando 'relay_board_1' como placeholder
+            device_uuid = "relay_board_1"  # Deve ser obtido da base de dados
+            topic = f"autocore/devices/{device_uuid}/relays/command"
+            payload = create_mqtt_payload(
+                uuid=device_uuid,
+                device_type="relay",
+                command=relay_action,
+                channel=relay_id,
+                source="macro_executor",
+                label=label,
+                test_mode=test_mode
+            )
             
             logger.info(f"Enviando comando de relé: {topic} -> {payload}")
             self.mqtt_client.publish(topic, json.dumps(payload), qos=1)
@@ -158,12 +175,11 @@ class MacroExecutor:
         targets = action.get('targets', [])
         scope = action.get('scope', 'specific')
         
-        topic = "autocore/state/save"
-        payload = {
-            "targets": targets,
-            "scope": scope,
-            "timestamp": datetime.now().isoformat()
-        }
+        topic = "autocore/system/state/save"
+        payload = create_mqtt_payload(
+            targets=targets,
+            scope=scope
+        )
         
         logger.info(f"Salvando estado: {payload}")
         self.mqtt_client.publish(topic, json.dumps(payload), qos=1)
@@ -173,19 +189,18 @@ class MacroExecutor:
         targets = action.get('targets', [])
         scope = action.get('scope', 'specific')
         
-        topic = "autocore/state/restore"
-        payload = {
-            "targets": targets,
-            "scope": scope,
-            "timestamp": datetime.now().isoformat()
-        }
+        topic = "autocore/system/state/restore"
+        payload = create_mqtt_payload(
+            targets=targets,
+            scope=scope
+        )
         
         logger.info(f"Restaurando estado: {payload}")
         self.mqtt_client.publish(topic, json.dumps(payload), qos=1)
     
     async def _execute_mqtt_action(self, action: Dict):
         """Envia mensagem MQTT customizada"""
-        topic = action.get('topic', 'autocore/macro/custom')
+        topic = action.get('topic', 'autocore/system/macros/custom')
         payload = action.get('payload', {})
         qos = action.get('qos', 1)
         
@@ -225,13 +240,16 @@ class MacroExecutor:
     
     def _publish_status(self, macro_id: int, status: str, name: str, error: str = None):
         """Publica status da execução da macro"""
-        topic = f"autocore/macro/{macro_id}/status"
-        payload = {
-            "macro_id": macro_id,
-            "name": name,
-            "status": status,
-            "timestamp": datetime.now().isoformat()
-        }
+        # TODO: Obter device_uuid correto para o macro
+        device_uuid = "gateway"  # Macros são executados pelo gateway
+        topic = f"autocore/devices/{device_uuid}/macros/status"
+        payload = create_mqtt_payload(
+            uuid=device_uuid,
+            device_type="gateway",
+            macro_id=macro_id,
+            name=name,
+            status=status
+        )
         
         if error:
             payload["error"] = error
