@@ -11,9 +11,12 @@ idf_component_register(
         nvs_flash
         esp_netif
         esp_timer
+        esp_http_client
         driver
         spi_flash
         display_driver
         touch_driver
         ui_manager
+        mqtt
+        json
 )

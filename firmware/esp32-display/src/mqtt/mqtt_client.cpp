@@ -223,7 +223,7 @@ void MQTTClient::subscribeToDeviceTopics() {
     
     // Tópicos globais do sistema
     subscribe("autocore/system/broadcast");
-    subscribe("autocore/relays/+/state");  // Estados dos relés
+    subscribe("autocore/devices/+/relays/state");  // Estados dos relés
     subscribe("autocore/can/data");        // Dados CAN
     
     LOG_INFO_CTX("MQTTClient", "Subscrito aos tópicos do dispositivo");
@@ -343,7 +343,7 @@ bool MQTTClient::publishDeviceAnnounce() {
     doc["ip_address"] = WiFi.localIP().toString();
     doc["mac_address"] = WiFi.macAddress();
     
-    String announceTopic = "autocore/system/device/announce";
+    String announceTopic = "autocore/system/devices/announce";
     return publishJSON(announceTopic, doc);
 }
 

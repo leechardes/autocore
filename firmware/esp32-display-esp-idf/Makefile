@@ -2,7 +2,7 @@
 # Build, flash e monitoramento para projeto ESP-IDF
 
 # Configurações
-PORT ?= /dev/cu.usbserial-2110
+PORT ?= /dev/cu.usbserial-0001
 BAUD_RATE ?= 115200
 IDF_PATH ?= $(HOME)/esp/esp-idf
 PROJECT_NAME = esp32-display

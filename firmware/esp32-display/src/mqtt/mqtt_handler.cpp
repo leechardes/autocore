@@ -110,7 +110,7 @@ MQTTMessageType MQTTHandler::getMessageType(const String& topic) {
     if (topic.endsWith("/config")) {
         return MSG_CONFIG_UPDATE;
     }
-    if (topic.indexOf("autocore/relays/") >= 0 && topic.endsWith("/state")) {
+    if (topic.indexOf("autocore/devices/") >= 0 && topic.indexOf("/relays/state") > 0) {
         return MSG_RELAY_STATE;
     }
     if (topic.indexOf("autocore/can/data") >= 0) {
@@ -386,12 +386,12 @@ void MQTTHandler::processSystemCommand(const JsonObject& command) {
 }
 
 String MQTTHandler::extractRelayIdFromTopic(const String& topic) {
-    // Exemplo: autocore/relays/relay-001/state -> relay-001
-    int startPos = topic.indexOf("autocore/relays/");
-    if (startPos < 0) return "";
+    // Exemplo: autocore/devices/relay-001/relays/state -> relay-001
+    int devicesPos = topic.indexOf("autocore/devices/");
+    if (devicesPos < 0) return "";
     
-    startPos += 16;  // Tamanho de "autocore/relays/"
-    int endPos = topic.indexOf("/", startPos);
+    int startPos = devicesPos + 17;  // Tamanho de "autocore/devices/"
+    int endPos = topic.indexOf("/relays/", startPos);
     if (endPos < 0) return "";
     
     return topic.substring(startPos, endPos);
