@@ -54,8 +54,57 @@ class DeviceManager:
         self.pending_commands: Dict[str, Dict] = {}  # command_id -> command_data
         self.device_timeout = 300  # 5 minutos
         
+        # Auto-registrar o gateway como dispositivo especial
+        self._register_gateway()
+        
         # Carregar dispositivos do database
         asyncio.create_task(self._load_devices_from_database())
+    
+    def _register_gateway(self):
+        """Auto-registra o gateway como dispositivo especial"""
+        gateway_info = DeviceInfo(
+            uuid="autocore-gateway",
+            device_type="gateway",
+            firmware_version="2.2.0",
+            capabilities=["mqtt", "websocket", "device_management", "telemetry", "can_bus"],
+            status=DeviceStatus.ONLINE,
+            last_seen=datetime.now(),
+            ip_address="127.0.0.1",
+            mac_address=None,
+            battery_level=None,
+            signal_strength=None,
+            uptime=0,
+            free_memory=None,
+            relay_count=None,
+            errors=None
+        )
+        
+        self.devices["autocore-gateway"] = gateway_info
+        
+        # Também registrar no banco de dados se não existir
+        try:
+            existing = devices.get_by_uuid("autocore-gateway")
+            if not existing:
+                devices.create(
+                    uuid="autocore-gateway",
+                    name="AutoCore Gateway",
+                    type="gateway",
+                    firmware_version="2.2.0",
+                    ip_address="127.0.0.1",
+                    status="online"
+                )
+                logger.info("🌐 Gateway registrado no banco de dados")
+            else:
+                # Atualizar status para online
+                devices.update(
+                    uuid="autocore-gateway",
+                    status="online",
+                    last_seen=datetime.now()
+                )
+        except Exception as e:
+            logger.warning(f"⚠️ Não foi possível registrar gateway no banco: {e}")
+        
+        logger.info("🌐 Gateway auto-registrado como dispositivo especial")
     
     async def _load_devices_from_database(self):
         """Carrega dispositivos do database na inicialização"""
