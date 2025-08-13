@@ -1373,28 +1373,7 @@ async def clear_mqtt_history():
     mqtt_monitor.message_history.clear()
     return {"success": True, "message": "Histórico limpo"}
 
-class MQTTPublishRequest(BaseModel):
-    """Request para publicar mensagem MQTT"""
-    topic: str = Field(..., description="Tópico MQTT")
-    payload: str = Field(..., description="Payload da mensagem")
-    qos: int = Field(1, ge=0, le=2, description="QoS level (0-2)")
-
-@app.post("/api/mqtt/publish", tags=["MQTT"])
-async def publish_mqtt_message(request: MQTTPublishRequest):
-    """Publica mensagem no broker MQTT"""
-    success = await mqtt_monitor.publish(
-        topic=request.topic,
-        payload=request.payload,
-        qos=request.qos
-    )
-    
-    if success:
-        return {"success": True, "message": "Mensagem publicada com sucesso"}
-    else:
-        raise HTTPException(
-            status_code=503,
-            detail="Falha ao publicar mensagem - MQTT não conectado"
-        )
+# Endpoint /api/mqtt/publish removido - está implementado em mqtt_routes.py
 
 @app.get("/api/mqtt/topics", tags=["MQTT"])
 async def get_mqtt_topics():
