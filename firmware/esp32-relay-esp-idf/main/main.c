@@ -110,6 +110,14 @@ static void wifi_connected_handler(void) {
     
     // Perform smart registration if backend is configured
     if (strlen(config->backend_ip) > 0 && config->backend_port > 0) {
+        // Update device MAC and IP in backend
+        ESP_LOGI(TAG, "🔄 Updating device network info in backend...");
+        if (mqtt_update_device_network_info() == ESP_OK) {
+            ESP_LOGI(TAG, "✅ Device network info updated successfully");
+        } else {
+            ESP_LOGW(TAG, "⚠️ Failed to update device network info");
+        }
+        
         ESP_LOGI(TAG, "🔄 Starting smart MQTT registration...");
         
         if (mqtt_smart_registration() == ESP_OK) {

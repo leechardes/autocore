@@ -46,6 +46,16 @@ esp_err_t mqtt_smart_registration(void);
  */
 esp_err_t mqtt_get_saved_credentials(mqtt_config_t* mqtt_config);
 
+/**
+ * Update device MAC and IP address in backend
+ * 
+ * This function updates only the MAC address (in uppercase) and IP address
+ * for an already registered device.
+ * 
+ * @return ESP_OK on success
+ */
+esp_err_t mqtt_update_device_network_info(void);
+
 #ifdef __cplusplus
 }
 #endif

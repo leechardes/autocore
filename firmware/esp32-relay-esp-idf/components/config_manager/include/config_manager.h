@@ -184,6 +184,21 @@ esp_err_t config_set_registration_status(bool registered);
 bool config_is_device_registered(void);
 
 /**
+ * Fetch configuration from API REST v2.2.0
+ * Busca configuração via API REST conforme protocolo v2.2.0
+ * @return ESP_OK on success, ESP_ERR_NOT_FOUND if device not registered
+ */
+esp_err_t config_fetch_from_api(void);
+
+/**
+ * Apply configuration from JSON
+ * Aplica configuração a partir de JSON recebido da API
+ * @param json_config JSON string with configuration
+ * @return ESP_OK on success
+ */
+esp_err_t config_apply_json(const char *json_config);
+
+/**
  * Factory reset - completely erase all NVS data and restart
  * This will stop all services, clear all configuration, and restart the device
  * @return ESP_OK on success (device will restart)

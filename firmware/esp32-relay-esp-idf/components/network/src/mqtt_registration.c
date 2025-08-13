@@ -271,6 +271,13 @@ static esp_err_t register_device_with_backend(void) {
     char mac_str[18];
     wifi_manager_get_mac_str(mac_str, sizeof(mac_str));
     
+    // Convert MAC to uppercase
+    for (int i = 0; mac_str[i]; i++) {
+        if (mac_str[i] >= 'a' && mac_str[i] <= 'f') {
+            mac_str[i] = mac_str[i] - 'a' + 'A';
+        }
+    }
+    
     char ip_str[16];
     wifi_manager_get_ip(ip_str, sizeof(ip_str));
     
@@ -485,4 +492,99 @@ esp_err_t mqtt_get_saved_credentials(mqtt_config_t* mqtt_config) {
              mqtt_config->username, mqtt_config->broker_host, mqtt_config->broker_port);
     
     return ESP_OK;
+}
+
+/**
+ * Update device MAC and IP address in backend
+ */
+esp_err_t mqtt_update_device_network_info(void) {
+    device_config_t* config = config_get();
+    
+    if (strlen(config->backend_ip) == 0 || config->backend_port == 0) {
+        ESP_LOGE(TAG, "Backend configuration missing");
+        return ESP_ERR_INVALID_STATE;
+    }
+    
+    // Build URL for device update
+    char url[256];
+    snprintf(url, sizeof(url), "http://%s:%d/api/devices/%s", 
+            config->backend_ip, config->backend_port, config->device_id);
+    
+    ESP_LOGI(TAG, "Updating device network info: %s", url);
+    
+    // Get MAC address in uppercase
+    char mac_str[18];
+    wifi_manager_get_mac_str(mac_str, sizeof(mac_str));
+    
+    // Convert MAC to uppercase
+    for (int i = 0; mac_str[i]; i++) {
+        if (mac_str[i] >= 'a' && mac_str[i] <= 'f') {
+            mac_str[i] = mac_str[i] - 'a' + 'A';
+        }
+    }
+    
+    // Get IP address
+    char ip_str[16];
+    wifi_manager_get_ip(ip_str, sizeof(ip_str));
+    
+    // Prepare update data - only MAC and IP
+    cJSON *json = cJSON_CreateObject();
+    cJSON_AddStringToObject(json, "mac_address", mac_str);
+    cJSON_AddStringToObject(json, "ip_address", ip_str);
+    
+    char *json_string = cJSON_Print(json);
+    if (json_string == NULL) {
+        ESP_LOGE(TAG, "Failed to create update JSON");
+        cJSON_Delete(json);
+        return ESP_FAIL;
+    }
+    
+    ESP_LOGI(TAG, "Update payload: %s", json_string);
+    
+    // Clear response buffer
+    memset(http_response_buffer, 0, sizeof(http_response_buffer));
+    
+    // Configure HTTP client
+    esp_http_client_config_t http_config = {
+        .url = url,
+        .event_handler = http_event_handler,
+        .method = HTTP_METHOD_PATCH,
+        .timeout_ms = 5000,
+        .buffer_size = HTTP_RESPONSE_BUFFER_SIZE,
+    };
+    
+    esp_http_client_handle_t client = esp_http_client_init(&http_config);
+    if (client == NULL) {
+        ESP_LOGE(TAG, "Failed to initialize HTTP client");
+        free(json_string);
+        cJSON_Delete(json);
+        return ESP_FAIL;
+    }
+    
+    // Set headers
+    esp_http_client_set_header(client, "Content-Type", "application/json");
+    esp_http_client_set_post_field(client, json_string, strlen(json_string));
+    
+    // Execute request
+    esp_err_t err = esp_http_client_perform(client);
+    int status_code = esp_http_client_get_status_code(client);
+    
+    // Cleanup JSON
+    free(json_string);
+    cJSON_Delete(json);
+    
+    if (err == ESP_OK && (status_code == 200 || status_code == 204)) {
+        ESP_LOGI(TAG, "✅ Device network info updated successfully");
+        ESP_LOGI(TAG, "MAC: %s, IP: %s", mac_str, ip_str);
+    } else {
+        ESP_LOGW(TAG, "Failed to update device network info: %s, HTTP %d", 
+                esp_err_to_name(err), status_code);
+        if (strlen(http_response_buffer) > 0) {
+            ESP_LOGD(TAG, "Response: %s", http_response_buffer);
+        }
+        err = ESP_FAIL;
+    }
+    
+    esp_http_client_cleanup(client);
+    return err;
 }

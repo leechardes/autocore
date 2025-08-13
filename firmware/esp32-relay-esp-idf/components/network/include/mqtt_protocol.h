@@ -10,6 +10,21 @@
 extern "C" {
 #endif
 
+// Versão do protocolo MQTT v2.2.0
+#define MQTT_PROTOCOL_VERSION "2.2.0"
+
+// QoS Levels conforme v2.2.0
+#define QOS_TELEMETRY    0
+#define QOS_COMMANDS     1
+#define QOS_HEARTBEAT    1
+#define QOS_STATUS       1
+#define QOS_CRITICAL     2
+
+// Timeouts e intervalos
+#define HEARTBEAT_TIMEOUT_MS     1000
+#define HEARTBEAT_INTERVAL_MS    500
+#define STATUS_INTERVAL_MS       30000
+
 // Configurações de timeout para relé momentâneo
 #define MOMENTARY_TIMEOUT_MS 1000  // 1 segundo sem heartbeat = desliga
 #define MOMENTARY_CHECK_INTERVAL_MS 100  // Verifica a cada 100ms
@@ -75,6 +90,46 @@ esp_err_t mqtt_parse_general_command(cJSON* json, mqtt_command_struct_t* cmd);
 esp_err_t mqtt_process_command_struct(mqtt_command_struct_t* cmd);
 esp_err_t mqtt_process_relay_command(mqtt_command_struct_t* cmd);
 esp_err_t mqtt_process_general_command(mqtt_command_struct_t* cmd);
+
+// Estrutura base para mensagens MQTT v2.2.0
+typedef struct {
+    const char *protocol_version;
+    const char *uuid;
+    char timestamp[32];
+} mqtt_base_message_t;
+
+// Códigos de erro padronizados v2.2.0
+typedef enum {
+    MQTT_ERR_COMMAND_FAILED = 1,
+    MQTT_ERR_INVALID_PAYLOAD,
+    MQTT_ERR_TIMEOUT,
+    MQTT_ERR_UNAUTHORIZED,
+    MQTT_ERR_DEVICE_BUSY,
+    MQTT_ERR_HARDWARE_FAULT,
+    MQTT_ERR_NETWORK_ERROR,
+    MQTT_ERR_PROTOCOL_MISMATCH
+} mqtt_error_code_t;
+
+// Funções auxiliares do protocolo v2.2.0
+void mqtt_init_base_message(mqtt_base_message_t *msg, const char *uuid);
+cJSON* mqtt_create_base_json(const mqtt_base_message_t *msg);
+bool mqtt_validate_protocol_version(cJSON *root);
+char* get_iso_timestamp(void);
+char* get_iso_timestamp_from_time(time_t timestamp);
+
+// Funções de validação
+bool mqtt_validate_uuid(const char *uuid);
+bool mqtt_validate_timestamp(const char *timestamp);
+
+// Funções de criação de payloads padronizados
+cJSON* mqtt_create_online_status(const char *uuid, const char *firmware_version, 
+                                const char *ip_address, int wifi_signal, 
+                                size_t free_memory, uint64_t uptime);
+cJSON* mqtt_create_lwt_payload(const char *uuid, const char *reason);
+
+// Códigos de erro
+const char* mqtt_error_code_to_string(mqtt_error_code_t code);
+const char* mqtt_error_type_to_string(mqtt_error_code_t code);
 
 // Funções de telemetria
 esp_err_t mqtt_publish_telemetry_event(telemetry_event_t* event);

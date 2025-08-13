@@ -21,24 +21,20 @@ esp_err_t mqtt_publish_telemetry_event(telemetry_event_t* event)
         return ESP_ERR_INVALID_STATE;
     }
 
-    // Gerar tópico de telemetria
-    char topic[256];
-    if (strlen(config->mqtt_topic_prefix) > 0) {
-        snprintf(topic, sizeof(topic), "%s/devices/%s/telemetry", 
-                config->mqtt_topic_prefix, config->device_id);
-    } else {
-        snprintf(topic, sizeof(topic), "autocore/devices/%s/telemetry", config->device_id);
-    }
+    // Tópico de telemetria conforme v2.2.0 (UUID no payload, não no tópico)
+    const char *topic = "autocore/telemetry/relays/data";
 
-    // Criar JSON da telemetria
-    cJSON *json = cJSON_CreateObject();
+    // Criar JSON da telemetria v2.2.0
+    mqtt_base_message_t msg;
+    mqtt_init_base_message(&msg, config->device_id);
+    
+    cJSON *json = mqtt_create_base_json(&msg);
     if (!json) {
-        ESP_LOGE(TAG, "Erro criando JSON de telemetria");
+        ESP_LOGE(TAG, "Erro criando JSON base de telemetria");
         return ESP_ERR_NO_MEM;
     }
 
-    // Campos obrigatórios
-    cJSON_AddStringToObject(json, "uuid", config->device_id);
+    // Campos obrigatórios v2.2.0
     cJSON_AddNumberToObject(json, "board_id", 1);
     
     // Timestamp
@@ -79,8 +75,8 @@ esp_err_t mqtt_publish_telemetry_event(telemetry_event_t* event)
         return ESP_ERR_NO_MEM;
     }
 
-    // Publicar
-    esp_err_t ret = mqtt_publish(topic, json_string, 0, false);
+    // Publicar com QoS 0 para telemetria v2.2.0
+    esp_err_t ret = mqtt_publish(topic, json_string, QOS_TELEMETRY, false);
     if (ret != ESP_OK) {
         ESP_LOGE(TAG, "Erro publicando telemetria: %s", esp_err_to_name(ret));
     } else {
@@ -147,33 +143,23 @@ esp_err_t mqtt_publish_safety_shutoff(int channel, const char* reason, float tim
         return ESP_ERR_INVALID_STATE;
     }
 
-    // Gerar tópico de telemetria
-    char topic[256];
-    if (strlen(config->mqtt_topic_prefix) > 0) {
-        snprintf(topic, sizeof(topic), "%s/devices/%s/telemetry", 
-                config->mqtt_topic_prefix, config->device_id);
-    } else {
-        snprintf(topic, sizeof(topic), "autocore/devices/%s/telemetry", config->device_id);
-    }
+    // Tópico de telemetria conforme v2.2.0 (UUID no payload, não no tópico)
+    const char *topic = "autocore/telemetry/relays/data";
 
-    // Criar JSON específico para safety shutoff
-    cJSON *json = cJSON_CreateObject();
+    // Criar JSON específico para safety shutoff v2.2.0
+    mqtt_base_message_t msg;
+    mqtt_init_base_message(&msg, config->device_id);
+    
+    cJSON *json = mqtt_create_base_json(&msg);
     if (!json) {
-        ESP_LOGE(TAG, "Erro criando JSON de safety shutoff");
+        ESP_LOGE(TAG, "Erro criando JSON base de safety shutoff");
         return ESP_ERR_NO_MEM;
     }
 
-    // Campos obrigatórios
-    cJSON_AddStringToObject(json, "uuid", config->device_id);
+    // Campos obrigatórios v2.2.0
     cJSON_AddNumberToObject(json, "board_id", 1);
     
-    // Timestamp atual
-    time_t now = time(NULL);
-    struct tm timeinfo;
-    localtime_r(&now, &timeinfo);
-    char timestamp_str[32];
-    strftime(timestamp_str, sizeof(timestamp_str), "%Y-%m-%dT%H:%M:%S", &timeinfo);
-    cJSON_AddStringToObject(json, "timestamp", timestamp_str);
+    // Timestamp já incluído no JSON base
 
     // Campos específicos do safety shutoff
     cJSON_AddStringToObject(json, "event", "safety_shutoff");
@@ -195,8 +181,8 @@ esp_err_t mqtt_publish_safety_shutoff(int channel, const char* reason, float tim
         return ESP_ERR_NO_MEM;
     }
 
-    // Publicar
-    esp_err_t ret = mqtt_publish(topic, json_string, 0, false);
+    // Publicar com QoS 1 para eventos críticos v2.2.0
+    esp_err_t ret = mqtt_publish(topic, json_string, QOS_COMMANDS, false);
     if (ret != ESP_OK) {
         ESP_LOGE(TAG, "Erro publicando safety shutoff: %s", esp_err_to_name(ret));
     } else {

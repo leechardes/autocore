@@ -13,8 +13,10 @@
 #include "nvs.h"
 #include "esp_wifi.h"
 #include "esp_mac.h"
+#include "esp_http_client.h"
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
+#include "cJSON.h"
 #include "config_manager.h"
 
 static const char *TAG = "CONFIG_MANAGER";
@@ -611,6 +613,203 @@ bool config_is_device_registered(void) {
         return false;
     }
     return device_config.device_registered;
+}
+
+/**
+ * Fetch configuration from API REST v2.2.0
+ * Configuração via API REST em vez de MQTT conforme protocolo v2.2.0
+ */
+esp_err_t config_fetch_from_api(void) {
+    if (!config_initialized) {
+        ESP_LOGE(TAG, "Configuration manager not initialized");
+        return ESP_ERR_INVALID_STATE;
+    }
+    
+    if (strlen(device_config.backend_ip) == 0) {
+        ESP_LOGE(TAG, "Backend IP not configured");
+        return ESP_ERR_INVALID_STATE;
+    }
+    
+    char url[256];
+    snprintf(url, sizeof(url), "http://%s:%d/api/devices/%s/config", 
+             device_config.backend_ip, 
+             device_config.backend_port > 0 ? device_config.backend_port : 8080,
+             device_config.device_id);
+    
+    ESP_LOGI(TAG, "Fetching config from API: %s", url);
+    
+    esp_http_client_config_t http_config = {
+        .url = url,
+        .timeout_ms = 10000,
+        .method = HTTP_METHOD_GET,
+    };
+    
+    esp_http_client_handle_t client = esp_http_client_init(&http_config);
+    if (!client) {
+        ESP_LOGE(TAG, "Failed to initialize HTTP client");
+        return ESP_FAIL;
+    }
+    
+    // Set headers
+    esp_http_client_set_header(client, "Content-Type", "application/json");
+    esp_http_client_set_header(client, "User-Agent", "ESP32-Relay/2.0.0");
+    
+    esp_err_t err = esp_http_client_perform(client);
+    
+    if (err == ESP_OK) {
+        int status_code = esp_http_client_get_status_code(client);
+        
+        if (status_code == 200) {
+            int content_length = esp_http_client_get_content_length(client);
+            if (content_length > 0 && content_length < 2048) {
+                char *buffer = malloc(content_length + 1);
+                if (buffer) {
+                    int read_len = esp_http_client_read_response(client, buffer, content_length);
+                    if (read_len > 0) {
+                        buffer[read_len] = '\0';
+                        
+                        ESP_LOGI(TAG, "Config response: %s", buffer);
+                        
+                        // Parse and apply configuration
+                        err = config_apply_json(buffer);
+                        if (err == ESP_OK) {
+                            ESP_LOGI(TAG, "Configuration fetched and applied successfully");
+                        } else {
+                            ESP_LOGE(TAG, "Failed to apply configuration: %s", esp_err_to_name(err));
+                        }
+                    } else {
+                        ESP_LOGE(TAG, "Failed to read HTTP response");
+                        err = ESP_FAIL;
+                    }
+                    
+                    free(buffer);
+                } else {
+                    ESP_LOGE(TAG, "Failed to allocate buffer for HTTP response");
+                    err = ESP_ERR_NO_MEM;
+                }
+            } else {
+                ESP_LOGE(TAG, "Invalid content length: %d", content_length);
+                err = ESP_FAIL;
+            }
+        } else if (status_code == 404) {
+            ESP_LOGW(TAG, "Device not found on backend (404) - needs registration");
+            err = ESP_ERR_NOT_FOUND;
+        } else {
+            ESP_LOGE(TAG, "HTTP error: %d", status_code);
+            err = ESP_FAIL;
+        }
+    } else {
+        ESP_LOGE(TAG, "HTTP request failed: %s", esp_err_to_name(err));
+    }
+    
+    esp_http_client_cleanup(client);
+    return err;
+}
+
+/**
+ * Apply configuration from JSON
+ */
+esp_err_t config_apply_json(const char *json_config) {
+    if (!json_config) {
+        ESP_LOGE(TAG, "JSON config is NULL");
+        return ESP_ERR_INVALID_ARG;
+    }
+    
+    cJSON *root = cJSON_Parse(json_config);
+    if (!root) {
+        ESP_LOGE(TAG, "Failed to parse JSON config");
+        return ESP_ERR_INVALID_ARG;
+    }
+    
+    ESP_LOGI(TAG, "Applying configuration from JSON...");
+    
+    // Apply MQTT configuration
+    cJSON *mqtt = cJSON_GetObjectItem(root, "mqtt");
+    if (mqtt && cJSON_IsObject(mqtt)) {
+        cJSON *broker = cJSON_GetObjectItem(mqtt, "broker_host");
+        cJSON *port = cJSON_GetObjectItem(mqtt, "broker_port");
+        cJSON *username = cJSON_GetObjectItem(mqtt, "username");
+        cJSON *password = cJSON_GetObjectItem(mqtt, "password");
+        cJSON *topic_prefix = cJSON_GetObjectItem(mqtt, "topic_prefix");
+        
+        if (broker && cJSON_IsString(broker) &&
+            port && cJSON_IsNumber(port) &&
+            username && cJSON_IsString(username) &&
+            password && cJSON_IsString(password)) {
+            
+            esp_err_t ret = config_save_mqtt_credentials(
+                broker->valuestring,
+                (uint16_t)port->valueint,
+                username->valuestring,
+                password->valuestring,
+                topic_prefix && cJSON_IsString(topic_prefix) ? topic_prefix->valuestring : NULL
+            );
+            
+            if (ret == ESP_OK) {
+                ESP_LOGI(TAG, "MQTT configuration applied successfully");
+            } else {
+                ESP_LOGE(TAG, "Failed to save MQTT configuration");
+            }
+        } else {
+            ESP_LOGW(TAG, "Incomplete MQTT configuration in JSON");
+        }
+    }
+    
+    // Apply relay configuration
+    cJSON *relays = cJSON_GetObjectItem(root, "relays");
+    if (relays && cJSON_IsObject(relays)) {
+        cJSON *channels = cJSON_GetObjectItem(relays, "channels");
+        if (channels && cJSON_IsNumber(channels)) {
+            int num_channels = channels->valueint;
+            if (num_channels > 0 && num_channels <= CONFIG_ESP32_RELAY_MAX_CHANNELS) {
+                device_config.relay_channels = (uint8_t)num_channels;
+                ESP_LOGI(TAG, "Relay channels updated: %d", num_channels);
+            }
+        }
+        
+        // Apply individual relay configurations
+        cJSON *config_array = cJSON_GetObjectItem(relays, "config");
+        if (config_array && cJSON_IsArray(config_array)) {
+            cJSON *relay_config = NULL;
+            cJSON_ArrayForEach(relay_config, config_array) {
+                cJSON *channel = cJSON_GetObjectItem(relay_config, "channel");
+                cJSON *state = cJSON_GetObjectItem(relay_config, "state");
+                
+                if (channel && cJSON_IsNumber(channel) &&
+                    state && cJSON_IsBool(state)) {
+                    
+                    int ch = channel->valueint - 1; // Convert to 0-based
+                    if (ch >= 0 && ch < CONFIG_ESP32_RELAY_MAX_CHANNELS) {
+                        config_set_relay_state(ch, cJSON_IsTrue(state) ? 1 : 0);
+                        ESP_LOGI(TAG, "Relay %d state set to %d", ch + 1, cJSON_IsTrue(state) ? 1 : 0);
+                    }
+                }
+            }
+        }
+    }
+    
+    // Apply device settings
+    cJSON *device = cJSON_GetObjectItem(root, "device");
+    if (device && cJSON_IsObject(device)) {
+        cJSON *name = cJSON_GetObjectItem(device, "name");
+        if (name && cJSON_IsString(name)) {
+            strncpy(device_config.device_name, name->valuestring, sizeof(device_config.device_name) - 1);
+            device_config.device_name[sizeof(device_config.device_name) - 1] = '\0';
+            ESP_LOGI(TAG, "Device name updated: %s", device_config.device_name);
+        }
+    }
+    
+    cJSON_Delete(root);
+    
+    // Save configuration
+    esp_err_t save_ret = config_save();
+    if (save_ret != ESP_OK) {
+        ESP_LOGE(TAG, "Failed to save applied configuration");
+        return save_ret;
+    }
+    
+    ESP_LOGI(TAG, "Configuration applied and saved successfully");
+    return ESP_OK;
 }
 
 /**
