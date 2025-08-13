@@ -2,360 +2,204 @@
 
 ## 📋 Visão Geral
 
-Esta pasta contém todos os firmwares dos dispositivos ESP32 que compõem o sistema AutoCore. Cada firmware é responsável por uma função específica no controle veicular.
+Esta pasta contém todos os firmwares dos dispositivos ESP32 que compõem o sistema AutoCore, organizados por tecnologia/framework.
 
-## 🎯 Dispositivos
+## 📂 Estrutura Organizacional
+
+```
+firmware/
+├── esp-idf/          # Projetos usando ESP-IDF (alta performance)
+│   └── esp32-relay   # Controlador de relés principal
+├── platformio/       # Projetos usando PlatformIO
+│   └── esp32-display # Interface touchscreen
+├── arduino/          # Projetos usando Arduino framework
+│   └── (vazio)       # Projetos migrados para outras tecnologias
+└── planning/         # Documentação e planejamento
+    ├── esp32-can     # Interface CAN Bus (futuro)
+    └── esp32-controls # Controles físicos (futuro)
+```
+
+## 🚀 Projetos Ativos
+
+### ⚡ esp32-relay (ESP-IDF)
+**Controlador de relés automotivos de alta performance**
+- **Status:** ✅ **Produção** - v2.2.0
+- **Localização:** `esp-idf/esp32-relay/`
+- **Framework:** ESP-IDF v5.0
+- **Hardware:** ESP32 + 16/32 relés
+- **Features:** 
+  - MQTT v2.2.0 com protocol_version
+  - Sistema de heartbeat para relés momentâneos
+  - Registro HTTP inteligente com backend
+  - Boot time < 1 segundo
+  - Latência MQTT < 50ms
+
+### 📺 esp32-display (PlatformIO)
+**Interface de display touchscreen para controle e visualização**
+- **Status:** 🚧 **Desenvolvimento**
+- **Localização:** `platformio/esp32-display/`
+- **Framework:** PlatformIO (Arduino core)
+- **Hardware:** ESP32 + ILI9341/ST7789 + XPT2046
+- **Features:**
+  - Hot reload para desenvolvimento rápido
+  - MQTT integration
+  - Interface touch responsiva
+  - Múltiplas telas configuráveis
+
+## 📋 Projetos em Planejamento
 
 ### 📡 esp32-can
-**Função:** Interface com barramento CAN Bus (FuelTech)
-- Leitura de sinais da ECU
-- Tradução de protocolos CAN
-- Envio de telemetria via MQTT
-- Suporte a múltiplos baudrates (250k, 500k, 1M)
+**Interface com barramento CAN Bus (FuelTech)**
+- **Status:** 📋 **Planejamento**
+- **Localização:** `planning/esp32-can/`
+- **Framework:** ESP-IDF (previsto)
+- **Hardware:** ESP32 + MCP2515/TJA1050
+- **Features planejadas:**
+  - Leitura de sinais da ECU
+  - Tradução de protocolos CAN
+  - Telemetria via MQTT
+  - Suporte a múltiplos baudrates
 
-### 🎮 esp32-controls
-**Função:** Interface com controles do volante
-- Leitura de botões e encoders
-- Detecção de gestos
-- Feedback háptico
-- Comunicação com display principal
+### 🎛️ esp32-controls
+**Interface com controles físicos**
+- **Status:** 📋 **Planejamento**
+- **Localização:** `planning/esp32-controls/`
+- **Framework:** PlatformIO (previsto)
+- **Hardware:** ESP32 + Botões + Encoders + LEDs
+- **Features planejadas:**
+  - Leitura de botões e encoders
+  - Detecção de gestos
+  - Feedback háptico
+  - LED indicators
 
-### 📺 esp32-display
-**Função:** Display touch principal (ILI9341 2.8")
-- Interface gráfica LVGL
-- Touch screen resistivo/capacitivo
-- Múltiplas telas configuráveis
-- Indicadores visuais em tempo real
+## 🛠️ Desenvolvimento por Framework
 
-### ⚡ esp32-relay
-**Função:** Controle de relés (16 canais)
-- Acionamento de cargas
-- Proteções configuráveis
-- Estados persistentes
-- Feedback de status
-
-## 🛠️ Ambiente de Desenvolvimento
-
-### Pré-requisitos
+### ESP-IDF Projects
 ```bash
-# PlatformIO (recomendado)
+# Ativar ambiente ESP-IDF
+source /path/to/esp-idf/export.sh
+
+# Compilar e gravar
+cd esp-idf/esp32-relay
+make build flash monitor
+```
+
+### PlatformIO Projects
+```bash
+# Instalar PlatformIO
 pip install platformio
 
-# OU Arduino IDE 2.0+
-# Com as seguintes bibliotecas:
-# - ESP32 Board Package
-# - PubSubClient (MQTT)
-# - ArduinoJson
-# - LVGL (para display)
-# - MCP2515 (para CAN)
-```
-
-### Estrutura Comum
-```
-esp32-{dispositivo}/
-├── src/
-│   └── main.cpp           # Código principal
-├── include/
-│   ├── config.h           # Configurações
-│   └── pins.h             # Mapeamento de pinos
-├── lib/                   # Bibliotecas customizadas
-├── platformio.ini         # Configuração PlatformIO
-└── README.md             # Documentação específica
-```
-
-## 📍 Pinout Padrão
-
-### Pinos Comuns (Todos os Dispositivos)
-| Pino | Função | Descrição |
-|------|--------|-----------|
-| GPIO 2 | LED Status | LED onboard de status |
-| GPIO 21 | I2C SDA | Comunicação I2C |
-| GPIO 22 | I2C SCL | Clock I2C |
-| GPIO 1 | TX | Serial debug |
-| GPIO 3 | RX | Serial debug |
-
-### ESP32-CAN Específico
-| Pino | Função | Descrição |
-|------|--------|-----------|
-| GPIO 5 | CAN CS | Chip Select MCP2515 |
-| GPIO 18 | SPI SCK | Clock SPI |
-| GPIO 19 | SPI MISO | Master In Slave Out |
-| GPIO 23 | SPI MOSI | Master Out Slave In |
-| GPIO 15 | CAN INT | Interrupt do MCP2515 |
-
-### ESP32-Display Específico
-| Pino | Função | Descrição |
-|------|--------|-----------|
-| GPIO 15 | TFT CS | Display Chip Select |
-| GPIO 4 | TFT RST | Display Reset |
-| GPIO 2 | TFT DC | Display Data/Command |
-| GPIO 18 | TFT CLK | Display Clock |
-| GPIO 23 | TFT MOSI | Display Data |
-| GPIO 19 | TFT MISO | Touch Data |
-| GPIO 25 | TFT LED | Backlight Control |
-
-### ESP32-Relay Específico
-| Pino | Função | Descrição |
-|------|--------|-----------|
-| GPIO 13-28 | RELAY 1-16 | Saídas de relé |
-| GPIO 34-39 | SENSE 1-6 | Entradas de sensoriamento |
-
-### ESP32-Controls Específico
-| Pino | Função | Descrição |
-|------|--------|-----------|
-| GPIO 32-35 | BTN 1-4 | Botões principais |
-| GPIO 25-26 | ENC A/B | Encoder rotativo |
-| GPIO 27 | ENC BTN | Botão do encoder |
-| GPIO 14 | BUZZER | Feedback sonoro |
-
-## 🔨 Compilação e Upload
-
-### Usando PlatformIO
-```bash
-# Compilar firmware específico
-cd firmware/esp32-{dispositivo}
-pio run
-
-# Upload via USB
-pio run --target upload
-
-# Upload via OTA
-pio run --target upload --upload-port [IP_DO_DISPOSITIVO]
-
-# Monitor serial
+# Compilar e gravar
+cd platformio/esp32-display
+pio run -t upload
 pio device monitor
 ```
 
-### Usando Arduino IDE
-1. Abra o arquivo `src/main.cpp`
-2. Selecione a placa: `ESP32 Dev Module`
-3. Configure:
-   - Flash Size: 4MB
-   - Partition: Default 4MB with OTA
-   - Upload Speed: 921600
-4. Compile e faça upload
-
-## 📡 Configuração de Rede
-
-### WiFi (config.h)
-```cpp
-#define WIFI_SSID "AutoCore_AP"
-#define WIFI_PASSWORD "autocore123"
-#define DEVICE_NAME "ESP32_RELAY_01"
-```
-
-### MQTT
-```cpp
-#define MQTT_SERVER "192.168.4.1"
-#define MQTT_PORT 1883
-#define MQTT_USER "autocore"
-#define MQTT_PASSWORD "autocore"
-#define MQTT_CLIENT_ID DEVICE_NAME
-```
-
-### Tópicos MQTT Padrão
-```
-autocore/devices/{device_id}/status    # Status do dispositivo
-autocore/devices/{device_id}/command   # Comandos para o dispositivo
-autocore/devices/{device_id}/telemetry # Dados de telemetria
-autocore/devices/{device_id}/config    # Configuração remota
-```
-
-## 🔄 OTA Updates
-
-### Habilitando OTA
-1. Certifique-se que a partição suporta OTA (4MB com OTA)
-2. Configure credenciais em `config.h`:
-```cpp
-#define OTA_PASSWORD "autocore_ota"
-#define OTA_PORT 3232
-```
-
-### Processo de Atualização
+### Arduino Projects
 ```bash
-# Via PlatformIO
-pio run --target upload --upload-port 192.168.1.100
-
-# Via script Python
-python ota_update.py --ip 192.168.1.100 --file firmware.bin
+# Usar Arduino IDE ou CLI
+arduino-cli compile --fqbn esp32:esp32:esp32
+arduino-cli upload -p /dev/ttyUSB0
 ```
 
-## 🐛 Debug e Troubleshooting
+## 📡 Protocolo MQTT AutoCore v2.2.0
 
-### Monitor Serial
-```bash
-# PlatformIO
-pio device monitor -b 115200
+Todos os firmwares seguem o protocolo MQTT v2.2.0:
 
-# Arduino IDE
-Tools > Serial Monitor (115200 baud)
-```
-
-### Comandos de Debug via MQTT
-```bash
-# Status do dispositivo
-mosquitto_pub -t "autocore/devices/esp32_relay/command" -m '{"cmd":"status"}'
-
-# Reset do dispositivo
-mosquitto_pub -t "autocore/devices/esp32_relay/command" -m '{"cmd":"reset"}'
-
-# Informações de rede
-mosquitto_pub -t "autocore/devices/esp32_relay/command" -m '{"cmd":"netinfo"}'
-```
-
-### LEDs de Status
-- **Piscando rápido (100ms):** Iniciando/Conectando WiFi
-- **Piscando devagar (1s):** Conectado WiFi, conectando MQTT
-- **Ligado fixo:** Operacional
-- **Piscando 3x:** Erro de conexão
-- **Piscando 5x:** Erro crítico
-
-## 📊 Protocolo de Comunicação
-
-### Formato de Mensagens (JSON)
 ```json
-// Status
 {
-  "device_id": "esp32_relay_01",
-  "type": "relay",
-  "status": "online",
-  "uptime": 3600,
-  "free_heap": 150000,
-  "wifi_rssi": -65,
-  "version": "1.0.0"
-}
-
-// Comando
-{
-  "cmd": "relay",
-  "channel": 5,
-  "state": "on",
-  "duration": 1000  // opcional, em ms
-}
-
-// Telemetria
-{
-  "timestamp": 1691419200,
-  "channels": [
-    {"id": 1, "state": true, "current": 0.5},
-    {"id": 2, "state": false, "current": 0.0}
-  ]
+  "protocol_version": "2.2.0",
+  "uuid": "esp32-relay-001",
+  "timestamp": "2025-08-13T10:30:00Z",
+  "message_type": "status",
+  "data": {}
 }
 ```
+
+### Tópicos Padrão
+```
+autocore/devices/{uuid}/status     # Status do dispositivo
+autocore/devices/{uuid}/announce   # Descoberta
+autocore/devices/{uuid}/telemetry  # Dados de telemetria
+autocore/devices/{uuid}/commands   # Comandos
+autocore/devices/{uuid}/relays/set # Comandos de relé específicos
+```
+
+## 🔄 Migração de Projetos
+
+### Processo de Evolução
+1. **planning/** → Especificação e documentação
+2. **arduino/** → Prototipagem rápida (se necessário)
+3. **platformio/** → Desenvolvimento com bibliotecas
+4. **esp-idf/** → Produção com máxima performance
+
+### Histórico de Migrações
+- `esp32-relay`: Arduino → ESP-IDF (performance crítica)
+- `esp32-display`: Arduino → PlatformIO (bibliotecas gráficas)
+
+## 📊 Comparação de Frameworks
+
+| Aspecto | ESP-IDF | PlatformIO | Arduino |
+|---------|---------|------------|---------|
+| **Performance** | ⭐⭐⭐⭐⭐ | ⭐⭐⭐⭐ | ⭐⭐⭐ |
+| **Controle Hardware** | ⭐⭐⭐⭐⭐ | ⭐⭐⭐⭐ | ⭐⭐⭐ |
+| **Facilidade** | ⭐⭐ | ⭐⭐⭐⭐ | ⭐⭐⭐⭐⭐ |
+| **Bibliotecas** | ⭐⭐⭐ | ⭐⭐⭐⭐⭐ | ⭐⭐⭐⭐ |
+| **Profissional** | ⭐⭐⭐⭐⭐ | ⭐⭐⭐⭐ | ⭐⭐ |
 
 ## 🔐 Segurança
 
-### Boas Práticas
-1. **Sempre use senhas fortes** para WiFi e MQTT
-2. **Habilite TLS/SSL** em produção
-3. **Implemente rate limiting** para comandos
-4. **Valide todos os inputs** recebidos
-5. **Use autenticação mútua** quando possível
+### Práticas Implementadas
+- ✅ Heartbeat obrigatório para relés momentâneos
+- ✅ Validação de protocol_version em mensagens MQTT
+- ✅ Timeouts em todas operações de rede
+- ✅ Rate limiting em comandos
+- ✅ Watchdog timer habilitado
 
-### Configuração Segura
-```cpp
-// config_secure.h
-#define USE_SSL true
-#define MQTT_PORT_SSL 8883
-#define VERIFY_CERTIFICATE true
-#define CA_CERT "-----BEGIN CERTIFICATE-----..."
-```
+### Em Desenvolvimento
+- 🚧 TLS/SSL para MQTT
+- 🚧 Autenticação mútua
+- 🚧 Criptografia de payloads sensíveis
 
 ## 📝 Versionamento
 
-### Formato
-`MAJOR.MINOR.PATCH-BUILD`
-- **MAJOR:** Mudanças incompatíveis
+Formato: `MAJOR.MINOR.PATCH`
+- **MAJOR:** Mudanças incompatíveis de protocolo
 - **MINOR:** Novas funcionalidades
 - **PATCH:** Correções de bugs
-- **BUILD:** Número de build automático
 
-### Exemplo
-```cpp
-#define FIRMWARE_VERSION "1.2.3-456"
-```
+Exemplo: `2.2.0` = Protocolo v2, Feature set 2, sem patches
 
 ## 🧪 Testes
 
-### Teste Básico de Conectividade
+### Teste de Integração
 ```bash
-# Ping
-ping [IP_DO_DISPOSITIVO]
+# Verificar MQTT
+mosquitto_sub -h localhost -t "autocore/devices/+/status" -v
 
-# Teste MQTT
-mosquitto_sub -t "autocore/devices/+/status" -v
+# Enviar comando de teste
+mosquitto_pub -h localhost -t "autocore/devices/esp32-relay-001/relays/set" \
+  -m '{"protocol_version":"2.2.0","channel":1,"state":true}'
 ```
 
-### Teste de Carga
-```python
-# test_load.py
-import paho.mqtt.client as mqtt
-import json
-import time
+## 📚 Documentação
 
-def test_relay_speed():
-    client = mqtt.Client()
-    client.connect("192.168.1.1", 1883)
-    
-    for i in range(100):
-        payload = json.dumps({
-            "cmd": "relay",
-            "channel": (i % 16) + 1,
-            "state": "toggle"
-        })
-        client.publish("autocore/devices/esp32_relay/command", payload)
-        time.sleep(0.1)
-```
-
-## 🚀 Deploy em Produção
-
-### Checklist
-- [ ] Remover mensagens de debug
-- [ ] Habilitar watchdog timer
-- [ ] Configurar brown-out detection
-- [ ] Implementar fallback para falhas
-- [ ] Testar OTA update
-- [ ] Validar certificados SSL
-- [ ] Documentar versão
-
-### Script de Deploy
-```bash
-#!/bin/bash
-# deploy_all.sh
-
-DEVICES=("192.168.1.100" "192.168.1.101" "192.168.1.102" "192.168.1.103")
-
-for device in "${DEVICES[@]}"; do
-    echo "Deploying to $device..."
-    pio run --target upload --upload-port $device
-    sleep 5
-done
-```
-
-## 📚 Recursos Adicionais
-
-### Documentação
-- [ESP32 Reference](https://docs.espressif.com/projects/esp-idf/en/latest/esp32/)
-- [PlatformIO Docs](https://docs.platformio.org/)
-- [MQTT Protocol](https://mqtt.org/mqtt-specification/)
-- [LVGL Graphics](https://lvgl.io/)
-
-### Bibliotecas Úteis
-- [AsyncMQTTClient](https://github.com/marvinroger/async-mqtt-client)
-- [ESP32 OTA](https://github.com/espressif/arduino-esp32/tree/master/libraries/Update)
-- [TFT_eSPI](https://github.com/Bodmer/TFT_eSPI)
-- [ESP32Encoder](https://github.com/madhephaestus/ESP32Encoder)
+Cada projeto contém:
+- `README.md` - Documentação específica
+- `CLAUDE.md` - Instruções para assistente AI
+- Esquemáticos e diagramas de hardware
+- Guias de configuração
 
 ## 🆘 Suporte
 
-Para dúvidas ou problemas:
-1. Verifique a documentação específica de cada firmware
-2. Consulte os logs via serial ou MQTT
-3. Abra uma issue no repositório
-4. Contate: suporte@autocore.com
+Para problemas ou dúvidas:
+1. Consulte a documentação específica do projeto
+2. Verifique os logs via serial ou MQTT
+3. Abra uma issue no GitHub
+4. Entre em contato com a equipe de desenvolvimento
 
 ---
 
-**Última Atualização:** 07 de agosto de 2025  
-**Versão da Documentação:** 1.0.0  
+**Última Atualização:** 13 de Agosto de 2025  
+**Versão da Documentação:** 2.0.0  
 **Mantenedor:** Lee Chardes
