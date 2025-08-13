@@ -90,7 +90,9 @@ check: ## Verifica dependências e configuração
 
 start: ## Inicia o Gateway
 	@echo -e "$(GREEN)🚀 Iniciando AutoCore Gateway...$(NC)"
-	@python3 run.py
+	@echo -e "$(BLUE)💡 Pressione Ctrl+C ou Ctrl+] para parar$(NC)"
+	@trap 'echo -e "\n$(YELLOW)⚠️ Gateway interrompido$(NC)"; exit 0' INT QUIT; \
+		python3 run.py
 
 start-bg: ## Inicia Gateway em background
 	@echo -e "$(GREEN)🚀 Iniciando Gateway em background...$(NC)"
@@ -174,7 +176,9 @@ watch: ## Monitora mudanças e reinicia automaticamente
 
 debug: ## Inicia Gateway em modo debug
 	@echo -e "$(GREEN)🐛 Iniciando em modo debug...$(NC)"
-	@LOG_LEVEL=DEBUG python3 run.py
+	@echo -e "$(BLUE)💡 Pressione Ctrl+C ou Ctrl+] para parar$(NC)"
+	@trap 'echo -e "\n$(YELLOW)⚠️ Modo debug interrompido$(NC)"; exit 0' INT QUIT; \
+		LOG_LEVEL=DEBUG python3 run.py
 
 # Comandos de manutenção
 upgrade: ## Atualiza dependências
