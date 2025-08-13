@@ -154,6 +154,10 @@ firmware/esp32-display-esp-idf/sdkconfig.old
 firmware/*/.pio/
 firmware/**/.pio/
 
+# TODO: Remover monitor/ do .gitignore após finalizar desenvolvimento
+# Temporariamente ignorando pasta monitor (ferramentas de monitoramento em desenvolvimento)
+monitor/
+
 # Keep these
 !.gitkeep
 !requirements.txt
