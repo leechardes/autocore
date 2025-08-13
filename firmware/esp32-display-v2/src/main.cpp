@@ -1,6 +1,6 @@
 /**
  * @file main.cpp
- * @brief AutoTech HMI Display v2 - Main entry point
+ * @brief AutoCore HMI Display v2 - Main entry point
  * 
  * Display HMI totalmente configurável via MQTT
  * Sem arquivo de configuração local - tudo vem do gateway
@@ -171,10 +171,10 @@ void setupMQTT() {
     logger->debug("MQTT Broker: '" + String(MQTT_BROKER) + "'");
     logger->debug("MQTT Port: " + String(MQTT_PORT));
     
-    mqttClient = new MQTTClient(DEVICE_ID, MQTT_BROKER, MQTT_PORT);
+    mqttClient = new MQTTClient(DEVICE_UUID, MQTT_BROKER, MQTT_PORT);
     configReceiver = new ConfigReceiver(mqttClient, configManager, screenApiClient);
-    statusReporter = new StatusReporter(mqttClient, DEVICE_ID);
-    commandSender = new CommandSender(mqttClient, logger, DEVICE_ID);
+    statusReporter = new StatusReporter(mqttClient, DEVICE_UUID);
+    commandSender = new CommandSender(mqttClient, logger, DEVICE_UUID);
     buttonStateManager = new ButtonStateManager(mqttClient, screenManager);
     
     // Show connecting screen
@@ -346,8 +346,8 @@ void setup() {
     #endif
     
     logger = new Logger(logLevel);
-    logger->info("=== AutoTech HMI Display v2 ===");
-    logger->info("Device ID: " + String(DEVICE_ID));
+    logger->info("=== AutoCore HMI Display v2 ===");
+    logger->info("Device ID: " + String(DEVICE_UUID));
     logger->info("Version: " + String(DEVICE_VERSION));
     logger->info("WiFi SSID: " + String(WIFI_SSID));
     logger->info("MQTT Broker: " + String(MQTT_BROKER) + ":" + String(MQTT_PORT));

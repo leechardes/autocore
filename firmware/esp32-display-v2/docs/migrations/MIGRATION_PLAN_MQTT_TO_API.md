@@ -60,9 +60,9 @@ Este plano detalha a migração do sistema de carregamento de configurações de
    ↓
 4. ConfigReceiver::requestConfig()
    ↓
-5. Publica em "autotech/gateway/config/request"
+5. Publica em "autocore/gateway/config/request"
    ↓
-6. Gateway responde em "autotech/gateway/config/response"
+6. Gateway responde em "autocore/gateway/config/response"
    ↓
 7. ConfigReceiver::handleConfigMessage()
    ↓
@@ -78,10 +78,10 @@ Este plano detalha a migração do sistema de carregamento de configurações de
 #### Tópicos MQTT Utilizados
 ```cpp
 // ConfigReceiver.cpp - L21-25
-String configTopic = "autotech/" + deviceId + "/config";           // Device specific
-String requestTopic = "autotech/gateway/config/request";           // Request config
-String responseTopic = "autotech/gateway/config/response";         // Receive config
-String updateTopic = "autotech/config/update";                     // Hot-reload
+String configTopic = "autocore/" + deviceId + "/config";           // Device specific
+String requestTopic = "autocore/gateway/config/request";           // Request config
+String responseTopic = "autocore/gateway/config/response";         // Receive config
+String updateTopic = "autocore/config/update";                     // Hot-reload
 ```
 
 #### Formato JSON Atual (MQTT)
@@ -218,12 +218,12 @@ struct CachedConfig {
 ```cpp
 // ============== MQTT (10.0.10.100:1883) ==============
 // Manter MQTT para comunicação em tempo real:
-- Comandos de relés: "autotech/relay_board_1/command"
-- Status: "autotech/hmi_display_1/status"
-- Telemetria: "autotech/hmi_display_1/telemetry"
-- Hot-reload: "autotech/config/update" (trigger para recarregar via API)
-- Eventos: "autotech/events/*"
-- Alertas: "autotech/alerts/*"
+- Comandos de relés: "autocore/relay_board_1/command"
+- Status: "autocore/hmi_display_1/status"
+- Telemetria: "autocore/hmi_display_1/telemetry"
+- Hot-reload: "autocore/config/update" (trigger para recarregar via API)
+- Eventos: "autocore/events/*"
+- Alertas: "autocore/alerts/*"
 
 // ============== API REST (10.0.10.100:8081) ==============
 // Migrar para REST dados estruturados:
@@ -487,12 +487,12 @@ public:
 -   
 -   // Setup topics - REMOVE CONFIG TOPICS
 -   String deviceId = mqttClient->getDeviceId();
--   configTopic = "autotech/" + deviceId + "/config";
--   requestTopic = "autotech/gateway/config/request";
--   responseTopic = "autotech/gateway/config/response";
+-   configTopic = "autocore/" + deviceId + "/config";
+-   requestTopic = "autocore/gateway/config/request";
+-   responseTopic = "autocore/gateway/config/response";
 +   
 +   // Keep only hot-reload topic  
-    updateTopic = "autotech/config/update";
+    updateTopic = "autocore/config/update";
 }
 
 void ConfigReceiver::begin() {
@@ -639,11 +639,11 @@ void setupMQTT() {
 ## ⚖️ Compatibilidade
 
 ### Manter MQTT Para
-- ✅ **Comandos de relés**: `autotech/relay_board_1/command`
-- ✅ **Status de sistema**: `autotech/hmi_display_1/status`  
-- ✅ **Telemetria**: `autotech/hmi_display_1/telemetry`
-- ✅ **Hot-reload trigger**: `autotech/config/update`
-- ✅ **Emergency commands**: `autotech/system/emergency_stop`
+- ✅ **Comandos de relés**: `autocore/relay_board_1/command`
+- ✅ **Status de sistema**: `autocore/hmi_display_1/status`  
+- ✅ **Telemetria**: `autocore/hmi_display_1/telemetry`
+- ✅ **Hot-reload trigger**: `autocore/config/update`
+- ✅ **Emergency commands**: `autocore/system/emergency_stop`
 
 ### Migrar para API REST
 - 🔄 **Lista de telas**: `GET /api/screens`

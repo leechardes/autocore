@@ -146,7 +146,7 @@ Para usar IP fixo em vez de DHCP:
 
 ### Tópicos MQTT Customizados
 
-Por padrão, usa o formato: `autotech/{device_id}/{tipo}`
+Por padrão, usa o formato: `autocore/{device_id}/{tipo}`
 
 Para customizar:
 ```cpp

@@ -25,7 +25,7 @@
 
 #### 1. Clone do Repositório
 ```bash
-git clone https://github.com/autotech/firmware-hmi-display-v2.git
+git clone https://github.com/autocore/firmware-hmi-display-v2.git
 cd firmware-hmi-display-v2
 ```
 
@@ -288,22 +288,22 @@ pio device monitor | grep -v "DEBUG"
 sudo apt install mosquitto-clients
 
 # Monitor todos os tópicos
-mosquitto_sub -h localhost -t "autotech/#" -v
+mosquitto_sub -h localhost -t "autocore/#" -v
 
 # Monitor específico
-mosquitto_sub -h localhost -t "autotech/hmi_display_1/status" -v
+mosquitto_sub -h localhost -t "autocore/hmi_display_1/status" -v
 ```
 
 #### Test MQTT Messages
 ```bash
 # Simular configuração
 mosquitto_pub -h localhost \
-  -t "autotech/gateway/config/response" \
+  -t "autocore/gateway/config/response" \
   -f test_config.json
 
 # Simular comando
 mosquitto_pub -h localhost \
-  -t "autotech/hmi_display_1/command" \
+  -t "autocore/hmi_display_1/command" \
   -m '{"type":"system","action":"ping"}'
 ```
 

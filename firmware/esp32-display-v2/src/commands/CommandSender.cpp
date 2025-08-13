@@ -1,15 +1,24 @@
 /**
  * @file CommandSender.cpp
- * @brief Implementação do gerenciador de comandos MQTT
+ * @brief Implementação do gerenciador de comandos MQTT v2.2.0 compliant
  */
 
 #include "commands/CommandSender.h"
+#include "core/MQTTProtocol.h"
 #include "core/Logger.h"
 
 extern Logger* logger;
 
 CommandSender::CommandSender(MQTTClient* mqtt, Logger* log, const String& devId) 
     : mqttClient(mqtt), logger(log), deviceId(devId), commandCounter(0) {
+    
+    // Initialize heartbeat arrays
+    for (int i = 0; i < MAX_CHANNELS; i++) {
+        heartbeatSequence[i] = 0;
+        lastHeartbeat[i] = 0;
+        heartbeatActive[i] = false;
+        heartbeatTargetDevice[i] = "";
+    }
 }
 
 String CommandSender::generateRequestId() {
@@ -18,13 +27,7 @@ String CommandSender::generateRequestId() {
 }
 
 String CommandSender::getCurrentTimestamp() {
-    // Formato simplificado para ESP32
-    unsigned long currentMillis = millis();
-    unsigned long seconds = currentMillis / 1000;
-    unsigned long minutes = seconds / 60;
-    unsigned long hours = minutes / 60;
-    
-    return String(hours) + ":" + String(minutes % 60) + ":" + String(seconds % 60);
+    return MQTTProtocol::getISOTimestamp();
 }
 
 bool CommandSender::sendCommand(NavButton* button) {
@@ -46,7 +49,7 @@ bool CommandSender::sendCommand(NavButton* button) {
                     button->getDeviceId(),
                     button->getChannel(),
                     button->getState() ? "OFF" : "ON",  // Toggle
-                    false  // Não é momentary
+                    "toggle"  // Function type
                 );
             } else {
                 // Para botões momentary, permitir comandos repetidos mas com debounce menor
@@ -54,7 +57,7 @@ bool CommandSender::sendCommand(NavButton* button) {
                     button->getDeviceId(),
                     button->getChannel(),
                     "ON",  // Momentary sempre ON
-                    true   // É momentary
+                    "momentary"   // Function type
                 );
             }
             
@@ -75,162 +78,177 @@ bool CommandSender::sendCommand(NavButton* button) {
     return false;
 }
 
-bool CommandSender::sendRelayCommand(const String& targetDevice, int channel, 
-                                   const String& state, bool momentary) {
-    // Extrair relay_board_id do device string (formato antigo: "relay_board_1")
-    int board_id = 0;
-    if (targetDevice.startsWith("relay_board_")) {
-        board_id = targetDevice.substring(12).toInt();
+bool CommandSender::sendRelayCommand(const String& targetUuid, int channel, 
+                                   const String& state, const String& functionType) {
+    if (!mqttClient || !mqttClient->isConnected()) {
+        logger->warning("MQTT not connected, command not sent");
+        return false;
     }
     
-    if (board_id > 0 && DeviceRegistry::getInstance()->hasRelayBoard(board_id)) {
-        // Usar novo formato se relay board existe no registry
-        String function_type = momentary ? "momentary" : "toggle";
-        sendRelayCommandV2(board_id, channel, state == "ON", function_type);
-        return true;
-    } else {
-        // Fallback para formato antigo
-        logger->warning("Using legacy format for device: " + targetDevice);
+    String topic = "autocore/devices/" + targetUuid + "/relays/set";
+    
+    StaticJsonDocument<512> doc;
+    MQTTProtocol::addProtocolFields(doc); // Adiciona protocol_version, uuid, timestamp
+    
+    doc["channel"] = channel;
+    doc["state"] = (state == "ON" || state == "true" || state == "1");
+    doc["function_type"] = functionType;
+    doc["user"] = "display_touch";
+    doc["source_uuid"] = MQTTProtocol::getDeviceUUID();
+    
+    String payload;
+    serializeJson(doc, payload);
+    bool result = mqttClient->publish(topic, payload);
+    
+    if (result) {
+        logger->info("CMD: Sent " + functionType + " command to " + 
+                    targetUuid + " ch:" + String(channel) + " state:" + state);
         
-        JsonDocument doc;
-        
-        doc["timestamp"] = getCurrentTimestamp();
-        doc["device_id"] = deviceId;
-        doc["request_id"] = generateRequestId();
-        doc["action"] = "relay_command";
-        doc["target"] = targetDevice;
-        doc["channel"] = channel;
-        doc["state"] = state;
-        
-        if (momentary) {
-            doc["momentary"] = true;
+        // Se for momentâneo e ON, iniciar heartbeat
+        if (functionType == "momentary" && (state == "ON" || state == "true" || state == "1")) {
+            startHeartbeat(targetUuid, channel);
         }
-        
-        // Enviar para o gateway, não direto para o dispositivo
-        String topic = "autotech/gateway/command";
-        String payload;
-        serializeJson(doc, payload);
-        
-        logger->info("Enviando comando para gateway: " + payload);
-        
-        return mqttClient->publish(topic, payload);
+    } else {
+        logger->error("CMD: Failed to send command to " + targetUuid);
+    }
+    
+    return result;
+}
+
+void CommandSender::startHeartbeat(const String& targetUuid, int channel) {
+    if (channel < 1 || channel > MAX_CHANNELS) {
+        logger->error("CMD: Invalid channel for heartbeat: " + String(channel));
+        return;
+    }
+    
+    int idx = channel - 1;
+    heartbeatActive[idx] = true;
+    heartbeatSequence[idx] = 0;
+    heartbeatTargetDevice[idx] = targetUuid;
+    lastHeartbeat[idx] = millis();
+    
+    logger->info("CMD: Started heartbeat for " + targetUuid + " channel " + String(channel));
+}
+
+void CommandSender::stopHeartbeat(int channel) {
+    if (channel < 1 || channel > MAX_CHANNELS) return;
+    
+    int idx = channel - 1;
+    heartbeatActive[idx] = false;
+    heartbeatTargetDevice[idx] = "";
+    
+    logger->info("CMD: Stopped heartbeat for channel " + String(channel));
+}
+
+void CommandSender::sendHeartbeat(const String& targetUuid, int channel) {
+    if (channel < 1 || channel > MAX_CHANNELS) return;
+    
+    int idx = channel - 1;
+    if (!heartbeatActive[idx]) return;
+    
+    String topic = "autocore/devices/" + targetUuid + "/relays/heartbeat";
+    
+    StaticJsonDocument<512> doc;
+    MQTTProtocol::addProtocolFields(doc);
+    
+    doc["channel"] = channel;
+    doc["source_uuid"] = MQTTProtocol::getDeviceUUID();
+    doc["target_uuid"] = targetUuid;
+    doc["sequence"] = ++heartbeatSequence[idx];
+    
+    mqttClient->publish(topic, doc, QOS_HEARTBEAT);
+    
+    lastHeartbeat[idx] = millis();
+    
+    logger->debug("CMD: Heartbeat sent to " + targetUuid + " ch:" + String(channel) + 
+                 " seq:" + String(heartbeatSequence[idx]));
+}
+
+void CommandSender::processHeartbeats() {
+    unsigned long now = millis();
+    
+    for (int i = 0; i < MAX_CHANNELS; i++) {
+        if (heartbeatActive[i]) {
+            if (now - lastHeartbeat[i] >= HEARTBEAT_INTERVAL_MS) {
+                sendHeartbeat(heartbeatTargetDevice[i], i + 1);
+            }
+        }
     }
 }
 
+void CommandSender::sendDisplayEvent(const String& eventType, const JsonObject& eventData) {
+    String topic = "autocore/devices/" + MQTTProtocol::getDeviceUUID() + "/display/touch";
+    
+    StaticJsonDocument<512> doc;
+    MQTTProtocol::addProtocolFields(doc);
+    
+    doc["event"] = eventType;
+    doc["data"] = eventData;
+    
+    mqttClient->publish(topic, doc, QOS_TELEMETRY);
+    
+    logger->info("CMD: Display event sent: " + eventType);
+}
+
 bool CommandSender::sendPresetCommand(const String& preset) {
-    JsonDocument doc;
+    String topic = "autocore/system/commands";
     
-    doc["timestamp"] = getCurrentTimestamp();
-    doc["device_id"] = deviceId;
-    doc["request_id"] = generateRequestId();
-    doc["action"] = "preset";
+    StaticJsonDocument<512> doc;
+    MQTTProtocol::addProtocolFields(doc);
+    
+    doc["command_type"] = "preset";
     doc["preset"] = preset;
+    doc["user"] = "display_touch";
+    doc["source_uuid"] = MQTTProtocol::getDeviceUUID();
     
-    String topic = "autotech/gateway/command";
+    logger->info("CMD: Sending preset command: " + preset);
+    
     String payload;
     serializeJson(doc, payload);
-    
-    logger->info("Enviando preset: " + preset);
-    
     return mqttClient->publish(topic, payload);
 }
 
 bool CommandSender::sendModeCommand(const String& mode) {
-    JsonDocument doc;
+    String topic = "autocore/system/commands";
     
-    doc["timestamp"] = getCurrentTimestamp();
-    doc["device_id"] = deviceId;
-    doc["request_id"] = generateRequestId();
-    doc["action"] = "set_mode";
+    StaticJsonDocument<512> doc;
+    MQTTProtocol::addProtocolFields(doc);
+    
+    doc["command_type"] = "set_mode";
     doc["mode"] = mode;
+    doc["user"] = "display_touch";
+    doc["source_uuid"] = MQTTProtocol::getDeviceUUID();
     
-    String topic = "autotech/4x4_controller/command";
+    logger->info("CMD: Sending mode command: " + mode);
+    
     String payload;
     serializeJson(doc, payload);
-    
-    logger->info("Enviando modo 4x4: " + mode);
-    
     return mqttClient->publish(topic, payload);
 }
 
 bool CommandSender::sendActionCommand(const String& action, JsonObject& params) {
-    JsonDocument doc;
+    String topic = "autocore/system/commands";
     
-    doc["timestamp"] = getCurrentTimestamp();
-    doc["device_id"] = deviceId;
-    doc["request_id"] = generateRequestId();
+    StaticJsonDocument<512> doc;
+    MQTTProtocol::addProtocolFields(doc);
+    
+    doc["command_type"] = "action";
     doc["action"] = action;
+    doc["user"] = "display_touch";
+    doc["source_uuid"] = MQTTProtocol::getDeviceUUID();
     
     // Copiar parâmetros
+    JsonObject parameters = doc["parameters"].to<JsonObject>();
     for (JsonPair kv : params) {
-        doc[kv.key()] = kv.value();
+        parameters[kv.key()] = kv.value();
     }
     
-    String topic = "autotech/gateway/command";
+    logger->info("CMD: Sending action command: " + action);
+    
     String payload;
     serializeJson(doc, payload);
-    
     return mqttClient->publish(topic, payload);
 }
 
-void CommandSender::sendDisplayStatus(const String& currentScreen, int backlight) {
-    JsonDocument doc;
-    
-    doc["timestamp"] = getCurrentTimestamp();
-    doc["device_id"] = deviceId;
-    doc["status"] = "online";
-    doc["current_screen"] = currentScreen;
-    doc["backlight"] = backlight;
-    
-    String topic = "autotech/" + deviceId + "/status";
-    String payload;
-    serializeJson(doc, payload);
-    
-    mqttClient->publish(topic, payload, true);  // Retained
-}
-
-void CommandSender::sendRelayCommandV2(uint8_t relay_board_id, uint8_t channel, bool state, const String& function_type) {
-    if (!mqttClient || !mqttClient->isConnected()) {
-        logger->error("Cannot send command - MQTT not connected");
-        return;
-    }
-    
-    // Resolver UUID do device através do relay_board_id
-    String deviceUuid = DeviceRegistry::getInstance()->resolveRelayBoardToUuid(relay_board_id);
-    
-    if (deviceUuid.isEmpty()) {
-        logger->error("Cannot resolve device UUID for relay_board_id: " + String(relay_board_id));
-        return;
-    }
-    
-    // Construir novo tópico MQTT
-    String topic = "autocore/devices/" + deviceUuid + "/relay/command";
-    
-    // Construir payload
-    JsonDocument doc;
-    doc["channel"] = channel;
-    doc["state"] = state;
-    doc["function_type"] = function_type;
-    
-    // Adicionar campo momentary se necessário
-    if (function_type == "momentary") {
-        doc["momentary"] = true;
-    }
-    
-    doc["user"] = "hmi_display";
-    
-    // Adicionar timestamp
-    doc["timestamp"] = millis(); // Simplificado para ESP32
-    
-    String payload;
-    serializeJson(doc, payload);
-    
-    logger->info("Sending command to " + topic);
-    logger->debug("Payload: " + payload);
-    
-    if (mqttClient->publish(topic, payload)) {
-        logger->info("Command sent successfully");
-    } else {
-        logger->error("Failed to send command");
-    }
-}
+// sendDisplayStatus removed - status is now handled by MQTTClient
+// sendRelayCommandV2 removed - replaced by v2.2.0 compliant sendRelayCommand

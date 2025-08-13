@@ -1,6 +1,6 @@
 /**
  * @file Theme.h
- * @brief Definições de cores e estilos do tema AutoTech
+ * @brief Definições de cores e estilos do tema AutoCore
  */
 
 #ifndef THEME_H
@@ -50,7 +50,7 @@
 // ============================================================================
 
 /**
- * @brief Aplica o tema AutoTech na tela
+ * @brief Aplica o tema AutoCore na tela
  * @param screen Objeto da tela
  */
 static inline void theme_apply_screen(lv_obj_t* screen) {

@@ -2,7 +2,7 @@
  * @file ScreenApiClient.cpp
  * @brief Implementação do cliente API REST para configurações de telas
  * 
- * @author Sistema AutoTech
+ * @author Sistema AutoCore
  * @version 2.0.0  
  * @date 2025-08-12
  */
@@ -40,7 +40,7 @@ bool ScreenApiClient::begin() {
     // Configurar HTTPClient
     httpClient.setTimeout(API_TIMEOUT);
     httpClient.setReuse(true);
-    httpClient.setUserAgent("AutoTech-HMI-v2.0.0");
+    httpClient.setUserAgent("AutoCore-HMI-v2.0.0");
     
     if (logger) {
         logger->info("ScreenApiClient: HTTP client configured");
@@ -204,7 +204,7 @@ bool ScreenApiClient::makeHttpRequest(const String& endpoint, String& response) 
     // Headers padrão
     httpClient.addHeader("Accept", "application/json");
     httpClient.addHeader("Content-Type", "application/json");
-    httpClient.addHeader("User-Agent", "AutoTech-HMI-v2.0.0");
+    httpClient.addHeader("User-Agent", "AutoCore-HMI-v2.0.0");
     
     lastHttpCode = httpClient.GET();
     

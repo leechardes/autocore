@@ -1,6 +1,6 @@
 /**
  * @file Icons.h
- * @brief Sistema de ícones para o AutoTech HMI Display
+ * @brief Sistema de ícones para o AutoCore HMI Display
  */
 
 #ifndef ICONS_H
@@ -73,7 +73,7 @@ public:
         if (strcmp(iconId, "reverse") == 0) return LV_SYMBOL_DOWN;      // Usando DOWN como genérico para ré
         if (strcmp(iconId, "parking") == 0) return LV_SYMBOL_PAUSE;    // Usando PAUSE como genérico para parking
         
-        // Ícones específicos do AutoTech
+        // Ícones específicos do AutoCore
         if (strcmp(iconId, "4x4") == 0) return LV_SYMBOL_DRIVE;        // Usando DRIVE como genérico para 4x4
         if (strcmp(iconId, "4x2") == 0) return LV_SYMBOL_DRIVE;        // Usando DRIVE como genérico para 4x2
         if (strcmp(iconId, "4x4_low") == 0) return LV_SYMBOL_DRIVE;    // Usando DRIVE como genérico para 4x4 low

@@ -8,11 +8,11 @@
     "metadata": {
       "created_at": "2025-08-04T00:00:00Z",
       "updated_at": "2025-08-04T22:10:00.000000",
-      "author": "AutoTech Team",
-      "description": "Configura\u00e7\u00e3o completa do sistema AutoTech com todas as funcionalidades"
+      "author": "AutoCore Team",
+      "description": "Configura\u00e7\u00e3o completa do sistema AutoCore com todas as funcionalidades"
     },
     "system": {
-      "name": "AutoTech Control System",
+      "name": "AutoCore Control System",
       "language": "pt-BR",
       "theme": "dark",
       "display": {
@@ -472,12 +472,12 @@
       "username": "",
       "password": "",
       "topics": {
-        "prefix": "autotech",
-        "command": "autotech/+/command",
-        "status": "autotech/+/status",
-        "telemetry": "autotech/+/telemetry",
-        "config_request": "autotech/gateway/config/request",
-        "config_response": "autotech/gateway/config/response"
+        "prefix": "autocore",
+        "command": "autocore/+/command",
+        "status": "autocore/+/status",
+        "telemetry": "autocore/+/telemetry",
+        "config_request": "autocore/gateway/config/request",
+        "config_response": "autocore/gateway/config/response"
       }
     },
     "simulation": {
@@ -489,7 +489,7 @@
 }...
 
 Mensagem recebida:
-Tópico: autotech/gateway/config/response
+Tópico: autocore/gateway/config/response
 Tamanho: 7483 bytes
 Payload: {
   "timestamp": "2025-08-05T00:52:05.694463",
@@ -501,11 +501,11 @@ Payload: {
     "metadata": {
       "created_at": "2025-08-04T00:00:00Z",
       "updated_at": "2025-08-04T22:10:00.000000",
-      "author": "AutoTech Team",
-      "description": "Configura\u00e7\u00e3o completa do sistema AutoTech com todas as funcionalidades"
+      "author": "AutoCore Team",
+      "description": "Configura\u00e7\u00e3o completa do sistema AutoCore com todas as funcionalidades"
     },
     "system": {
-      "name": "AutoTech Control System",
+      "name": "AutoCore Control System",
       "language": "pt-BR",
       "theme": "dark",
       "display": {
@@ -965,12 +965,12 @@ Payload: {
       "username": "",
       "password": "",
       "topics": {
-        "prefix": "autotech",
-        "command": "autotech/+/command",
-        "status": "autotech/+/status",
-        "telemetry": "autotech/+/telemetry",
-        "config_request": "autotech/gateway/config/request",
-        "config_response": "autotech/gateway/config/response"
+        "prefix": "autocore",
+        "command": "autocore/+/command",
+        "status": "autocore/+/status",
+        "telemetry": "autocore/+/telemetry",
+        "config_request": "autocore/gateway/config/request",
+        "config_response": "autocore/gateway/config/response"
       }
     },
     "simulation": {

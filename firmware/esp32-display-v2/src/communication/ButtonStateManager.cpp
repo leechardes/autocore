@@ -28,20 +28,20 @@ void ButtonStateManager::begin() {
         };
         
         // Status de canais individuais
-        mqttClient->subscribe("autotech/+/channel/+/status", emptyCallback);
-        logger->info("Inscrito em: autotech/+/channel/+/status");
+        mqttClient->subscribe("autocore/devices/+/relays/status", 0, emptyCallback);
+        logger->info("Inscrito em: autocore/devices/+/relays/status");
         
         // Status geral das placas
-        mqttClient->subscribe("autotech/+/status", emptyCallback);
-        logger->info("Inscrito em: autotech/+/status");
+        mqttClient->subscribe("autocore/devices/+/status", 0, emptyCallback);
+        logger->info("Inscrito em: autocore/devices/+/status");
         
         // Status do controlador 4x4
-        mqttClient->subscribe("autotech/4x4_controller/status", emptyCallback);
-        logger->info("Inscrito em: autotech/4x4_controller/status");
+        mqttClient->subscribe("autocore/devices/4x4_controller/status", 0, emptyCallback);
+        logger->info("Inscrito em: autocore/devices/4x4_controller/status");
         
         // Status de presets
-        mqttClient->subscribe("autotech/preset/+/status", emptyCallback);
-        logger->info("Inscrito em: autotech/preset/+/status");
+        mqttClient->subscribe("autocore/devices/+/presets/status", 0, emptyCallback);
+        logger->info("Inscrito em: autocore/devices/+/presets/status");
     }
     
     logger->info("ButtonStateManager pronto para receber status via MQTTClient");
@@ -184,19 +184,18 @@ bool ButtonStateManager::isButtonActive(const String& buttonId) {
 
 void ButtonStateManager::handleMQTTMessage(const String& topic, JsonDocument& payload) {
     // Parse do tópico para determinar tipo
-    if (topic.indexOf("/channel/") > 0 && topic.endsWith("/status")) {
-        // Status de canal específico: autotech/relay_board_1/channel/1/status
-        int boardEnd = topic.indexOf("/channel/");
-        String boardId = topic.substring(9, boardEnd); // Skip "autotech/"
+    if (topic.indexOf("/relays/") > 0 && topic.endsWith("/status")) {
+        // Status de relé específico: autocore/devices/{uuid}/relays/status
+        int devicesPos = topic.indexOf("/devices/");
+        int relaysPos = topic.indexOf("/relays/");
+        String deviceId = topic.substring(devicesPos + 9, relaysPos); // Skip "/devices/"
         
-        int channelStart = boardEnd + 9; // Length of "/channel/"
-        int channelEnd = topic.lastIndexOf("/status");
-        int channel = topic.substring(channelStart, channelEnd).toInt();
-        
+        // Extraír informações do payload (agora contém canal/relé)
+        int channel = payload["channel"] | payload["relay_id"] | 0;
         String state = payload["state"].as<String>();
         String source = payload["device_id"] | payload["source"] | "unknown";
         
-        processRelayStatus(boardId, channel, state, source);
+        processRelayStatus(deviceId, channel, state, source);
         
     } else if (topic.indexOf("/4x4_controller/status") > 0) {
         // Status de modo 4x4

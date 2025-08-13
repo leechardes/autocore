@@ -230,7 +230,7 @@ NavButton* ScreenFactory::createRelayItem(lv_obj_t* parent, JsonObject& config) 
             }
             
             // Enviar comando com novo formato
-            commandSender->sendRelayCommandV2(relay_board_id, relay_channel_id, newState, function_type);
+            commandSender->sendRelayCommand(String(relay_board_id), relay_channel_id, newState ? "on" : "off", function_type);
             
             // Para toggle, atualizar estado visual imediatamente
             if (function_type == "toggle") {

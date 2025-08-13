@@ -50,7 +50,7 @@ O **AutoTech HMI Display v2** é um sistema de interface humano-máquina revoluc
 
 ```bash
 # 1. Clonar o repositório
-git clone https://github.com/autotech/firmware-hmi-display-v2.git
+git clone https://github.com/autocore/firmware-hmi-display-v2.git
 cd firmware-hmi-display-v2
 
 # 2. Configurar dispositivo
@@ -244,7 +244,7 @@ src/
 
 ### Canais de Suporte
 
-- 🐛 **Issues**: [GitHub Issues](https://github.com/autotech/firmware-hmi-display-v2/issues)
+- 🐛 **Issues**: [GitHub Issues](https://github.com/autocore/firmware-hmi-display-v2/issues)
 - 📧 **Email**: support@autotech.com
 - 📖 **Docs**: [docs.autotech.com](https://docs.autotech.com)
 - 💬 **Discord**: [AutoTech Community](https://discord.gg/autotech)
@@ -265,11 +265,11 @@ Edite o arquivo `include/config/DeviceConfig.h`:
 <details>
 <summary><strong>❓ Como enviar configuração via MQTT?</strong></summary>
 <br>
-Publique no tópico `autotech/gateway/config/response`:
+Publique no tópico `autocore/gateway/config/response`:
 
 ```bash
 mosquitto_pub -h localhost \
-  -t "autotech/gateway/config/response" \
+  -t "autocore/gateway/config/response" \
   -f minha_config.json
 ```
 </details>

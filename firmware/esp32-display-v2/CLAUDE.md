@@ -84,7 +84,7 @@ graph TD
 
 ### Topologia de Tópicos
 ```
-autotech/
+autocore/
 ├── gateway/config/
 │   ├── request          # HMI → Gateway: Solicita config
 │   ├── response         # Gateway → HMI: Envia config  
@@ -442,21 +442,21 @@ pio test
 ### Debug MQTT
 ```bash
 # Monitor todos os tópicos AutoTech
-mosquitto_sub -h localhost -t "autotech/#" -v
+mosquitto_sub -h localhost -t "autocore/#" -v
 
 # Simular configuração
 mosquitto_pub -h localhost \
-  -t "autotech/gateway/config/response" \
+  -t "autocore/gateway/config/response" \
   -f docs/config.json
 
 # Teste comando relé
 mosquitto_pub -h localhost \
-  -t "autotech/relay_board_1/command" \
+  -t "autocore/relay_board_1/command" \
   -m '{"channel":1,"action":"toggle"}'
 
 # Monitor status do HMI  
 mosquitto_sub -h localhost \
-  -t "autotech/hmi_display_1/status" -v
+  -t "autocore/hmi_display_1/status" -v
 ```
 
 ## 🎯 Tarefas Comuns
@@ -541,7 +541,7 @@ public:
         String payload;
         serializeJson(cmd, payload);
         
-        mqttClient->publish("autotech/servo_controller_1/command", payload);
+        mqttClient->publish("autocore/servo_controller_1/command", payload);
     }
 };
 

@@ -10,6 +10,7 @@
  */
 
 #include "communication/ConfigReceiver.h"
+#include "core/MQTTProtocol.h"
 #include "core/Logger.h"
 #include <ArduinoJson.h>
 
@@ -24,7 +25,7 @@ ConfigReceiver::ConfigReceiver(MQTTClient* mqtt, ConfigManager* config, ScreenAp
     instance = this;
     
     // Setup MQTT topics (apenas hot-reload)
-    updateTopic = "autotech/config/update";  // Broadcast topic for updates
+    updateTopic = "autocore/system/config/update";  // Broadcast topic for updates
     
     // Verificar se API client está disponível
     if (apiClient) {
@@ -49,7 +50,7 @@ void ConfigReceiver::begin() {
     }
     
     // Subscribe apenas ao hot-reload topic
-    mqttClient->subscribe(updateTopic, onConfigUpdate);
+    mqttClient->subscribe(updateTopic, 0, onConfigUpdate);
     
     if (logger) {
         logger->info("ConfigReceiver: Hot reload enabled on " + updateTopic);
@@ -131,13 +132,13 @@ bool ConfigReceiver::loadFromMqtt() {
     
     // Subscribe to legacy MQTT config topics  
     String deviceId = mqttClient->getDeviceId();
-    String configTopic = "autotech/" + deviceId + "/config";
-    String requestTopic = "autotech/gateway/config/request";
-    String responseTopic = "autotech/gateway/config/response";
+    String configTopic = "autocore/" + deviceId + "/config";
+    String requestTopic = "autocore/gateway/config/request";
+    String responseTopic = "autocore/gateway/config/response";
     
     // Subscribe temporariamente
-    mqttClient->subscribe(configTopic, onConfigReceived);
-    mqttClient->subscribe(responseTopic, onConfigReceived);
+    mqttClient->subscribe(configTopic, 0, onConfigReceived);
+    mqttClient->subscribe(responseTopic, 0, onConfigReceived);
     
     // Enviar request
     requestConfigMqtt();
@@ -178,15 +179,15 @@ void ConfigReceiver::requestConfigMqtt() {
     
     // Create request message (formato esperado pelo gateway)
     JsonDocument doc;
+    MQTTProtocol::addProtocolFields(doc);  // Adiciona version, uuid, timestamp
     doc["device_id"] = mqttClient->getDeviceId();
     doc["request"] = "full_config";
-    doc["timestamp"] = millis();
     doc["source"] = "api_fallback"; // Indicar que é fallback da API
     
     String payload;
     serializeJson(doc, payload);
     
-    String requestTopic = "autotech/gateway/config/request";
+    String requestTopic = "autocore/gateway/config/request";
     
     if (logger) {
         logger->debug("ConfigReceiver: MQTT request payload: " + payload);
@@ -403,18 +404,18 @@ void ConfigReceiver::handleConfigUpdate(const String& payload) {
 void ConfigReceiver::sendConfigAck(const String& source, const String& status) {
     // Send acknowledgment via MQTT
     JsonDocument ack;
+    MQTTProtocol::addProtocolFields(ack);  // Adiciona version, uuid, timestamp
     ack["device_id"] = mqttClient->getDeviceId();
     ack["type"] = "config_ack";
     ack["source"] = source;
     ack["status"] = status;
     ack["version"] = configManager->getVersion();
-    ack["timestamp"] = millis();
     ack["using_api"] = useApi;
     
     String ackPayload;
     serializeJson(ack, ackPayload);
     
-    String ackTopic = "autotech/config/ack";
+    String ackTopic = "autocore/system/config/ack";
     mqttClient->publish(ackTopic, ackPayload);
     
     if (logger) {

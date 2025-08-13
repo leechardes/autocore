@@ -110,7 +110,7 @@ Definidas em `include/config/DeviceConfig.h`:
 O sistema de hot-reload continua funcionando via MQTT:
 
 ```json
-// Tópico: autotech/config/update
+// Tópico: autocore/config/update
 {
   "command": "reload",
   "target": "all"
@@ -310,5 +310,5 @@ O AutoTech HMI Display v2 agora possui um sistema híbrido robusto que combina o
 
 Para dúvidas sobre a implementação:
 - Consultar logs via serial: `pio device monitor`
-- Verificar status via MQTT: tópico `autotech/config/ack`
+- Verificar status via MQTT: tópico `autocore/config/ack`
 - Testar API: `curl http://10.0.10.100:8081/api/screens`

@@ -186,11 +186,11 @@ ledcWrite(0, 255);               // 100% brilho
 **Debug MQTT Config**:
 ```bash
 # Monitor topic de configuração
-mosquitto_sub -h localhost -t "autotech/gateway/config/#" -v
+mosquitto_sub -h localhost -t "autocore/gateway/config/#" -v
 
 # Simular request manual
 mosquitto_pub -h localhost \
-  -t "autotech/gateway/config/request" \
+  -t "autocore/gateway/config/request" \
   -m '{"device_id":"hmi_display_1","type":"config_request"}'
 ```
 
@@ -454,7 +454,7 @@ python $IDF_PATH/components/partition_table/gen_esp32part.py partition_table.bin
 
 ### Canais de Suporte
 
-**GitHub Issues**: [github.com/autotech/firmware-hmi-display-v2/issues]()
+**GitHub Issues**: [github.com/autocore/firmware-hmi-display-v2/issues]()
 - Bug reports
 - Feature requests  
 - Discussões técnicas

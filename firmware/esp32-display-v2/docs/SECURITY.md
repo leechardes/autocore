@@ -51,14 +51,14 @@ String clientId = String(MQTT_CLIENT_ID_PREFIX) +
   "mqtt_acl": {
     "hmi_display_1": {
       "subscribe": [
-        "autotech/gateway/config/#",
-        "autotech/relay_board_+/status",
-        "autotech/sensor_board_+/telemetry"
+        "autocore/gateway/config/#",
+        "autocore/relay_board_+/status",
+        "autocore/sensor_board_+/telemetry"
       ],
       "publish": [
-        "autotech/hmi_display_1/status",
-        "autotech/hmi_display_1/telemetry",
-        "autotech/relay_board_+/command"
+        "autocore/hmi_display_1/status",
+        "autocore/hmi_display_1/telemetry",
+        "autocore/relay_board_+/command"
       ]
     }
   }

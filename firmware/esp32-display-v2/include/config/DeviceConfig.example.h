@@ -10,7 +10,7 @@
 // ============================================================================
 /*
 #define DEVICE_ID "hmi_prod_01"
-#define WIFI_SSID "AutoTech_Producao"
+#define WIFI_SSID "AutoCore_Producao"
 #define WIFI_PASSWORD "senha_forte_123"
 #define MQTT_BROKER "mqtt.autotech.com.br"
 #define MQTT_PORT 8883  // TLS
@@ -39,7 +39,7 @@
 /*
 #define DEVICE_ID "hmi_ap_mode"
 #define WIFI_MODE_AP true
-#define WIFI_AP_SSID "AutoTech-Config"
+#define WIFI_AP_SSID "AutoCore-Config"
 #define WIFI_AP_PASS "12345678"
 #define MQTT_BROKER "192.168.4.1"  // IP do AP
 #define ENABLE_WEB_CONFIG true

@@ -207,7 +207,7 @@ sequenceDiagram
 ### Topologia de Tópicos
 
 ```
-autotech/
+autocore/
 ├── gateway/
 │   ├── config/
 │   │   ├── request          # HMI → Gateway: Solicita configuração

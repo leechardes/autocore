@@ -5,7 +5,7 @@
  * Esta classe substitui o carregamento de configurações via MQTT por API REST,
  * proporcionando maior performance e flexibilidade para configurações grandes.
  * 
- * @author Sistema AutoTech
+ * @author Sistema AutoCore
  * @version 2.0.0
  * @date 2025-08-12
  */

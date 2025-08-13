@@ -33,6 +33,12 @@ private:
     String preset;          // Para presets
     String modeValue;       // Para modos 4x4
     
+    // For momentary buttons
+    bool isPressed = false;          // Estado atual do botão momentâneo
+    unsigned long pressStartTime = 0; // Quando o botão foi pressionado
+    String targetDevice;             // UUID do dispositivo alvo
+    String functionType = "toggle";  // "toggle" ou "momentary"
+    
     // Para display items
     String dataSource;      // Fonte dos dados (can, sensors, etc)
     String dataPath;        // Caminho dos dados
@@ -95,6 +101,14 @@ public:
         dataUnit = unit;
     }
     
+    // Configuração para botões momentâneos
+    void setMomentaryConfig(const String& device, int ch, const String& funcType) {
+        targetDevice = device;
+        channel = ch;
+        functionType = funcType;
+        mode = funcType; // Backward compatibility
+    }
+    
     // Getters
     String getDeviceId() const { return deviceId; }
     int getChannel() const { return channel; }
@@ -105,6 +119,22 @@ public:
     String getDataSource() const { return dataSource; }
     String getDataPath() const { return dataPath; }
     String getDataUnit() const { return dataUnit; }
+    
+    // Momentary button getters
+    String getTargetDevice() const { return targetDevice; }
+    String getFunctionType() const { return functionType; }
+    bool getIsPressed() const { return isPressed; }
+    unsigned long getPressStartTime() const { return pressStartTime; }
+    
+    // Momentary button setters
+    void setPressed(bool pressed) { 
+        isPressed = pressed; 
+        if (pressed) {
+            pressStartTime = millis();
+        } else {
+            pressStartTime = 0;
+        }
+    }
     
     // Controle de debounce
     bool canSendCommand() {

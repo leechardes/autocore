@@ -15,9 +15,9 @@ O AutoTech HMI Display v2 suporta **hot reload**, permitindo atualizar a configu
 
 ### 1. Tópicos MQTT
 
-- **Receber atualizações**: `autotech/config/update`
-- **Enviar confirmação**: `autotech/config/update/ack`
-- **Config específica**: `autotech/{device_id}/config`
+- **Receber atualizações**: `autocore/config/update`
+- **Enviar confirmação**: `autocore/config/update/ack`
+- **Config específica**: `autocore/{device_id}/config`
 
 ### 2. Formato das Mensagens
 
@@ -70,7 +70,7 @@ python test_hot_reload.py
 
 ```bash
 # Enviar atualização para todos os dispositivos
-mosquitto_pub -h 10.0.10.100 -t "autotech/config/update" -m '{
+mosquitto_pub -h 10.0.10.100 -t "autocore/config/update" -m '{
   "target": "all",
   "config": {
     "device_type": "hmi_display",
@@ -84,7 +84,7 @@ mosquitto_pub -h 10.0.10.100 -t "autotech/config/update" -m '{
 }'
 
 # Forçar reload
-mosquitto_pub -h 10.0.10.100 -t "autotech/config/update" -m '{
+mosquitto_pub -h 10.0.10.100 -t "autocore/config/update" -m '{
   "target": "hmi_display_1",
   "command": "reload"
 }'
@@ -108,7 +108,7 @@ msg.payload = {
         ]
     }
 };
-msg.topic = "autotech/config/update";
+msg.topic = "autocore/config/update";
 return msg;
 ```
 
@@ -133,7 +133,7 @@ config_update = {
 
 # Enviar
 client.publish(
-    "autotech/config/update", 
+    "autocore/config/update", 
     json.dumps(config_update)
 )
 ```
@@ -206,7 +206,7 @@ configReceiver->enableHotReload([]() {
 2. **MQTT Monitor**
 ```bash
 # Monitorar ACKs
-mosquitto_sub -h 10.0.10.100 -t "autotech/config/update/ack" -v
+mosquitto_sub -h 10.0.10.100 -t "autocore/config/update/ack" -v
 ```
 
 ### Problemas Comuns

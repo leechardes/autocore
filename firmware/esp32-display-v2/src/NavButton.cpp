@@ -20,24 +20,42 @@ NavButton::NavButton(lv_obj_t* parent, const String& text, const String& iconId,
     
     // Verificação de visibilidade removida
     
-    // Handler de clique com debounce mais rigoroso
+    // Handler de eventos com suporte a press/release para botões momentâneos
     lv_obj_add_event_cb(button, [](lv_event_t* e) {
         NavButton* navBtn = (NavButton*)lv_event_get_user_data(e);
+        lv_event_code_t event = lv_event_get_code(e);
         
-        // Para botões toggle, usar debounce mais longo para evitar múltiplos comandos
-        static unsigned long lastClickTime = 0;
-        unsigned long now = millis();
-        
-        // Debounce mais rigoroso - 500ms para evitar múltiplos comandos ao segurar
-        if (now - lastClickTime < 500) {
-            return; // Ignorar clique/toque muito rápido
+        if (navBtn->functionType == "momentary") {
+            // Para botões momentâneos: press/release
+            if (event == LV_EVENT_PRESSED) {
+                navBtn->setPressed(true);
+                if (navBtn->clickCallback) {
+                    navBtn->clickCallback(navBtn);
+                }
+            } else if (event == LV_EVENT_RELEASED) {
+                navBtn->setPressed(false);
+                if (navBtn->clickCallback) {
+                    navBtn->clickCallback(navBtn);
+                }
+            }
+        } else {
+            // Para botões toggle: apenas clicked com debounce
+            if (event == LV_EVENT_CLICKED) {
+                static unsigned long lastClickTime = 0;
+                unsigned long now = millis();
+                
+                // Debounce - 500ms para evitar múltiplos comandos
+                if (now - lastClickTime < 500) {
+                    return;
+                }
+                lastClickTime = now;
+                
+                if (navBtn->clickCallback) {
+                    navBtn->clickCallback(navBtn);
+                }
+            }
         }
-        lastClickTime = now;
-        
-        if (navBtn->clickCallback) {
-            navBtn->clickCallback(navBtn);
-        }
-    }, LV_EVENT_CLICKED, this);
+    }, LV_EVENT_ALL, this);
 }
 
 NavButton::~NavButton() {

@@ -502,8 +502,8 @@ O AutoTech HMI Display v2 é **100% configurável** via JSON, eliminando complet
         "current_limit": 15.0      // Limite de corrente (A)
       },
       "mqtt": {
-        "status_topic": "autotech/relay_board_1/status",
-        "command_topic": "autotech/relay_board_1/command"
+        "status_topic": "autocore/relay_board_1/status",
+        "command_topic": "autocore/relay_board_1/command"
       }
     },
     
@@ -1202,12 +1202,12 @@ python validate_config.py config.json
 ```bash
 # Enviar configuração de teste
 mosquitto_pub -h localhost \
-  -t "autotech/gateway/config/update" \
+  -t "autocore/gateway/config/update" \
   -f test_config.json
 
 # Monitorar resposta
 mosquitto_sub -h localhost \
-  -t "autotech/hmi_display_1/status" \
+  -t "autocore/hmi_display_1/status" \
   -v
 ```
 

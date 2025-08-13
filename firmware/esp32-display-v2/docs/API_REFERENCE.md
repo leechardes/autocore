@@ -32,7 +32,7 @@ O AutoTech HMI Display v2 comunica-se exclusivamente através do protocolo MQTT,
 
 ### Hierarquia Global
 ```
-autotech/
+autocore/
 ├── gateway/                    # Gateway central do sistema
 │   ├── config/
 │   │   ├── request            # → Solicita configuração
@@ -92,7 +92,7 @@ Todas as mensagens seguem este formato base:
 
 ### 1. Configuração do Sistema
 
-#### `autotech/gateway/config/request`
+#### `autocore/gateway/config/request`
 **Direção**: HMI → Gateway  
 **QoS**: 1  
 **Retained**: false  
@@ -113,7 +113,7 @@ Todas as mensagens seguem este formato base:
 }
 ```
 
-#### `autotech/gateway/config/response`
+#### `autocore/gateway/config/response`
 **Direção**: Gateway → HMI  
 **QoS**: 1  
 **Retained**: true  
@@ -134,7 +134,7 @@ Todas as mensagens seguem este formato base:
 }
 ```
 
-#### `autotech/gateway/config/update`
+#### `autocore/gateway/config/update`
 **Direção**: Gateway → HMI  
 **QoS**: 1  
 **Retained**: false  
@@ -155,7 +155,7 @@ Todas as mensagens seguem este formato base:
 
 ### 2. Controle de Dispositivos
 
-#### `autotech/relay_board_1/command`
+#### `autocore/relay_board_1/command`
 **Direção**: HMI → Placa de Relés  
 **QoS**: 1  
 **Retained**: false  
@@ -178,7 +178,7 @@ Todas as mensagens seguem este formato base:
 }
 ```
 
-#### `autotech/relay_board_1/channel/1/command`
+#### `autocore/relay_board_1/channel/1/command`
 **Direção**: HMI → Placa de Relés (Canal Específico)  
 **QoS**: 1  
 **Retained**: false  
@@ -199,7 +199,7 @@ Todas as mensagens seguem este formato base:
 
 ### 3. Status e Monitoramento
 
-#### `autotech/hmi_display_1/status`
+#### `autocore/hmi_display_1/status`
 **Direção**: HMI → Sistema  
 **QoS**: 0  
 **Retained**: true  
@@ -231,7 +231,7 @@ Todas as mensagens seguem este formato base:
 }
 ```
 
-#### `autotech/hmi_display_1/telemetry`
+#### `autocore/hmi_display_1/telemetry`
 **Direção**: HMI → Sistema  
 **QoS**: 0  
 **Retained**: false  
@@ -268,7 +268,7 @@ Todas as mensagens seguem este formato base:
 }
 ```
 
-#### `autotech/hmi_display_1/heartbeat`
+#### `autocore/hmi_display_1/heartbeat`
 **Direção**: HMI → Sistema  
 **QoS**: 0  
 **Retained**: false  
@@ -286,7 +286,7 @@ Todas as mensagens seguem este formato base:
 
 ### 4. Recebimento de Status Externos
 
-#### `autotech/relay_board_1/status`
+#### `autocore/relay_board_1/status`
 **Direção**: Placa de Relés → HMI  
 **QoS**: 0  
 **Retained**: true  
@@ -310,7 +310,7 @@ Todas as mensagens seguem este formato base:
 }
 ```
 
-#### `autotech/relay_board_1/channel/1/status`
+#### `autocore/relay_board_1/channel/1/status`
 **Direção**: Placa de Relés → HMI  
 **QoS**: 0  
 **Retained**: true  
@@ -548,7 +548,7 @@ sequenceDiagram
 
 ```bash
 # 1. HMI solicita configuração
-mosquitto_pub -h localhost -t "autotech/gateway/config/request" -m '{
+mosquitto_pub -h localhost -t "autocore/gateway/config/request" -m '{
   "timestamp": "2025-01-18T12:00:00Z",
   "device_id": "hmi_display_1",
   "type": "config_request",
@@ -556,7 +556,7 @@ mosquitto_pub -h localhost -t "autotech/gateway/config/request" -m '{
 }'
 
 # 2. Gateway responde com configuração
-mosquitto_pub -h localhost -t "autotech/gateway/config/response" -m '{
+mosquitto_pub -h localhost -t "autocore/gateway/config/response" -m '{
   "timestamp": "2025-01-18T12:00:01Z",
   "device_id": "hmi_display_1",
   "type": "config_response",
@@ -568,7 +568,7 @@ mosquitto_pub -h localhost -t "autotech/gateway/config/response" -m '{
 }'
 
 # 3. HMI envia status após carregar configuração
-mosquitto_pub -h localhost -t "autotech/hmi_display_1/status" -m '{
+mosquitto_pub -h localhost -t "autocore/hmi_display_1/status" -m '{
   "timestamp": "2025-01-18T12:00:02Z",
   "device_id": "hmi_display_1",
   "type": "device_status",
@@ -583,7 +583,7 @@ mosquitto_pub -h localhost -t "autotech/hmi_display_1/status" -m '{
 ```bash
 # 1. Usuário pressiona botão no HMI
 # HMI envia comando para controlar luz alta
-mosquitto_pub -h localhost -t "autotech/relay_board_1/command" -m '{
+mosquitto_pub -h localhost -t "autocore/relay_board_1/command" -m '{
   "timestamp": "2025-01-18T12:00:00Z",
   "device_id": "hmi_display_1",
   "type": "device_command",
@@ -598,7 +598,7 @@ mosquitto_pub -h localhost -t "autotech/relay_board_1/command" -m '{
 }'
 
 # 2. Placa de relés responde com novo status
-mosquitto_pub -h localhost -t "autotech/relay_board_1/channel/1/status" -m '{
+mosquitto_pub -h localhost -t "autocore/relay_board_1/channel/1/status" -m '{
   "timestamp": "2025-01-18T12:00:01Z",
   "device_id": "relay_board_1",
   "type": "channel_status",
@@ -613,7 +613,7 @@ mosquitto_pub -h localhost -t "autotech/relay_board_1/channel/1/status" -m '{
 
 ```bash
 # 1. Gateway envia atualização de configuração
-mosquitto_pub -h localhost -t "autotech/gateway/config/update" -m '{
+mosquitto_pub -h localhost -t "autocore/gateway/config/update" -m '{
   "timestamp": "2025-01-18T12:00:00Z",
   "device_id": "hmi_display_1",
   "type": "config_update",
@@ -630,7 +630,7 @@ mosquitto_pub -h localhost -t "autotech/gateway/config/update" -m '{
 }'
 
 # 2. HMI confirma aplicação da atualização
-mosquitto_pub -h localhost -t "autotech/hmi_display_1/status" -m '{
+mosquitto_pub -h localhost -t "autocore/hmi_display_1/status" -m '{
   "timestamp": "2025-01-18T12:00:02Z",
   "device_id": "hmi_display_1",
   "type": "device_status",
@@ -645,23 +645,23 @@ mosquitto_pub -h localhost -t "autotech/hmi_display_1/status" -m '{
 
 ```bash
 # Monitorar todos os status do sistema
-mosquitto_sub -h localhost -t "autotech/+/status" -v
+mosquitto_sub -h localhost -t "autocore/+/status" -v
 
 # Monitorar todos os comandos
-mosquitto_sub -h localhost -t "autotech/+/command" -v
+mosquitto_sub -h localhost -t "autocore/+/command" -v
 
 # Monitorar canais específicos de todas as placas
-mosquitto_sub -h localhost -t "autotech/relay_board_+/channel/+/status" -v
+mosquitto_sub -h localhost -t "autocore/relay_board_+/channel/+/status" -v
 
 # Monitorar tudo do gateway
-mosquitto_sub -h localhost -t "autotech/gateway/#" -v
+mosquitto_sub -h localhost -t "autocore/gateway/#" -v
 ```
 
 ### 5. Teste de Preset
 
 ```bash
 # Executar preset de emergência
-mosquitto_pub -h localhost -t "autotech/relay_board_1/command" -m '{
+mosquitto_pub -h localhost -t "autocore/relay_board_1/command" -m '{
   "timestamp": "2025-01-18T12:00:00Z",
   "device_id": "hmi_display_1",
   "type": "device_command",
@@ -683,16 +683,16 @@ mosquitto_pub -h localhost -t "autotech/relay_board_1/command" -m '{
 brew install mosquitto
 
 # Monitorar tráfego MQTT em tempo real
-mosquitto_sub -h localhost -t "autotech/#" -v
+mosquitto_sub -h localhost -t "autocore/#" -v
 
 # Enviar comando de teste
-mosquitto_pub -h localhost -t "autotech/hmi_display_1/command" -m '{
+mosquitto_pub -h localhost -t "autocore/hmi_display_1/command" -m '{
   "type": "system",
   "action": "ping"
 }'
 
 # Solicitar status completo
-mosquitto_pub -h localhost -t "autotech/hmi_display_1/command" -m '{
+mosquitto_pub -h localhost -t "autocore/hmi_display_1/command" -m '{
   "type": "system",
   "action": "full_status"
 }'

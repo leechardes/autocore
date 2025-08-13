@@ -5,7 +5,7 @@
  * IMPORTANTE: Estes testes requerem um servidor API mockado ou real em execução
  * Configure as variáveis de ambiente ou use um mock server para testes automatizados.
  * 
- * @author Sistema AutoTech  
+ * @author Sistema AutoCore  
  * @version 2.0.0
  * @date 2025-08-12
  */
@@ -250,7 +250,7 @@ void setup() {
     Serial.begin(115200);
     delay(2000);
     
-    Serial.println("\n=== AutoTech HMI - ScreenApiClient Tests ===");
+    Serial.println("\n=== AutoCore HMI - ScreenApiClient Tests ===");
     Serial.println("Testing API configuration migration...\n");
     
     // Inicializar WiFi para testes (opcional)

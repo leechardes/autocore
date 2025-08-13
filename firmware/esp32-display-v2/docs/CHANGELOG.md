@@ -213,10 +213,10 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 
 ## 🔗 Links
 
-- **Repository**: [github.com/autotech/firmware-hmi-display-v2]()
+- **Repository**: [github.com/autocore/firmware-hmi-display-v2]()
 - **Documentation**: [docs.autotech.com]()
-- **Issues**: [github.com/autotech/firmware-hmi-display-v2/issues]()
-- **Releases**: [github.com/autotech/firmware-hmi-display-v2/releases]()
+- **Issues**: [github.com/autocore/firmware-hmi-display-v2/issues]()
+- **Releases**: [github.com/autocore/firmware-hmi-display-v2/releases]()
 
 ---
 

@@ -34,7 +34,7 @@ O AutoTech HMI Display v2 utiliza MQTT como protocolo principal de comunicação
 
 ### Hierarquia Base
 ```
-autotech/
+autocore/
 ├── discovery/              # Auto-discovery de dispositivos
 ├── gateway/                # Gateway central
 ├── {device_type}_{id}/     # Dispositivos específicos
@@ -44,13 +44,13 @@ autotech/
 
 ### Convenções de Nomenclatura
 ```
-autotech/{component}/{device_id}/{category}/{action}
+autocore/{component}/{device_id}/{category}/{action}
 
 Exemplos:
-autotech/hmi_display_1/status/health
-autotech/relay_board_1/command/channel
-autotech/gateway/config/response
-autotech/sensor_board_2/telemetry/data
+autocore/hmi_display_1/status/health
+autocore/relay_board_1/command/channel
+autocore/gateway/config/response
+autocore/sensor_board_2/telemetry/data
 ```
 
 ### Device Types Suportados
@@ -67,7 +67,7 @@ autotech/sensor_board_2/telemetry/data
 ### Discovery Protocol
 
 #### Device Announce
-**Tópico**: `autotech/discovery/announce`
+**Tópico**: `autocore/discovery/announce`
 **Payload**:
 ```json
 {
@@ -88,16 +88,16 @@ autotech/sensor_board_2/telemetry/data
 ```
 
 #### Device Registration
-**Tópico**: `autotech/discovery/register`
+**Tópico**: `autocore/discovery/register`
 **Payload**:
 ```json
 {
   "device_id": "hmi_display_1",
   "status": "registered",
   "assigned_topics": [
-    "autotech/hmi_display_1/command",
-    "autotech/hmi_display_1/status",
-    "autotech/gateway/config/response"
+    "autocore/hmi_display_1/command",
+    "autocore/hmi_display_1/status",
+    "autocore/gateway/config/response"
   ],
   "config_version": "2.0.1"
 }
@@ -106,7 +106,7 @@ autotech/sensor_board_2/telemetry/data
 ### System Control
 
 #### System Ping
-**Request Tópico**: `autotech/system/ping`
+**Request Tópico**: `autocore/system/ping`
 **Request Payload**:
 ```json
 {
@@ -116,7 +116,7 @@ autotech/sensor_board_2/telemetry/data
 }
 ```
 
-**Response Tópico**: `autotech/{device_id}/pong`
+**Response Tópico**: `autocore/{device_id}/pong`
 **Response Payload**:
 ```json
 {
@@ -130,7 +130,7 @@ autotech/sensor_board_2/telemetry/data
 ```
 
 #### Emergency Stop
-**Tópico**: `autotech/system/emergency_stop`
+**Tópico**: `autocore/system/emergency_stop`
 **Payload**:
 ```json
 {
@@ -145,7 +145,7 @@ autotech/sensor_board_2/telemetry/data
 ## ⚙️ Configuração Dinâmica
 
 ### Configuration Request
-**Tópico**: `autotech/gateway/config/request`
+**Tópico**: `autocore/gateway/config/request`
 **Payload**:
 ```json
 {
@@ -157,7 +157,7 @@ autotech/sensor_board_2/telemetry/data
 ```
 
 ### Configuration Response
-**Tópico**: `autotech/gateway/config/response`
+**Tópico**: `autocore/gateway/config/response`
 **QoS**: 1 (garantir entrega)
 **Retained**: true
 **Payload**:
@@ -221,7 +221,7 @@ autotech/sensor_board_2/telemetry/data
 ```
 
 ### Configuration Update
-**Tópico**: `autotech/gateway/config/update`
+**Tópico**: `autocore/gateway/config/update`
 **Payload**:
 ```json
 {
@@ -237,7 +237,7 @@ autotech/sensor_board_2/telemetry/data
 ```
 
 ### Hot Reload Acknowledgment
-**Tópico**: `autotech/hmi_display_1/config/ack`
+**Tópico**: `autocore/hmi_display_1/config/ack`
 **Payload**:
 ```json
 {
@@ -256,7 +256,7 @@ autotech/sensor_board_2/telemetry/data
 ### Relay Control
 
 #### Command Request
-**Tópico**: `autotech/relay_board_1/command`
+**Tópico**: `autocore/relay_board_1/command`
 **QoS**: 1
 **Payload**:
 ```json
@@ -271,7 +271,7 @@ autotech/sensor_board_2/telemetry/data
 ```
 
 #### Batch Command
-**Tópico**: `autotech/relay_board_1/command/batch`
+**Tópico**: `autocore/relay_board_1/command/batch`
 **Payload**:
 ```json
 {
@@ -287,7 +287,7 @@ autotech/sensor_board_2/telemetry/data
 ```
 
 #### Command Response
-**Tópico**: `autotech/relay_board_1/response`
+**Tópico**: `autocore/relay_board_1/response`
 **Payload**:
 ```json
 {
@@ -305,7 +305,7 @@ autotech/sensor_board_2/telemetry/data
 ### Preset Execution
 
 #### Execute Preset
-**Tópico**: `autotech/preset/execute`
+**Tópico**: `autocore/preset/execute`
 **Payload**:
 ```json
 {
@@ -320,7 +320,7 @@ autotech/sensor_board_2/telemetry/data
 ```
 
 #### Preset Status
-**Tópico**: `autotech/preset/status`
+**Tópico**: `autocore/preset/status`
 **Payload**:
 ```json
 {
@@ -339,7 +339,7 @@ autotech/sensor_board_2/telemetry/data
 ### Device Status
 
 #### Health Status
-**Tópico**: `autotech/hmi_display_1/status/health`
+**Tópico**: `autocore/hmi_display_1/status/health`
 **Interval**: 30 segundos
 **QoS**: 0
 **Payload**:
@@ -359,7 +359,7 @@ autotech/sensor_board_2/telemetry/data
 ```
 
 #### Operational Status
-**Tópico**: `autotech/hmi_display_1/status/operational`
+**Tópico**: `autocore/hmi_display_1/status/operational`
 **Interval**: 10 segundos durante operação
 **Payload**:
 ```json
@@ -387,7 +387,7 @@ autotech/sensor_board_2/telemetry/data
 ### Telemetry Data
 
 #### Performance Telemetry
-**Tópico**: `autotech/hmi_display_1/telemetry/performance`
+**Tópico**: `autocore/hmi_display_1/telemetry/performance`
 **Interval**: 60 segundos
 **Payload**:
 ```json
@@ -419,7 +419,7 @@ autotech/sensor_board_2/telemetry/data
 ```
 
 #### Error Telemetry
-**Tópico**: `autotech/hmi_display_1/telemetry/errors`
+**Tópico**: `autocore/hmi_display_1/telemetry/errors`
 **QoS**: 1
 **Payload**:
 ```json
@@ -446,7 +446,7 @@ autotech/sensor_board_2/telemetry/data
 ## 🎨 Sistema de Presets
 
 ### Preset Definition
-**Tópico**: `autotech/preset/define`
+**Tópico**: `autocore/preset/define`
 **QoS**: 1
 **Retained**: true
 **Payload**:
@@ -494,7 +494,7 @@ autotech/sensor_board_2/telemetry/data
 ```
 
 ### Preset Execution Log
-**Tópico**: `autotech/preset/log`
+**Tópico**: `autocore/preset/log`
 **Payload**:
 ```json
 {
@@ -525,7 +525,7 @@ autotech/sensor_board_2/telemetry/data
 ### Authentication Protocol
 
 #### Device Authentication
-**Tópico**: `autotech/auth/device_login`
+**Tópico**: `autocore/auth/device_login`
 **QoS**: 2
 **Payload**:
 ```json
@@ -541,7 +541,7 @@ autotech/sensor_board_2/telemetry/data
 ```
 
 #### Authentication Response
-**Tópico**: `autotech/auth/response`
+**Tópico**: `autocore/auth/response`
 **Payload**:
 ```json
 {
@@ -562,7 +562,7 @@ autotech/sensor_board_2/telemetry/data
 ### Access Control
 
 #### Permission Check
-**Tópico**: `autotech/auth/permission_check`
+**Tópico**: `autocore/auth/permission_check`
 **Payload**:
 ```json
 {
@@ -577,7 +577,7 @@ autotech/sensor_board_2/telemetry/data
 ### Audit Trail
 
 #### Security Event
-**Tópico**: `autotech/security/event`
+**Tópico**: `autocore/security/event`
 **QoS**: 2
 **Payload**:
 ```json
@@ -614,10 +614,10 @@ autotech/sensor_board_2/telemetry/data
 ```json
 {
   "retained_topics": [
-    "autotech/gateway/config/response",
-    "autotech/preset/define",
-    "autotech/security/device_permissions",
-    "autotech/discovery/device_registry"
+    "autocore/gateway/config/response",
+    "autocore/preset/define",
+    "autocore/security/device_permissions",
+    "autocore/discovery/device_registry"
   ],
   "retention_duration": {
     "config": "permanent",
@@ -631,7 +631,7 @@ autotech/sensor_board_2/telemetry/data
 ### Last Will Testament
 
 #### HMI Display LWT
-**Tópico**: `autotech/hmi_display_1/status/lwt`
+**Tópico**: `autocore/hmi_display_1/status/lwt`
 **QoS**: 1
 **Retained**: true
 **Payload**:
@@ -652,7 +652,7 @@ autotech/sensor_board_2/telemetry/data
 
 ```bash
 # 1. Device announce
-mosquitto_pub -h localhost -t "autotech/discovery/announce" -m '{
+mosquitto_pub -h localhost -t "autocore/discovery/announce" -m '{
   "device_id": "hmi_display_1",
   "device_type": "hmi_display",
   "firmware_version": "2.0.0",
@@ -660,14 +660,14 @@ mosquitto_pub -h localhost -t "autotech/discovery/announce" -m '{
 }'
 
 # 2. Request configuration
-mosquitto_pub -h localhost -t "autotech/gateway/config/request" -m '{
+mosquitto_pub -h localhost -t "autocore/gateway/config/request" -m '{
   "device_id": "hmi_display_1",
   "config_version": "0.0.0",
   "request_type": "full_config"
 }'
 
 # 3. Receive configuration (simulated)
-mosquitto_pub -h localhost -t "autotech/gateway/config/response" -r -m '{
+mosquitto_pub -h localhost -t "autocore/gateway/config/response" -r -m '{
   "version": "2.0.0",
   "target_device": "hmi_display_1",
   "system": {"name": "Meu Veículo"},
@@ -679,24 +679,24 @@ mosquitto_pub -h localhost -t "autotech/gateway/config/response" -r -m '{
 
 ```bash
 # Monitor status do relé
-mosquitto_sub -h localhost -t "autotech/relay_board_1/status" -v &
+mosquitto_sub -h localhost -t "autocore/relay_board_1/status" -v &
 
 # Enviar comando
-mosquitto_pub -h localhost -t "autotech/relay_board_1/command" -m '{
+mosquitto_pub -h localhost -t "autocore/relay_board_1/command" -m '{
   "channel": 1,
   "state": true,
   "source": "hmi_display_1"
 }'
 
 # Verificar resposta
-mosquitto_sub -h localhost -t "autotech/relay_board_1/response" -v
+mosquitto_sub -h localhost -t "autocore/relay_board_1/response" -v
 ```
 
 ### Cenário 3: Execução de Preset
 
 ```bash
 # Definir preset
-mosquitto_pub -h localhost -t "autotech/preset/define" -r -m '{
+mosquitto_pub -h localhost -t "autocore/preset/define" -r -m '{
   "preset_id": "luzes_noturnas",
   "name": "Luzes Noturnas",
   "sequence": [
@@ -706,23 +706,23 @@ mosquitto_pub -h localhost -t "autotech/preset/define" -r -m '{
 }'
 
 # Executar preset
-mosquitto_pub -h localhost -t "autotech/preset/execute" -m '{
+mosquitto_pub -h localhost -t "autocore/preset/execute" -m '{
   "preset_id": "luzes_noturnas",
   "source": "hmi_display_1"
 }'
 
 # Monitor execução
-mosquitto_sub -h localhost -t "autotech/preset/status" -v
+mosquitto_sub -h localhost -t "autocore/preset/status" -v
 ```
 
 ### Cenário 4: Hot Reload de Configuração
 
 ```bash
 # Monitor config acknowledgment
-mosquitto_sub -h localhost -t "autotech/hmi_display_1/config/ack" -v &
+mosquitto_sub -h localhost -t "autocore/hmi_display_1/config/ack" -v &
 
 # Enviar configuração atualizada
-mosquitto_pub -h localhost -t "autotech/gateway/config/response" -r -m '{
+mosquitto_pub -h localhost -t "autocore/gateway/config/response" -r -m '{
   "version": "2.0.1",
   "target_device": "hmi_display_1",
   "screens": {
@@ -746,29 +746,29 @@ mosquitto_pub -h localhost -t "autotech/gateway/config/response" -r -m '{
 
 ```bash
 # Terminal 1: Monitor health
-mosquitto_sub -h localhost -t "autotech/+/status/health" -v
+mosquitto_sub -h localhost -t "autocore/+/status/health" -v
 
 # Terminal 2: Monitor operacional
-mosquitto_sub -h localhost -t "autotech/+/status/operational" -v  
+mosquitto_sub -h localhost -t "autocore/+/status/operational" -v  
 
 # Terminal 3: Monitor telemetria
-mosquitto_sub -h localhost -t "autotech/+/telemetry/+" -v
+mosquitto_sub -h localhost -t "autocore/+/telemetry/+" -v
 
 # Terminal 4: Monitor erros
-mosquitto_sub -h localhost -t "autotech/+/telemetry/errors" -v
+mosquitto_sub -h localhost -t "autocore/+/telemetry/errors" -v
 ```
 
 ### Debugging MQTT
 
 ```bash
 # Monitor todos os tópicos AutoTech
-mosquitto_sub -h localhost -t "autotech/#" -v
+mosquitto_sub -h localhost -t "autocore/#" -v
 
 # Monitor com timestamp
-mosquitto_sub -h localhost -t "autotech/#" -v | ts '[%Y-%m-%d %H:%M:%S]'
+mosquitto_sub -h localhost -t "autocore/#" -v | ts '[%Y-%m-%d %H:%M:%S]'
 
 # Salvar logs
-mosquitto_sub -h localhost -t "autotech/#" -v > mqtt_debug.log
+mosquitto_sub -h localhost -t "autocore/#" -v > mqtt_debug.log
 
 # Test broker connectivity
 mosquitto_pub -h localhost -t "test" -m "hello"

@@ -12,7 +12,9 @@
 // ============================================================================
 // IDENTIFICAÇÃO DO DISPOSITIVO
 // ============================================================================
-#define DEVICE_ID "hmi_display_1"              // ID único do dispositivo
+// TODO: Implementar geração dinâmica de UUIDs únicos baseada no MAC address ou outro identificador
+// TODO: Para produção, cada dispositivo deve ter um UUID único gerado automaticamente
+#define DEVICE_UUID "esp32-display-001"         // UUID único do dispositivo
 #define DEVICE_TYPE "hmi_display"              // Tipo do dispositivo
 #define DEVICE_VERSION "2.0.0"                 // Versão do firmware
 
