@@ -132,7 +132,7 @@ const MacroActionEditor = ({ actions = [], onChange }) => {
       delete formattedAction.target;
       delete formattedAction.action;
     } else if (currentAction.type === 'mqtt') {
-      formattedAction.topic = currentAction.topic || 'autocore/macro';
+      formattedAction.topic = currentAction.topic || 'autocore/gateway/macros/execute';
       formattedAction.payload = currentAction.payload || {};
       delete formattedAction.target;
       delete formattedAction.action;
@@ -621,7 +621,7 @@ const MacroActionEditor = ({ actions = [], onChange }) => {
                   <Input
                     value={currentAction.topic || ''}
                     onChange={(e) => setCurrentAction({ ...currentAction, topic: e.target.value })}
-                    placeholder="autocore/macro/custom"
+                    placeholder="autocore/gateway/macros/execute"
                   />
                 </div>
                 <div className="space-y-2">

@@ -16,7 +16,8 @@ import {
   Mountain,
   Power,
   ParkingCircle,
-  HelpCircle
+  HelpCircle,
+  Octagon
 } from 'lucide-react';
 import MacroActionEditor from '@/components/MacroActionEditor';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -225,6 +226,35 @@ const MacrosPage = () => {
       });
     }
   };
+
+  const handleEmergencyStop = async () => {
+    if (!confirm('⚠️ Isso irá parar TODAS as macros em execução. Continuar?')) {
+      return;
+    }
+    
+    try {
+      await api.emergencyStop();
+      
+      toast({
+        title: 'Parada de Emergência',
+        description: 'Comando enviado com sucesso. Todas as macros foram interrompidas.',
+        variant: 'default'
+      });
+      
+      // Limpar lista de macros executando
+      setRunningMacros({});
+      
+      // Recarregar macros para atualizar status
+      loadMacros();
+    } catch (error) {
+      console.error('Erro enviando comando de emergência:', error);
+      toast({
+        title: 'Erro',
+        description: 'Não foi possível enviar o comando de parada de emergência',
+        variant: 'destructive'
+      });
+    }
+  };
   
   const createNewMacro = async () => {
     if (!newMacro) return;
@@ -355,6 +385,18 @@ const MacrosPage = () => {
             <HelpCircle className="h-4 w-4" />
             Ajuda
           </Button>
+          
+          {Object.keys(runningMacros).length > 0 && (
+            <Button 
+              variant="destructive"
+              size="sm"
+              onClick={handleEmergencyStop}
+              className="gap-2"
+            >
+              <Octagon className="h-4 w-4" />
+              Parada de Emergência
+            </Button>
+          )}
           
           <Dialog open={showCreate} onOpenChange={setShowCreate}>
           <DialogTrigger asChild>
