@@ -18,7 +18,11 @@ from pydantic import BaseModel, Field
 from datetime import datetime
 import asyncio
 import os
+import logging
 from dotenv import load_dotenv
+
+# Configurar logger
+logger = logging.getLogger(__name__)
 
 # Carregar variáveis de ambiente
 load_dotenv()
