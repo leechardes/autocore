@@ -1,3 +1,6 @@
+# Archived projects (not in active development)
+archived_projects/
+
 # Python
 __pycache__/
 *.py[cod]
