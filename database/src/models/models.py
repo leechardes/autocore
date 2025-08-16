@@ -348,6 +348,55 @@ class Macro(Base):
     created_at = Column(DateTime, default=func.now())
 
 # ====================================
+# ICONS MANAGEMENT
+# ====================================
+
+class Icon(Base):
+    """Ícones do sistema para diferentes plataformas"""
+    __tablename__ = 'icons'
+    
+    # Identificação
+    id = Column(Integer, primary_key=True)
+    name = Column(String(50), unique=True, nullable=False)
+    display_name = Column(String(100), nullable=False)
+    category = Column(String(50), nullable=True)
+    
+    # SVG Customizado
+    svg_content = Column(Text, nullable=True)
+    svg_viewbox = Column(String(50), nullable=True)
+    svg_fill_color = Column(String(7), nullable=True)
+    svg_stroke_color = Column(String(7), nullable=True)
+    
+    # Mapeamentos para Bibliotecas
+    lucide_name = Column(String(50), nullable=True)
+    material_name = Column(String(50), nullable=True)
+    fontawesome_name = Column(String(50), nullable=True)
+    lvgl_symbol = Column(String(50), nullable=True)
+    
+    # Fallbacks e Alternativas
+    unicode_char = Column(String(10), nullable=True)
+    emoji = Column(String(10), nullable=True)
+    fallback_icon_id = Column(Integer, ForeignKey('icons.id', ondelete='SET NULL'), nullable=True)
+    
+    # Metadados
+    description = Column(Text, nullable=True)
+    tags = Column(Text, nullable=True)  # JSON array
+    is_custom = Column(Boolean, default=False)
+    is_active = Column(Boolean, default=True)
+    created_at = Column(DateTime, default=func.now())
+    updated_at = Column(DateTime, default=func.now(), onupdate=func.now())
+    
+    # Relacionamentos
+    fallback_icon = relationship("Icon", remote_side=[id])
+    
+    # Índices
+    __table_args__ = (
+        Index('idx_icons_name', 'name'),
+        Index('idx_icons_category', 'category'),
+        Index('idx_icons_active', 'is_active'),
+    )
+
+# ====================================
 # ENGINE & SESSION
 # ====================================
 

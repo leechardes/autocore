@@ -28,7 +28,7 @@ logger = logging.getLogger(__name__)
 load_dotenv()
 
 # Import repositories do database
-from shared.repositories import devices, relays, telemetry, events, config
+from shared.repositories import devices, relays, telemetry, events, config, icons
 
 # Import MQTT Monitor
 from services.mqtt_monitor import mqtt_monitor
@@ -1146,8 +1146,140 @@ async def get_events(limit: int = 100):
         raise HTTPException(status_code=500, detail=str(e))
 
 # ====================================
-# ENDPOINTS - CONFIG GENERATOR
+# ENDPOINTS - CONFIG
 # ====================================
+
+@app.get("/api/config/full/{device_uuid}", tags=["Config"])
+async def get_full_config(device_uuid: str):
+    """
+    Retorna configuração completa para um dispositivo ESP32
+    Endpoint otimizado para reduzir número de requisições no ESP32
+    """
+    try:
+        # Buscar dispositivo usando campos reais
+        device = devices.get_by_uuid(device_uuid)
+        if not device:
+            raise HTTPException(404, f"Device '{device_uuid}' not found")
+        
+        # Base config com campos existentes
+        config_data = {
+            "version": "2.0.0",
+            "protocol_version": "2.2.0",
+            "timestamp": datetime.now().isoformat(),
+            "device": {
+                "id": device.id,
+                "uuid": device.uuid,
+                "type": device.type,
+                "name": device.name,
+                "status": device.status,
+                "ip_address": device.ip_address,
+                "mac_address": device.mac_address
+            },
+            "system": {
+                "name": "AutoCore System",
+                "language": "pt-BR"
+            }
+        }
+        
+        # Se for display, adicionar configurações específicas
+        if device.type in ["hmi_display", "esp32-display", "esp32_display"]:
+            # Screens com campos reais
+            screens_data = []
+            all_screens = config.get_screens()
+            
+            for screen in all_screens:
+                if screen.show_on_display_small or screen.show_on_display_large:
+                    screen_dict = {
+                        "id": screen.id,
+                        "name": screen.name,
+                        "title": screen.title,
+                        "icon": screen.icon,
+                        "screen_type": screen.screen_type,
+                        "parent_id": screen.parent_id,
+                        "position": screen.position,
+                        "columns_display_small": screen.columns_display_small or 2,
+                        "columns_display_large": screen.columns_display_large or 3,
+                        "is_visible": screen.is_visible,
+                        "show_on_display_small": screen.show_on_display_small,
+                        "show_on_display_large": screen.show_on_display_large,
+                        "items": []
+                    }
+                    
+                    # Adicionar screen_items
+                    items = config.get_screen_items(screen.id)
+                    for item in items:
+                        if item.is_active:  # Apenas itens ativos
+                            screen_dict["items"].append({
+                                "id": item.id,
+                                "item_type": item.item_type,
+                                "name": item.name,
+                                "label": item.label,
+                                "icon": item.icon,
+                                "position": item.position,
+                                "action_type": item.action_type,
+                                "action_target": item.action_target,
+                                "action_payload": item.action_payload,
+                                "relay_board_id": item.relay_board_id,
+                                "relay_channel_id": item.relay_channel_id
+                            })
+                    
+                    screens_data.append(screen_dict)
+            
+            config_data["screens"] = screens_data
+            
+            # Devices registry
+            all_devices = devices.get_all(active_only=True)
+            config_data["devices"] = [
+                {
+                    "id": d.id,
+                    "uuid": d.uuid,
+                    "name": d.name,
+                    "type": d.type,
+                    "status": d.status,
+                    "ip_address": d.ip_address,
+                    "is_active": d.is_active
+                }
+                for d in all_devices
+            ]
+            
+            # Relay boards com campos reais
+            boards = relays.get_boards(active_only=True)
+            config_data["relay_boards"] = [
+                {
+                    "id": b.id,
+                    "device_id": b.device_id,
+                    "total_channels": b.total_channels,
+                    "board_model": b.board_model,
+                    "is_active": b.is_active
+                }
+                for b in boards
+            ]
+            
+            # Theme padrão
+            default_theme = config.get_default_theme()
+            if default_theme:
+                config_data["theme"] = {
+                    "id": default_theme.id,
+                    "name": default_theme.name,
+                    "primary_color": default_theme.primary_color,
+                    "secondary_color": default_theme.secondary_color,
+                    "background_color": default_theme.background_color,
+                    "surface_color": default_theme.surface_color,
+                    "text_primary": default_theme.text_primary,
+                    "text_secondary": default_theme.text_secondary,
+                    "error_color": default_theme.error_color,
+                    "warning_color": default_theme.warning_color,
+                    "success_color": default_theme.success_color,
+                    "info_color": default_theme.info_color
+                }
+        
+        return config_data
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error generating full config for {device_uuid}: {e}")
+        raise HTTPException(500, f"Internal server error: {str(e)}")
 
 @app.get("/api/config/generate/{device_uuid}", tags=["Config"])
 async def generate_config(device_uuid: str):
@@ -1224,6 +1356,221 @@ async def generate_config(device_uuid: str):
         raise
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
+
+# ====================================
+# ENDPOINTS - ICONS
+# ====================================
+
+@app.get("/api/icons", tags=["UI"])
+async def get_icons(platform: str = "esp32"):
+    """
+    Retorna mapeamento de ícones para displays
+    Usa a tabela icons do database
+    """
+    try:
+        # Buscar mapeamento otimizado para a plataforma
+        if platform == "esp32":
+            # Para ESP32, retornar mapeamento LVGL
+            all_icons = icons.get_all(active_only=True)
+            icons_map = {}
+            
+            for icon in all_icons:
+                icons_map[icon.name] = {
+                    "id": icon.id,
+                    "display_name": icon.display_name,
+                    "category": icon.category,
+                    "lvgl_symbol": icon.lvgl_symbol,
+                    "unicode_char": icon.unicode_char,
+                    "emoji": icon.emoji,
+                    "fallback": icon.fallback_icon_id
+                }
+            
+            return {
+                "version": "1.0.0",
+                "platform": platform,
+                "icons": icons_map
+            }
+            
+        elif platform == "web":
+            # Para web, retornar Lucide/Material/FontAwesome
+            all_icons = icons.get_all(active_only=True)
+            icons_map = {}
+            
+            for icon in all_icons:
+                icons_map[icon.name] = {
+                    "id": icon.id,
+                    "display_name": icon.display_name,
+                    "lucide_name": icon.lucide_name,
+                    "material_name": icon.material_name,
+                    "fontawesome_name": icon.fontawesome_name,
+                    "svg_content": icon.svg_content if icon.is_custom else None
+                }
+            
+            return {
+                "version": "1.0.0",
+                "platform": platform,
+                "icons": icons_map
+            }
+            
+        else:
+            # Método otimizado do repository
+            mapping = icons.get_platform_mapping(platform)
+            return {
+                "version": "1.0.0",
+                "platform": platform,
+                "icons": mapping
+            }
+            
+    except Exception as e:
+        logger.error(f"Error getting icons for platform {platform}: {e}")
+        raise HTTPException(500, str(e))
+
+@app.get("/api/icons/{icon_name}", tags=["UI"])
+async def get_icon_by_name(icon_name: str):
+    """Retorna detalhes completos de um ícone específico"""
+    try:
+        icon = icons.get_by_name(icon_name)
+        if not icon:
+            raise HTTPException(404, f"Icon '{icon_name}' not found")
+        
+        # Se tem fallback, buscar o nome do ícone de fallback
+        fallback_name = None
+        if icon.fallback_icon_id:
+            fallback_icon = icons.get_by_id(icon.fallback_icon_id)
+            if fallback_icon:
+                fallback_name = fallback_icon.name
+        
+        return {
+            "id": icon.id,
+            "name": icon.name,
+            "display_name": icon.display_name,
+            "category": icon.category,
+            "svg_content": icon.svg_content,
+            "svg_viewbox": icon.svg_viewbox,
+            "lucide_name": icon.lucide_name,
+            "material_name": icon.material_name,
+            "fontawesome_name": icon.fontawesome_name,
+            "lvgl_symbol": icon.lvgl_symbol,
+            "unicode_char": icon.unicode_char,
+            "emoji": icon.emoji,
+            "fallback": fallback_name,
+            "is_custom": icon.is_custom,
+            "description": icon.description,
+            "tags": []  # Por enquanto, retornar lista vazia
+        }
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error getting icon {icon_name}: {e}")
+        raise HTTPException(500, str(e))
+
+@app.get("/api/screens/{screen_id}", tags=["UI"])
+async def get_screen_by_id(screen_id: int, include_items: bool = False):
+    """Retorna detalhes completos de uma tela específica"""
+    try:
+        screen = config.get_screen_by_id(screen_id)
+        if not screen:
+            raise HTTPException(404, "Screen not found")
+        
+        result = {
+            "id": screen.id,
+            "name": screen.name,
+            "title": screen.title,
+            "icon": screen.icon,
+            "screen_type": screen.screen_type,
+            "parent_id": screen.parent_id,
+            "position": screen.position,
+            "columns_display_small": screen.columns_display_small,
+            "columns_display_large": screen.columns_display_large,
+            "is_visible": screen.is_visible,
+            "show_on_display_small": screen.show_on_display_small,
+            "show_on_display_large": screen.show_on_display_large,
+            "required_permission": screen.required_permission
+        }
+        
+        if include_items:
+            items = config.get_screen_items(screen_id)
+            result["items"] = [
+                {
+                    "id": i.id,
+                    "item_type": i.item_type,
+                    "name": i.name,
+                    "label": i.label,
+                    "icon": i.icon,
+                    "position": i.position,
+                    "action_type": i.action_type,
+                    "action_target": i.action_target,
+                    "relay_board_id": i.relay_board_id,
+                    "relay_channel_id": i.relay_channel_id,
+                    "is_active": i.is_active
+                }
+                for i in items if i.is_active
+            ]
+            result["items_count"] = len(result["items"])
+        else:
+            # Contar itens ativos
+            items = config.get_screen_items(screen_id)
+            result["items_count"] = len([i for i in items if i.is_active])
+        
+        return result
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error getting screen {screen_id}: {e}")
+        raise HTTPException(500, str(e))
+
+@app.get("/api/layouts", tags=["UI"])
+async def get_layouts():
+    """Retorna layouts disponíveis para displays"""
+    return [
+        {
+            "id": "grid_2x2",
+            "name": "Grid 2x2",
+            "description": "4 itens em grade",
+            "max_items": 4,
+            "columns": 2,
+            "rows": 2,
+            "supported_devices": ["hmi_display_small", "hmi_display_large"]
+        },
+        {
+            "id": "grid_2x3",
+            "name": "Grid 2x3",
+            "description": "6 itens em grade", 
+            "max_items": 6,
+            "columns": 2,
+            "rows": 3,
+            "supported_devices": ["hmi_display_large"]
+        },
+        {
+            "id": "grid_3x2",
+            "name": "Grid 3x2",
+            "description": "6 itens em grade horizontal",
+            "max_items": 6,
+            "columns": 3,
+            "rows": 2,
+            "supported_devices": ["hmi_display_large"]
+        },
+        {
+            "id": "list",
+            "name": "Lista Vertical",
+            "description": "Lista com scroll",
+            "max_items": 20,
+            "columns": 1,
+            "rows": None,
+            "supported_devices": ["hmi_display_small", "hmi_display_large"]
+        },
+        {
+            "id": "form",
+            "name": "Formulário",
+            "description": "Layout para configurações",
+            "max_items": 15,
+            "columns": 1,
+            "rows": None,
+            "supported_devices": ["hmi_display_large"]
+        }
+    ]
 
 # ====================================
 # ENDPOINTS - CAN SIGNALS

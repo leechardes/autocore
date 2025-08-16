@@ -16,7 +16,7 @@ from sqlalchemy import create_engine, func, and_, or_
 from src.models.models import (
     Base, Device, RelayBoard, RelayChannel, 
     TelemetryData, EventLog, Screen, ScreenItem,
-    Theme, CANSignal, Macro, User
+    Theme, CANSignal, Macro, User, Icon
 )
 
 # Configuração da sessão
@@ -456,6 +456,11 @@ class ConfigRepository(BaseRepository):
                 query = query.filter(Screen.is_visible == True)
             return query.order_by(Screen.position).all()
     
+    def get_screen_by_id(self, screen_id: int) -> Optional[Screen]:
+        """Busca tela por ID"""
+        with SessionLocal() as session:
+            return session.query(Screen).filter(Screen.id == screen_id).first()
+    
     def get_screen_items(self, screen_id: int) -> List[ScreenItem]:
         """Lista itens de uma tela"""
         with SessionLocal() as session:
@@ -787,3 +792,239 @@ class MacroRepository:
             return macro
 
 macros = MacroRepository()
+
+class IconsRepository(BaseRepository):
+    """Repository para gerenciamento de ícones"""
+    
+    def get_all(self, category: str = None, active_only: bool = True) -> List[Icon]:
+        """Lista todos os ícones, opcionalmente filtrados por categoria"""
+        with SessionLocal() as session:
+            query = session.query(Icon)
+            if active_only:
+                query = query.filter(Icon.is_active == True)
+            if category:
+                query = query.filter(Icon.category == category)
+            return query.order_by(Icon.category, Icon.name).all()
+    
+    def get_by_name(self, name: str) -> Optional[Icon]:
+        """Busca ícone por nome único"""
+        with SessionLocal() as session:
+            return session.query(Icon).filter(
+                Icon.name == name,
+                Icon.is_active == True
+            ).first()
+    
+    def get_by_id(self, icon_id: int) -> Optional[Icon]:
+        """Busca ícone por ID"""
+        with SessionLocal() as session:
+            return session.query(Icon).filter(
+                Icon.id == icon_id,
+                Icon.is_active == True
+            ).first()
+    
+    def get_platform_mapping(self, platform: str) -> Dict[str, str]:
+        """Retorna mapeamento de ícones para plataforma específica"""
+        with SessionLocal() as session:
+            icons = session.query(Icon).filter(Icon.is_active == True).all()
+            mapping = {}
+            
+            for icon in icons:
+                if platform == 'web':
+                    # Preferência: SVG customizado > Lucide > Material > FontAwesome
+                    if icon.svg_content:
+                        mapping[icon.name] = {'type': 'svg', 'content': icon.svg_content}
+                    elif icon.lucide_name:
+                        mapping[icon.name] = {'type': 'lucide', 'name': icon.lucide_name}
+                    elif icon.material_name:
+                        mapping[icon.name] = {'type': 'material', 'name': icon.material_name}
+                    elif icon.fontawesome_name:
+                        mapping[icon.name] = {'type': 'fontawesome', 'name': icon.fontawesome_name}
+                
+                elif platform == 'mobile':
+                    # Preferência: Material > SVG > Lucide
+                    if icon.material_name:
+                        mapping[icon.name] = {'type': 'material', 'name': icon.material_name}
+                    elif icon.svg_content:
+                        mapping[icon.name] = {'type': 'svg', 'content': icon.svg_content}
+                    elif icon.lucide_name:
+                        mapping[icon.name] = {'type': 'lucide', 'name': icon.lucide_name}
+                
+                elif platform == 'esp32':
+                    # Preferência: LVGL > Unicode > Emoji
+                    if icon.lvgl_symbol:
+                        mapping[icon.name] = {'type': 'lvgl', 'symbol': icon.lvgl_symbol}
+                    elif icon.unicode_char:
+                        mapping[icon.name] = {'type': 'unicode', 'char': icon.unicode_char}
+                    elif icon.emoji:
+                        mapping[icon.name] = {'type': 'emoji', 'char': icon.emoji}
+            
+            return mapping
+    
+    def get_with_fallbacks(self, name: str) -> Optional[Dict]:
+        """Retorna ícone com sua cadeia de fallbacks"""
+        with SessionLocal() as session:
+            icon = session.query(Icon).filter(
+                Icon.name == name,
+                Icon.is_active == True
+            ).first()
+            
+            if not icon:
+                return None
+            
+            result = {
+                'id': icon.id,
+                'name': icon.name,
+                'display_name': icon.display_name,
+                'category': icon.category,
+                'svg_content': icon.svg_content,
+                'svg_viewbox': icon.svg_viewbox,
+                'svg_fill_color': icon.svg_fill_color,
+                'svg_stroke_color': icon.svg_stroke_color,
+                'lucide_name': icon.lucide_name,
+                'material_name': icon.material_name,
+                'fontawesome_name': icon.fontawesome_name,
+                'lvgl_symbol': icon.lvgl_symbol,
+                'unicode_char': icon.unicode_char,
+                'emoji': icon.emoji,
+                'description': icon.description,
+                'is_custom': icon.is_custom,
+                'fallbacks': []
+            }
+            
+            # Construir cadeia de fallbacks
+            fallback_icon = icon.fallback_icon
+            while fallback_icon and fallback_icon.is_active:
+                result['fallbacks'].append({
+                    'id': fallback_icon.id,
+                    'name': fallback_icon.name,
+                    'display_name': fallback_icon.display_name,
+                    'lucide_name': fallback_icon.lucide_name,
+                    'material_name': fallback_icon.material_name,
+                    'fontawesome_name': fallback_icon.fontawesome_name,
+                    'lvgl_symbol': fallback_icon.lvgl_symbol,
+                    'unicode_char': fallback_icon.unicode_char,
+                    'emoji': fallback_icon.emoji
+                })
+                fallback_icon = fallback_icon.fallback_icon
+            
+            return result
+    
+    def search(self, query: str) -> List[Icon]:
+        """Busca ícones por nome, display_name ou tags"""
+        with SessionLocal() as session:
+            search_term = f"%{query.lower()}%"
+            return session.query(Icon).filter(
+                Icon.is_active == True,
+                or_(
+                    func.lower(Icon.name).like(search_term),
+                    func.lower(Icon.display_name).like(search_term),
+                    func.lower(Icon.description).like(search_term),
+                    func.lower(Icon.tags).like(search_term)
+                )
+            ).order_by(Icon.name).all()
+    
+    def create(self, icon_data: Dict) -> Icon:
+        """Cria novo ícone"""
+        with SessionLocal() as session:
+            icon = Icon(
+                name=icon_data['name'],
+                display_name=icon_data['display_name'],
+                category=icon_data.get('category'),
+                svg_content=icon_data.get('svg_content'),
+                svg_viewbox=icon_data.get('svg_viewbox'),
+                svg_fill_color=icon_data.get('svg_fill_color'),
+                svg_stroke_color=icon_data.get('svg_stroke_color'),
+                lucide_name=icon_data.get('lucide_name'),
+                material_name=icon_data.get('material_name'),
+                fontawesome_name=icon_data.get('fontawesome_name'),
+                lvgl_symbol=icon_data.get('lvgl_symbol'),
+                unicode_char=icon_data.get('unicode_char'),
+                emoji=icon_data.get('emoji'),
+                fallback_icon_id=icon_data.get('fallback_icon_id'),
+                description=icon_data.get('description'),
+                tags=icon_data.get('tags'),
+                is_custom=icon_data.get('is_custom', False),
+                is_active=icon_data.get('is_active', True)
+            )
+            session.add(icon)
+            session.commit()
+            session.refresh(icon)
+            return icon
+    
+    def create_custom(self, name: str, svg_content: str, **kwargs) -> Icon:
+        """Cria ícone customizado com SVG"""
+        icon_data = {
+            'name': name,
+            'display_name': kwargs.get('display_name', name.title()),
+            'category': kwargs.get('category', 'custom'),
+            'svg_content': svg_content,
+            'is_custom': True,
+            **kwargs
+        }
+        return self.create(icon_data)
+    
+    def update(self, icon_id: int, update_data: Dict) -> Optional[Icon]:
+        """Atualiza ícone existente"""
+        with SessionLocal() as session:
+            icon = session.query(Icon).filter(Icon.id == icon_id).first()
+            if not icon:
+                return None
+            
+            # Atualizar campos fornecidos
+            for key, value in update_data.items():
+                if hasattr(icon, key) and key not in ['id', 'created_at']:
+                    setattr(icon, key, value)
+            
+            session.commit()
+            session.refresh(icon)
+            return icon
+    
+    def update_mappings(self, icon_id: int, mappings: Dict) -> Optional[Icon]:
+        """Atualiza mapeamentos para bibliotecas"""
+        mapping_fields = [
+            'lucide_name', 'material_name', 'fontawesome_name', 
+            'lvgl_symbol', 'unicode_char', 'emoji'
+        ]
+        
+        update_data = {k: v for k, v in mappings.items() if k in mapping_fields}
+        return self.update(icon_id, update_data)
+    
+    def delete(self, icon_id: int) -> bool:
+        """Soft delete de ícone"""
+        with SessionLocal() as session:
+            icon = session.query(Icon).filter(Icon.id == icon_id).first()
+            if not icon:
+                return False
+            
+            icon.is_active = False
+            session.commit()
+            return True
+    
+    def get_categories(self) -> List[str]:
+        """Lista todas as categorias de ícones"""
+        with SessionLocal() as session:
+            result = session.query(Icon.category).filter(
+                Icon.category.isnot(None),
+                Icon.is_active == True
+            ).distinct().all()
+            return [r[0] for r in result if r[0]]
+    
+    def bulk_insert(self, icons_data: List[Dict]) -> int:
+        """Insere múltiplos ícones"""
+        with SessionLocal() as session:
+            count = 0
+            for icon_data in icons_data:
+                # Verificar se já existe
+                existing = session.query(Icon).filter(Icon.name == icon_data['name']).first()
+                if existing:
+                    continue
+                
+                icon = Icon(**icon_data)
+                session.add(icon)
+                count += 1
+            
+            session.commit()
+            return count
+
+# Instância singleton
+icons = IconsRepository()
