@@ -1205,11 +1205,11 @@ async def get_full_config(device_uuid: str):
                         "items": []
                     }
                     
-                    # Adicionar screen_items
+                    # Adicionar screen_items com dados expandidos
                     items = config.get_screen_items(screen.id)
                     for item in items:
                         if item.is_active:  # Apenas itens ativos
-                            screen_dict["items"].append({
+                            item_data = {
                                 "id": item.id,
                                 "item_type": item.item_type,
                                 "name": item.name,
@@ -1219,9 +1219,55 @@ async def get_full_config(device_uuid: str):
                                 "action_type": item.action_type,
                                 "action_target": item.action_target,
                                 "action_payload": item.action_payload,
+                                # Manter IDs para compatibilidade
                                 "relay_board_id": item.relay_board_id,
                                 "relay_channel_id": item.relay_channel_id
-                            })
+                            }
+                            
+                            # Expandir relay_board se existe
+                            if item.relay_board_id:
+                                try:
+                                    board = relays.get_board_by_id(item.relay_board_id)
+                                    if board:
+                                        # Buscar device relacionado
+                                        device = devices.get_by_id(board.device_id) if board.device_id else None
+                                        item_data["relay_board"] = {
+                                            "id": board.id,
+                                            "device_id": board.device_id,
+                                            "device_uuid": device.uuid if device else None,
+                                            "device_name": device.name if device else None,
+                                            "device_ip": device.ip_address if device else None,
+                                            "device_type": device.type if device else None,
+                                            "total_channels": board.total_channels,
+                                            "board_model": board.board_model,
+                                            "is_active": board.is_active
+                                        }
+                                except Exception as e:
+                                    logger.warning(f"Erro ao expandir relay_board {item.relay_board_id}: {str(e)}")
+                            
+                            # Expandir relay_channel se existe  
+                            if item.relay_channel_id:
+                                try:
+                                    channel = relays.get_channel(item.relay_channel_id)
+                                    if channel:
+                                        item_data["relay_channel"] = {
+                                            "id": channel.id,
+                                            "board_id": channel.board_id,
+                                            "channel_number": channel.channel_number,
+                                            "name": channel.name,
+                                            "description": channel.description,
+                                            "function_type": channel.function_type,
+                                            "icon": channel.icon,
+                                            "color": channel.color,
+                                            "protection_mode": channel.protection_mode,
+                                            "max_activation_time": channel.max_activation_time,
+                                            "allow_in_macro": channel.allow_in_macro,
+                                            "is_active": channel.is_active
+                                        }
+                                except Exception as e:
+                                    logger.warning(f"Erro ao expandir relay_channel {item.relay_channel_id}: {str(e)}")
+                            
+                            screen_dict["items"].append(item_data)
                     
                     screens_data.append(screen_dict)
             

@@ -165,6 +165,14 @@ class RelayRepository(BaseRepository):
                 RelayBoard.is_active == True
             ).order_by(RelayBoard.id).all()
     
+    def get_board_by_id(self, board_id: int) -> Optional[RelayBoard]:
+        """Busca placa de relé por ID"""
+        with SessionLocal() as session:
+            return session.query(RelayBoard).filter(
+                RelayBoard.id == board_id,
+                RelayBoard.is_active == True
+            ).first()
+    
     def get_channels(self, board_id: int = None) -> List[RelayChannel]:
         """Lista canais de relé"""
         with SessionLocal() as session:
