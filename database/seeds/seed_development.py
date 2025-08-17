@@ -16,7 +16,7 @@ from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 from src.models.models import (
     Base, User, Device, RelayBoard, RelayChannel,
-    Screen, ScreenItem, Theme, CANSignal, Macro, EventLog
+    Screen, ScreenItem, Theme, CANSignal, Macro, EventLog, Icon
 )
 
 DATABASE_URL = f"sqlite:///{Path(__file__).parent.parent}/autocore.db"
@@ -38,6 +38,7 @@ def clear_database(session):
     session.query(User).delete()
     session.query(Theme).delete()
     session.query(CANSignal).delete()
+    session.query(Icon).delete()  # Limpar ícones também
     session.commit()
     print("✓ Dados anteriores removidos")
 
@@ -947,6 +948,134 @@ def seed_initial_events(session):
     session.commit()
     print(f"✓ {len(events)} eventos criados")
 
+def seed_icons(session):
+    """Cria ícones do sistema"""
+    print("\n🎨 Criando ícones...")
+    
+    icons = [
+        # Iluminação
+        Icon(id=1, name='light', display_name='Luz', category='lighting',
+             lucide_name='lightbulb', material_name='lightbulb', 
+             lvgl_symbol='LV_SYMBOL_LIGHT', unicode_char='\uf0eb', emoji='💡',
+             description='Luz geral', tags='["luz", "iluminação", "light"]'),
+        Icon(id=2, name='light_high', display_name='Farol Alto', category='lighting',
+             lucide_name='zap', material_name='flash_on',
+             lvgl_symbol='LV_SYMBOL_LIGHT', unicode_char='\uf0e7', emoji='🔦',
+             description='Farol alto do veículo', tags='["farol", "alto", "high"]'),
+        Icon(id=3, name='light_low', display_name='Farol Baixo', category='lighting',
+             lucide_name='lightbulb', material_name='lightbulb_outline',
+             lvgl_symbol='LV_SYMBOL_LIGHT', unicode_char='\uf0eb', emoji='💡',
+             description='Farol baixo do veículo', tags='["farol", "baixo", "low"]'),
+        Icon(id=4, name='fog_light', display_name='Farol de Neblina', category='lighting',
+             lucide_name='cloud-fog', material_name='blur_on',
+             unicode_char='\uf0c2', emoji='🌫️',
+             description='Farol de neblina', tags='["neblina", "fog", "milha"]'),
+        
+        # Controle
+        Icon(id=5, name='power', display_name='Liga/Desliga', category='control',
+             lucide_name='power', material_name='power_settings_new',
+             lvgl_symbol='LV_SYMBOL_POWER', unicode_char='\uf011', emoji='⚡',
+             description='Botão de liga/desliga', tags='["power", "on", "off"]'),
+        Icon(id=6, name='play', display_name='Iniciar', category='control',
+             lucide_name='play', material_name='play_arrow',
+             lvgl_symbol='LV_SYMBOL_PLAY', unicode_char='\uf04b', emoji='▶️',
+             description='Iniciar operação', tags='["play", "start", "iniciar"]'),
+        Icon(id=7, name='stop', display_name='Parar', category='control',
+             lucide_name='square', material_name='stop',
+             lvgl_symbol='LV_SYMBOL_STOP', unicode_char='\uf04d', emoji='⏹️',
+             description='Parar operação', tags='["stop", "parar", "halt"]'),
+        Icon(id=8, name='pause', display_name='Pausar', category='control',
+             lucide_name='pause', material_name='pause',
+             lvgl_symbol='LV_SYMBOL_PAUSE', unicode_char='\uf04c', emoji='⏸️',
+             description='Pausar operação', tags='["pause", "pausar"]'),
+        
+        # Navegação
+        Icon(id=9, name='home', display_name='Início', category='navigation',
+             lucide_name='home', material_name='home',
+             lvgl_symbol='LV_SYMBOL_HOME', unicode_char='\uf015', emoji='🏠',
+             description='Página inicial', tags='["home", "início", "casa"]'),
+        Icon(id=10, name='back', display_name='Voltar', category='navigation',
+             lucide_name='arrow-left', material_name='arrow_back',
+             lvgl_symbol='LV_SYMBOL_LEFT', unicode_char='\uf060', emoji='⬅️',
+             description='Voltar à tela anterior', tags='["back", "voltar", "anterior"]'),
+        Icon(id=11, name='next', display_name='Próximo', category='navigation',
+             lucide_name='arrow-right', material_name='arrow_forward',
+             lvgl_symbol='LV_SYMBOL_RIGHT', unicode_char='\uf061', emoji='➡️',
+             description='Próxima tela', tags='["next", "próximo", "avançar"]'),
+        Icon(id=12, name='settings', display_name='Configurações', category='navigation',
+             lucide_name='settings', material_name='settings',
+             lvgl_symbol='LV_SYMBOL_SETTINGS', unicode_char='\uf013', emoji='⚙️',
+             description='Configurações do sistema', tags='["settings", "config", "ajustes"]'),
+        
+        # Status
+        Icon(id=13, name='ok', display_name='OK', category='status',
+             lucide_name='check', material_name='check',
+             lvgl_symbol='LV_SYMBOL_OK', unicode_char='\uf00c', emoji='✅',
+             description='Status OK', tags='["ok", "check", "sucesso"]'),
+        Icon(id=14, name='warning', display_name='Aviso', category='status',
+             lucide_name='alert-triangle', material_name='warning',
+             lvgl_symbol='LV_SYMBOL_WARNING', unicode_char='\uf071', emoji='⚠️',
+             description='Aviso de atenção', tags='["warning", "aviso", "alerta"]'),
+        Icon(id=15, name='error', display_name='Erro', category='status',
+             lucide_name='x-circle', material_name='error',
+             lvgl_symbol='LV_SYMBOL_CLOSE', unicode_char='\uf00d', emoji='❌',
+             description='Erro ou falha', tags='["error", "erro", "falha"]'),
+        Icon(id=16, name='info', display_name='Informação', category='status',
+             lucide_name='info', material_name='info',
+             lvgl_symbol='LV_SYMBOL_INFO', unicode_char='\uf129', emoji='ℹ️',
+             description='Informação', tags='["info", "informação", "dados"]'),
+        
+        # Automotivo
+        Icon(id=17, name='car', display_name='Veículo', category='control',
+             lucide_name='car', material_name='directions_car',
+             lvgl_symbol='LV_SYMBOL_CAR', unicode_char='\uf1b9', emoji='🚗',
+             description='Veículo', tags='["car", "carro", "veículo"]'),
+        Icon(id=18, name='winch', display_name='Guincho', category='control',
+             lucide_name='anchor', material_name='build',
+             lvgl_symbol='LV_SYMBOL_WINCH', unicode_char='\uf13d', emoji='⚓',
+             description='Guincho elétrico', tags='["winch", "guincho", "anchor"]'),
+        Icon(id=19, name='compressor', display_name='Compressor', category='control',
+             lucide_name='wind', material_name='air',
+             lvgl_symbol='LV_SYMBOL_AIR', unicode_char='\uf72e', emoji='💨',
+             description='Compressor de ar', tags='["compressor", "ar", "air"]'),
+        Icon(id=20, name='gps', display_name='GPS', category='navigation',
+             lucide_name='map-pin', material_name='location_on',
+             lvgl_symbol='LV_SYMBOL_GPS', unicode_char='\uf3c5', emoji='📍',
+             description='Localização GPS', tags='["gps", "location", "mapa"]'),
+        
+        # Conectividade
+        Icon(id=21, name='wifi', display_name='WiFi', category='status',
+             lucide_name='wifi', material_name='wifi',
+             lvgl_symbol='LV_SYMBOL_WIFI', unicode_char='\uf1eb', emoji='📶',
+             description='Conexão WiFi', tags='["wifi", "wireless", "internet"]'),
+        Icon(id=22, name='bluetooth', display_name='Bluetooth', category='status',
+             lucide_name='bluetooth', material_name='bluetooth',
+             lvgl_symbol='LV_SYMBOL_BLUETOOTH', unicode_char='\uf293', emoji='📘',
+             description='Conexão Bluetooth', tags='["bluetooth", "bt", "wireless"]'),
+        Icon(id=23, name='battery', display_name='Bateria', category='status',
+             lucide_name='battery', material_name='battery_full',
+             lvgl_symbol='LV_SYMBOL_BATTERY_FULL', unicode_char='\uf240', emoji='🔋',
+             description='Status da bateria', tags='["battery", "bateria", "power"]'),
+        Icon(id=24, name='signal', display_name='Sinal', category='status',
+             lucide_name='signal', material_name='signal_cellular_4_bar',
+             lvgl_symbol='LV_SYMBOL_SIGNAL', unicode_char='\uf012', emoji='📶',
+             description='Força do sinal', tags='["signal", "sinal", "rssi"]'),
+        
+        # Extras
+        Icon(id=25, name='refresh', display_name='Atualizar', category='control',
+             lucide_name='refresh-cw', material_name='refresh',
+             lvgl_symbol='LV_SYMBOL_REFRESH', unicode_char='\uf021', emoji='🔄',
+             description='Atualizar/Recarregar', tags='["refresh", "reload", "atualizar"]'),
+        Icon(id=26, name='save', display_name='Salvar', category='control',
+             lucide_name='save', material_name='save',
+             lvgl_symbol='LV_SYMBOL_SAVE', unicode_char='\uf0c7', emoji='💾',
+             description='Salvar configuração', tags='["save", "salvar", "guardar"]'),
+    ]
+    
+    session.bulk_save_objects(icons)
+    session.commit()
+    print(f"✓ {len(icons)} ícones criados")
+
 def main():
     """Executa o seed de desenvolvimento"""
     print("\n" + "=" * 50)
@@ -968,6 +1097,7 @@ def main():
         seed_screen_items(session)
         seed_themes(session)
         seed_can_signals(session)
+        seed_icons(session)  # Adicionar ícones
         seed_macros(session)
         seed_initial_events(session)
         

@@ -4,7 +4,7 @@
 # Ferramenta completa de desenvolvimento e debug
 
 PROJETO_DIR="/Users/leechardes/Projetos/autocore/firmware/autotech_hmi_display_v2"
-PORTA_SERIAL="/dev/cu.usbserial-2110"
+PORTA_SERIAL="/dev/cu.usbserial-110"
 VELOCIDADE="115200"
 
 # Cores para interface

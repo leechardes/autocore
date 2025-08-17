@@ -156,7 +156,8 @@ bool DeviceRegistration::loadMQTTCredentials(MQTTCredentials& creds) {
 }
 
 bool DeviceRegistration::checkDeviceExists(const String& deviceId) {
-    String url = buildApiUrl("/devices/uuid/" + deviceId);
+    // Endpoint: GET /api/devices/{device_identifier}
+    String url = buildApiUrl("/devices/" + deviceId);
     String response;
     
     if (logger) {
@@ -264,24 +265,37 @@ bool DeviceRegistration::fetchMQTTConfig(MQTTCredentials& credentials) {
 }
 
 bool DeviceRegistration::updateDeviceNetworkInfo(const String& deviceId) {
-    String url = buildApiUrl("/devices/uuid/" + deviceId);
+    // Endpoint correto: /api/devices/{device_identifier} (sem /uuid/)
+    String url = buildApiUrl("/devices/" + deviceId);
     
-    // Construir payload de atualização
+    // Construir payload de atualização conforme documentação
     StaticJsonDocument<512> doc;
+    doc["name"] = "ESP32-Display-" + deviceId.substring(deviceId.length() - 6);
+    doc["type"] = DEVICE_TYPE;
     doc["ip_address"] = WiFi.localIP().toString();
-    doc["mac_address"] = DeviceUtils::getMACAddress();
-    doc["firmware_version"] = DEVICE_VERSION;
-    doc["last_seen"] = esp_timer_get_time() / 1000000; // Timestamp em segundos
+    doc["mac_address"] = DeviceUtils::getMACAddress(true, ":");
+    doc["is_active"] = true;
+    
+    // Adicionar configuration e capabilities como objetos vazios se necessário
+    JsonObject configuration = doc.createNestedObject("configuration");
+    configuration["firmware_version"] = DEVICE_VERSION;
+    
+    JsonObject capabilities = doc.createNestedObject("capabilities");
+    capabilities["display"] = true;
+    capabilities["touch"] = true;
+    capabilities["width"] = 320;
+    capabilities["height"] = 240;
     
     String payload;
     serializeJson(doc, payload);
     
     if (logger) {
         logger->debug("DeviceRegistration: Atualizando informações de rede: " + url);
+        logger->debug("DeviceRegistration: Método: PATCH");
     }
     
     String response;
-    return makeHttpRequest(url, "PUT", payload, response);
+    return makeHttpRequest(url, "PATCH", payload, response);
 }
 
 void DeviceRegistration::saveRegistrationTime() {

@@ -55,6 +55,13 @@ public:
     static String getDeviceUUID();
     
     /**
+     * @brief Obtém Device ID para MQTT v2.2.0
+     * Formato: hmi_display_XXXXXX onde XXXXXX são os últimos 6 caracteres do UUID
+     * @return Device ID no formato MQTT v2.2.0
+     */
+    static String getDeviceId();
+    
+    /**
      * @brief Valida se um UUID tem formato válido
      * @param uuid UUID para validar
      * @return true se UUID é válido

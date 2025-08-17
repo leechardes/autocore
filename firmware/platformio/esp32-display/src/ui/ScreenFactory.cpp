@@ -8,6 +8,7 @@
 #include "core/Logger.h"
 #include "Layout.h"
 #include "ui/Icons.h"
+#include "ui/IconManager.h"
 #include "ui/ScreenManager.h"
 #include "commands/CommandSender.h"
 #include "communication/ButtonStateManager.h"
@@ -18,6 +19,7 @@
 
 extern Logger* logger;
 extern ScreenManager* screenManager;
+extern IconManager* iconManager;
 
 std::unique_ptr<ScreenBase> ScreenFactory::createScreen(JsonObject& config) {
     // Convert id to string if it's a number
@@ -135,9 +137,31 @@ std::unique_ptr<ScreenBase> ScreenFactory::createScreen(JsonObject& config) {
     // Set title in header
     screen->getHeader()->setTitle(title);
     
-    // Process items from new structure (screen_items)
-    if (config["screen_items"].is<JsonArray>()) {
-        JsonArray items = config["screen_items"].as<JsonArray>();
+    // Add debug logs to verify API structure
+    if (logger) {
+        logger->debug("ScreenFactory: Processing screen config");
+        if (config["items"].is<JsonArray>()) {
+            logger->debug("ScreenFactory: Found items array with " + String(config["items"].as<JsonArray>().size()) + " items");
+        }
+        if (config["screen_items"].is<JsonArray>()) {
+            logger->warning("ScreenFactory: Found deprecated screen_items field - should use 'items' instead");
+        }
+    }
+    
+    // Process items from API structure (items) with backwards compatibility
+    JsonArray items;
+    if (config["items"].is<JsonArray>()) {
+        // New API format uses 'items'
+        items = config["items"].as<JsonArray>();
+    } else if (config["screen_items"].is<JsonArray>()) {
+        // Legacy format uses 'screen_items' 
+        items = config["screen_items"].as<JsonArray>();
+        if (logger) {
+            logger->warning("ScreenFactory: Using deprecated 'screen_items' field");
+        }
+    }
+    
+    if (!items.isNull()) {
         screen->setItems(items); // Armazenar todos os items
         
         // Update navigation state
@@ -412,10 +436,41 @@ lv_obj_t* ScreenFactory::createButton(lv_obj_t* parent, JsonObject& config) {
         lv_obj_set_size(btn, BUTTON_WIDTH, BUTTON_HEIGHT);
     }
     
-    // Create label
+    // Create label with icon support
     lv_obj_t* label = lv_label_create(btn);
-    lv_label_set_text(label, config["label"].as<String>().c_str());
+    
+    // Build label text with icon if available
+    String labelText = config["label"].as<String>();
+    String iconName = config["icon"].as<String>();
+    
+    if (iconManager && !iconName.isEmpty() && iconManager->hasIcon(iconName)) {
+        // Use IconManager to create button text with icon
+        String buttonText = iconManager->createButtonSymbol(iconName, labelText, true);
+        lv_label_set_text(label, buttonText.c_str());
+        
+        if (logger) {
+            logger->debug("ScreenFactory: Button created with icon '" + iconName + "' and text '" + labelText + "'");
+        }
+    } else {
+        // Fallback to text only
+        lv_label_set_text(label, labelText.c_str());
+        
+        if (!iconName.isEmpty() && logger) {
+            logger->warning("ScreenFactory: Icon '" + iconName + "' not found, using text only");
+        }
+    }
+    
     lv_obj_center(label);
+    
+    // Apply suggested color from IconManager if available
+    if (iconManager && !iconName.isEmpty() && iconManager->hasIcon(iconName)) {
+        String suggestedColor = iconManager->getSuggestedColor(iconName);
+        // Convert hex color to LVGL color and apply
+        // For now, we'll use the theme color but log the suggestion
+        if (logger) {
+            logger->debug("ScreenFactory: Suggested color for '" + iconName + "': " + suggestedColor);
+        }
+    }
     
     // Apply theme button style (default OFF)
     theme_apply_button_off(btn);

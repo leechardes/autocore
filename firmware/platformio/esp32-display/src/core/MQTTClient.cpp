@@ -20,8 +20,8 @@ MQTTClient::MQTTClient(const String& deviceId, const String& broker, uint16_t po
     instance = this;
     client = new PubSubClient(wifiClient);
     
-    // Initialize MQTTProtocol
-    MQTTProtocol::initialize(deviceId, "display");
+    // Initialize MQTTProtocol with correct device type
+    MQTTProtocol::initialize(deviceId, DEVICE_TYPE);
     
     // Try to parse as IP address first
     IPAddress ip;
@@ -87,14 +87,14 @@ bool MQTTClient::connect() {
     String willTopic = "autocore/devices/" + MQTTProtocol::getDeviceUUID() + "/status";
     
     StaticJsonDocument<512> willDoc;
-    willDoc["protocol_version"] = MQTT_PROTOCOL_VERSION;
+    willDoc["protocol_version"] = PROTOCOL_VERSION;
     willDoc["uuid"] = MQTTProtocol::getDeviceUUID();
     willDoc["status"] = "offline";
     willDoc["timestamp"] = MQTTProtocol::getISOTimestamp();
     willDoc["reason"] = "unexpected_disconnect";
     willDoc["last_seen"] = MQTTProtocol::getISOTimestamp();
     willDoc["device_type"] = "display";
-    willDoc["firmware_version"] = FIRMWARE_VERSION;
+    willDoc["firmware_version"] = DEVICE_VERSION;
     
     String willMessage;
     serializeJson(willDoc, willMessage);
@@ -134,7 +134,7 @@ void MQTTClient::disconnect() {
         String willTopic = "autocore/devices/" + MQTTProtocol::getDeviceUUID() + "/status";
         
         StaticJsonDocument<512> offlineDoc;
-        offlineDoc["protocol_version"] = MQTT_PROTOCOL_VERSION;
+        offlineDoc["protocol_version"] = PROTOCOL_VERSION;
         offlineDoc["uuid"] = MQTTProtocol::getDeviceUUID();
         offlineDoc["status"] = "offline";
         offlineDoc["timestamp"] = MQTTProtocol::getISOTimestamp();
@@ -252,28 +252,33 @@ void MQTTClient::removeCallback(const String& topic) {
 }
 
 void MQTTClient::subscribeToTopics() {
-    // Tópicos corretos v2.2.0
-    String deviceBase = "autocore/devices/" + MQTTProtocol::getDeviceUUID();
+    // Tópicos MQTT v2.2.0 - ESP32-display
+    // Usa UUID completo para identificação de dispositivos
     
-    // Comandos para display
-    subscribe(deviceBase + "/display/screen", QOS_COMMANDS);
-    subscribe(deviceBase + "/display/config", QOS_COMMANDS);
+    // IMPORTANTE: ESP32-display busca configurações via REST API
+    // NÃO usa MQTT para receber configurações
     
-    // Status de relés para exibir (com wildcard para múltiplos dispositivos)
-    subscribe("autocore/devices/+/relays/state", QOS_TELEMETRY);
+    // Status de dispositivos (usando wildcard para múltiplos UUIDs)
+    // Formato: autocore/devices/{uuid}/status
+    subscribe("autocore/devices/+/status", QOS_TELEMETRY);
+    subscribe("autocore/devices/+/response", QOS_TELEMETRY);
+    subscribe("autocore/devices/+/telemetry/data", QOS_TELEMETRY);
     
-    // Telemetria (sem UUID no tópico!)
-    subscribe("autocore/telemetry/relays/data", QOS_TELEMETRY);
-    subscribe("autocore/telemetry/can/+", QOS_TELEMETRY);
+    // Sistema e broadcast
+    subscribe("autocore/system/ping", QOS_TELEMETRY);
+    subscribe("autocore/system/emergency_stop", QOS_COMMANDS);
+    subscribe("autocore/broadcast", QOS_TELEMETRY);
     
-    // Sistema
-    subscribe("autocore/system/broadcast", QOS_TELEMETRY);
-    subscribe("autocore/system/alert", QOS_COMMANDS);
+    // Presets status
+    subscribe("autocore/preset/status", QOS_TELEMETRY);
     
-    // Erros para exibir
-    subscribe("autocore/errors/+/+", QOS_COMMANDS);
+    // Security events
+    subscribe("autocore/security/event", QOS_COMMANDS);
     
-    logger->info("MQTT: Subscribed to v2.2.0 compliant topics");
+    logger->info("MQTT: Subscribed to protocol v2.2.0 topics");
+    logger->info("  UUID: " + MQTTProtocol::getDeviceUUID());
+    logger->info("  Config: via REST API /api/config/full/{uuid}");
+    logger->info("  Topics: using full UUID format (autocore/devices/{uuid}/...)");
 }
 
 void MQTTClient::messageReceived(char* topic, byte* payload, unsigned int length) {
@@ -364,7 +369,7 @@ void MQTTClient::publishStatus() {
     
     doc["status"] = "online";
     doc["device_type"] = "display";
-    doc["firmware_version"] = FIRMWARE_VERSION;
+    doc["firmware_version"] = DEVICE_VERSION;
     doc["ip_address"] = WiFi.localIP().toString();
     doc["wifi_signal"] = WiFi.RSSI();
     doc["uptime"] = millis() / 1000;

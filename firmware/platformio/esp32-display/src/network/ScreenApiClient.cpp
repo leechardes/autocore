@@ -10,6 +10,7 @@
 #include "network/ScreenApiClient.h"
 #include "core/Logger.h"
 #include "models/DeviceModels.h"
+#include "utils/DeviceUtils.h"
 
 // Logger global declarado em main.cpp
 extern Logger* logger;
@@ -362,13 +363,134 @@ bool ScreenApiClient::loadFullConfiguration(JsonDocument& config) {
     if (isCacheValid() && !cachedConfig.isEmpty()) {
         DeserializationError error = deserializeJson(config, cachedConfig);
         if (error == DeserializationError::Ok) {
-            Serial.println("[API] Using cached full configuration");
+            if (logger) {
+                logger->info("ScreenApiClient: Using cached full configuration");
+            }
             return true;
         }
     }
     
     // Clear device registry before loading new data
     DeviceRegistry::getInstance()->clear();
+    
+    // Use unified endpoint /api/config/full/{device_uuid} for single request
+    String deviceUUID = DeviceUtils::getDeviceUUID();
+    String endpoint = "/config/full/" + deviceUUID;
+    String response;
+    
+    if (logger) {
+        logger->info("ScreenApiClient: Loading full configuration from unified endpoint: " + endpoint);
+    }
+    
+    for (int attempt = 1; attempt <= API_RETRY_COUNT; attempt++) {
+        if (makeHttpRequest(endpoint, response)) {
+            if (logger) {
+                logger->debug("ScreenApiClient: Received full config response (" + String(response.length()) + " bytes)");
+            }
+            
+            // Parse unified response
+            JsonDocument fullResponse;
+            DeserializationError error = deserializeJson(fullResponse, response);
+            
+            if (error == DeserializationError::Ok) {
+                // Process unified response structure
+                if (processUnifiedResponse(fullResponse, config)) {
+                    // Cache the result
+                    cachedConfig.clear();
+                    serializeJson(config, cachedConfig);
+                    cacheTimestamp = millis();
+                    
+                    if (logger) {
+                        logger->info("ScreenApiClient: Full configuration loaded successfully from unified endpoint");
+                        logger->info("ScreenApiClient: Performance improvement - Single request vs multiple requests");
+                    }
+                    return true;
+                }
+            } else {
+                lastError = "JSON parse error in unified response: " + String(error.c_str());
+                if (logger) {
+                    logger->error("ScreenApiClient: " + lastError);
+                }
+            }
+        }
+        
+        if (logger) {
+            logger->warning("ScreenApiClient: Unified endpoint attempt " + String(attempt) + " failed: " + lastError);
+        }
+        
+        if (attempt < API_RETRY_COUNT) {
+            delay(API_RETRY_DELAY * attempt); // Exponential backoff
+        }
+    }
+    
+    // Fallback to legacy multiple requests if unified endpoint fails
+    // COMENTADO: Por enquanto, não usar fallback para múltiplas requisições
+    // if (logger) {
+    //     logger->warning("ScreenApiClient: Unified endpoint failed, falling back to legacy multiple requests");
+    // }
+    // 
+    // return loadLegacyConfiguration(config);
+    
+    // Retornar falha se o endpoint unificado falhar
+    if (logger) {
+        logger->error("ScreenApiClient: Failed to load configuration from unified endpoint");
+    }
+    return false;
+}
+
+bool ScreenApiClient::processUnifiedResponse(const JsonDocument& response, JsonDocument& config) {
+    if (logger) {
+        logger->debug("ScreenApiClient: Processing unified API response");
+    }
+    
+    // Validate response structure
+    if (!response["version"].is<String>() || !response["protocol_version"].is<String>()) {
+        lastError = "Invalid unified response structure - missing version fields";
+        return false;
+    }
+    
+    // Simply copy the response elements to config for now
+    config["version"] = response["version"];
+    config["protocol_version"] = response["protocol_version"];
+    
+    if (response["devices"]) {
+        config["devices"] = response["devices"];
+    }
+    
+    if (response["relay_boards"]) {
+        config["relay_boards"] = response["relay_boards"];
+    }
+    
+    if (response["screens"]) {
+        config["screens"] = response["screens"];
+    }
+    
+    if (response["theme"]) {
+        config["theme"] = response["theme"];
+    }
+    
+    if (response["system"]) {
+        config["system"] = response["system"];
+    }
+    
+    if (response["icons"]) {
+        config["icons"] = response["icons"];
+    }
+    
+    config["source"] = "api_unified";
+    config["timestamp"] = millis();
+    
+    if (logger) {
+        logger->info("ScreenApiClient: Successfully processed unified response");
+    }
+    
+    return true;
+}
+
+bool ScreenApiClient::loadLegacyConfiguration(JsonDocument& config) {
+    if (logger) {
+        logger->info("ScreenApiClient: Loading configuration using legacy multiple requests");
+    }
     
     // 1. Load devices
     JsonDocument devicesDoc;
@@ -384,7 +506,9 @@ bool ScreenApiClient::loadFullConfiguration(JsonDocument& config) {
             );
             DeviceRegistry::getInstance()->addDevice(info);
         }
-        Serial.printf("[API] Registered %d devices\n", DeviceRegistry::getInstance()->getDeviceCount());
+        if (logger) {
+            logger->debug("ScreenApiClient: Legacy - Registered " + String(DeviceRegistry::getInstance()->getDeviceCount()) + " devices");
+        }
     }
     
     // 2. Load relay boards
@@ -401,10 +525,12 @@ bool ScreenApiClient::loadFullConfiguration(JsonDocument& config) {
             );
             DeviceRegistry::getInstance()->addRelayBoard(info);
         }
-        Serial.printf("[API] Registered %d relay boards\n", DeviceRegistry::getInstance()->getRelayBoardCount());
+        if (logger) {
+            logger->debug("ScreenApiClient: Legacy - Registered " + String(DeviceRegistry::getInstance()->getRelayBoardCount()) + " relay boards");
+        }
     }
     
-    // 3. Load screens (existing code)
+    // 3. Load screens
     JsonDocument screensDoc;
     JsonArray screensArray = screensDoc["screens"].to<JsonArray>();
     
@@ -415,10 +541,21 @@ bool ScreenApiClient::loadFullConfiguration(JsonDocument& config) {
     // For each screen, load its items
     for (JsonObject screen : screensArray) {
         int screenId = screen["id"];
-        JsonArray items = screen["screen_items"].to<JsonArray>();
+        // Try new API format first (items), fallback to legacy (screen_items)
+        JsonArray items;
+        if (screen["items"].is<JsonArray>()) {
+            items = screen["items"].to<JsonArray>();
+        } else if (screen["screen_items"].is<JsonArray>()) {
+            items = screen["screen_items"].to<JsonArray>();
+            if (logger) {
+                logger->warning("ScreenApiClient: Using deprecated 'screen_items' field for screen " + String(screenId));
+            }
+        }
         
         if (!getScreenItems(screenId, items)) {
-            Serial.printf("[API] Warning: Failed to load items for screen %d\n", screenId);
+            if (logger) {
+                logger->warning("ScreenApiClient: Legacy - Failed to load items for screen " + String(screenId));
+            }
         }
     }
     
@@ -427,7 +564,7 @@ bool ScreenApiClient::loadFullConfiguration(JsonDocument& config) {
     config["screens"] = screensArray;
     config["devices"] = devicesArray;
     config["relay_boards"] = boardsArray;
-    config["source"] = "api";
+    config["source"] = "api_legacy";
     config["timestamp"] = millis();
     
     // Cache the result
@@ -435,10 +572,120 @@ bool ScreenApiClient::loadFullConfiguration(JsonDocument& config) {
     serializeJson(config, cachedConfig);
     cacheTimestamp = millis();
     
-    Serial.println("[API] Full configuration loaded successfully");
-    Serial.printf("[API] Memory - Devices: %d, Relay Boards: %d\n", 
-                  DeviceRegistry::getInstance()->getDeviceCount(),
-                  DeviceRegistry::getInstance()->getRelayBoardCount());
+    if (logger) {
+        logger->info("ScreenApiClient: Legacy configuration loaded successfully");
+        logger->warning("ScreenApiClient: Consider upgrading backend to support unified endpoint for better performance");
+    }
+    
+    return true;
+}
+
+bool ScreenApiClient::getIcons(JsonDocument& icons) {
+    String endpoint = "/icons?platform=esp32";
+    String response;
+    
+    if (logger) {
+        logger->debug("ScreenApiClient: Fetching icons from endpoint: " + endpoint);
+    }
+    
+    if (makeHttpRequest(endpoint, response)) {
+        DeserializationError error = deserializeJson(icons, response);
+        
+        if (error == DeserializationError::Ok) {
+            if (logger) {
+                logger->info("ScreenApiClient: Successfully loaded icon mappings for ESP32 platform");
+            }
+            return true;
+        } else {
+            lastError = "JSON parse error for icons: " + String(error.c_str());
+            if (logger) {
+                logger->error("ScreenApiClient: " + lastError);
+            }
+        }
+    }
+    
+    return false;
+}
+
+bool ScreenApiClient::getThemes(JsonDocument& themes) {
+    String response;
+    
+    if (makeHttpRequest("/themes", response)) {
+        DeserializationError error = deserializeJson(themes, response);
+        
+        if (error == DeserializationError::Ok) {
+            if (logger) {
+                logger->debug("ScreenApiClient: Successfully loaded themes");
+            }
+            return true;
+        } else {
+            lastError = "JSON parse error for themes: " + String(error.c_str());
+            if (logger) {
+                logger->error("ScreenApiClient: " + lastError);
+            }
+        }
+    }
+    
+    return false;
+}
+
+bool ScreenApiClient::parseScreensResponse(const String& response, JsonDocument& doc) {
+    DeserializationError error = deserializeJson(doc, response);
+    
+    if (error != DeserializationError::Ok) {
+        lastError = "JSON parse error in screens response: " + String(error.c_str());
+        if (logger) {
+            logger->error("ScreenApiClient: " + lastError);
+        }
+        return false;
+    }
+    
+    if (!doc.is<JsonArray>()) {
+        lastError = "Screens response is not an array";
+        if (logger) {
+            logger->error("ScreenApiClient: " + lastError);
+        }
+        return false;
+    }
+    
+    if (logger) {
+        logger->debug("ScreenApiClient: Successfully parsed screens response with " + 
+                     String(doc.as<JsonArray>().size()) + " screens");
+    }
+    
+    return true;
+}
+
+bool ScreenApiClient::parseItemsResponse(const String& response, JsonArray& items) {
+    JsonDocument doc;
+    DeserializationError error = deserializeJson(doc, response);
+    
+    if (error != DeserializationError::Ok) {
+        lastError = "JSON parse error in items response: " + String(error.c_str());
+        if (logger) {
+            logger->error("ScreenApiClient: " + lastError);
+        }
+        return false;
+    }
+    
+    if (!doc.is<JsonArray>()) {
+        lastError = "Items response is not an array";
+        if (logger) {
+            logger->error("ScreenApiClient: " + lastError);
+        }
+        return false;
+    }
+    
+    // Copiar elementos para o array fornecido
+    JsonArray responseArray = doc.as<JsonArray>();
+    for (JsonVariant v : responseArray) {
+        items.add(v);
+    }
+    
+    if (logger) {
+        logger->debug("ScreenApiClient: Successfully parsed items response with " + 
+                     String(items.size()) + " items");
+    }
     
     return true;
 }

@@ -12,11 +12,14 @@
 // ============================================================================
 // IDENTIFICAÇÃO DO DISPOSITIVO
 // ============================================================================
-// TODO: Implementar geração dinâmica de UUIDs únicos baseada no MAC address ou outro identificador
-// TODO: Para produção, cada dispositivo deve ter um UUID único gerado automaticamente
-#define DEVICE_UUID "esp32-display-001"         // UUID único do dispositivo
+// UUID será gerado automaticamente baseado no MAC address
+// Formato: "esp32-display-AABBCCDDEEFF" onde AABBCCDDEEFF são os últimos 6 bytes do MAC
+#define DEVICE_UUID_PREFIX "esp32-display-"     // Prefixo do UUID
 #define DEVICE_TYPE "hmi_display"              // Tipo do dispositivo
-#define DEVICE_VERSION "2.0.0"                 // Versão do firmware
+#define DEVICE_VERSION "2.2.0"                 // Versão do firmware (atualizado para v2.2.0)
+#define PROTOCOL_VERSION "2.2.0"               // Versão do protocolo MQTT
+#define GENERATE_UUID_FROM_MAC true            // Gerar UUID a partir do MAC address
+// DEVICE_ID será gerado dinamicamente: hmi_display_[últimos_6_chars_do_UUID]
 
 // ============================================================================
 // CONFIGURAÇÕES DE REDE WiFi

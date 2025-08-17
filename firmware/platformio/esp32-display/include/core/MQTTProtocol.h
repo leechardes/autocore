@@ -6,9 +6,7 @@
 #include <ArduinoJson.h>
 #include <WiFi.h>
 #include <time.h>
-
-#define MQTT_PROTOCOL_VERSION "2.2.0"
-#define FIRMWARE_VERSION "1.0.0"
+#include "config/DeviceConfig.h"
 
 // QoS Levels
 #define QOS_TELEMETRY    0
@@ -33,7 +31,7 @@ protected:
     
 public:
     static void initialize(const String& id, const String& type) {
-        deviceId = id;
+        deviceId = id;  // Usar o ID passado como parâmetro
         deviceType = type;
         configTime(0, 0, "pool.ntp.org");  // Configurar NTP para timestamps
     }
@@ -69,9 +67,14 @@ public:
     }
     
     static void addProtocolFields(JsonDocument& doc) {
-        doc["protocol_version"] = MQTT_PROTOCOL_VERSION;
+        doc["protocol_version"] = PROTOCOL_VERSION;  // Usar versão do config
         doc["uuid"] = getDeviceUUID();
         doc["timestamp"] = getISOTimestamp();
+    }
+    
+    static unsigned long getTimestamp() {
+        // Retorna timestamp Unix em segundos
+        return millis() / 1000;
     }
     
     static bool validateProtocolVersion(const JsonDocument& doc) {
@@ -80,6 +83,7 @@ public:
         }
         
         String version = doc["protocol_version"];
+        // Aceitar versões 2.x
         return version.startsWith("2.");
     }
 };

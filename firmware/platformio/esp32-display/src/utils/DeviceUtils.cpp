@@ -111,6 +111,24 @@ String DeviceUtils::getDeviceUUID() {
     return uuid;
 }
 
+String DeviceUtils::getDeviceId() {
+    // Obter UUID completo
+    String uuid = getDeviceUUID();
+    
+    // Extrair últimos 6 caracteres do UUID (parte única do MAC)
+    String uniquePart = uuid.substring(uuid.length() - 6);
+    uniquePart.toLowerCase(); // MQTT v2.2.0 usa lowercase
+    
+    // Formato: hmi_display_XXXXXX
+    String deviceId = String(DEVICE_TYPE) + "_" + uniquePart;
+    
+    if (logger) {
+        logger->debug("DeviceUtils: Generated Device ID for MQTT v2.2.0: " + deviceId);
+    }
+    
+    return deviceId;
+}
+
 bool DeviceUtils::isValidUUID(const String& uuid) {
     // Validação básica de UUID
     if (uuid.length() < 10) return false;

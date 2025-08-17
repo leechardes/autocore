@@ -373,7 +373,7 @@ class ApiService {
   // Versão que retorna List<ScreenConfig> para uso interno
   List<ScreenConfig> getDefaultScreensAsModels() {
     return getDefaultScreens()
-        .map((json) => ScreenConfig.fromJson(json))
+        .map(ScreenConfig.fromJson)
         .toList();
   }
   
@@ -409,7 +409,7 @@ class ApiService {
   // Versão que retorna List<Macro> para uso interno
   List<Macro> getDefaultMacrosAsModels() {
     return getDefaultMacros()
-        .map((json) => Macro.fromJson(json))
+        .map(Macro.fromJson)
         .toList();
   }
   

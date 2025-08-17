@@ -6,6 +6,8 @@
 #include "commands/CommandSender.h"
 #include "core/MQTTProtocol.h"
 #include "core/Logger.h"
+#include "config/DeviceConfig.h"
+#include "utils/DeviceUtils.h"
 
 extern Logger* logger;
 
@@ -85,7 +87,8 @@ bool CommandSender::sendRelayCommand(const String& targetUuid, int channel,
         return false;
     }
     
-    String topic = "autocore/devices/" + targetUuid + "/relays/set";
+    // V2.2.0: Comando para dispositivo usando UUID completo
+    String topic = "autocore/devices/" + targetUuid + "/command";
     
     StaticJsonDocument<512> doc;
     MQTTProtocol::addProtocolFields(doc); // Adiciona protocol_version, uuid, timestamp
@@ -146,7 +149,8 @@ void CommandSender::sendHeartbeat(const String& targetUuid, int channel) {
     int idx = channel - 1;
     if (!heartbeatActive[idx]) return;
     
-    String topic = "autocore/devices/" + targetUuid + "/relays/heartbeat";
+    // V2.2.0: Heartbeat usando UUID completo
+    String topic = "autocore/devices/" + targetUuid + "/heartbeat";
     
     StaticJsonDocument<512> doc;
     MQTTProtocol::addProtocolFields(doc);
@@ -177,7 +181,8 @@ void CommandSender::processHeartbeats() {
 }
 
 void CommandSender::sendDisplayEvent(const String& eventType, const JsonObject& eventData) {
-    String topic = "autocore/devices/" + MQTTProtocol::getDeviceUUID() + "/display/touch";
+    // V2.2.0: Eventos do display usando UUID
+    String topic = "autocore/devices/" + MQTTProtocol::getDeviceUUID() + "/telemetry/touch";
     
     StaticJsonDocument<512> doc;
     MQTTProtocol::addProtocolFields(doc);
@@ -191,15 +196,15 @@ void CommandSender::sendDisplayEvent(const String& eventType, const JsonObject& 
 }
 
 bool CommandSender::sendPresetCommand(const String& preset) {
-    String topic = "autocore/system/commands";
+    // V2.2.0: Preset execution topic
+    String topic = "autocore/preset/execute";
     
     StaticJsonDocument<512> doc;
     MQTTProtocol::addProtocolFields(doc);
     
-    doc["command_type"] = "preset";
-    doc["preset"] = preset;
-    doc["user"] = "display_touch";
-    doc["source_uuid"] = MQTTProtocol::getDeviceUUID();
+    doc["preset_id"] = preset;
+    doc["source"] = MQTTProtocol::getDeviceUUID();
+    doc["parameters"] = JsonObject(); // Empty parameters for now
     
     logger->info("CMD: Sending preset command: " + preset);
     
@@ -209,7 +214,8 @@ bool CommandSender::sendPresetCommand(const String& preset) {
 }
 
 bool CommandSender::sendModeCommand(const String& mode) {
-    String topic = "autocore/system/commands";
+    // V2.2.0: System control topic
+    String topic = "autocore/system/control";
     
     StaticJsonDocument<512> doc;
     MQTTProtocol::addProtocolFields(doc);
@@ -227,7 +233,8 @@ bool CommandSender::sendModeCommand(const String& mode) {
 }
 
 bool CommandSender::sendActionCommand(const String& action, JsonObject& params) {
-    String topic = "autocore/system/commands";
+    // V2.2.0: System control topic
+    String topic = "autocore/system/control";
     
     StaticJsonDocument<512> doc;
     MQTTProtocol::addProtocolFields(doc);

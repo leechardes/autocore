@@ -170,6 +170,36 @@ public:
      * @return true se carregamento bem-sucedido
      */
     bool loadFullConfiguration(JsonDocument& config);
+
+    /**
+     * @brief Carrega mapeamento de ícones para plataforma ESP32
+     * @param icons JsonDocument para armazenar ícones
+     * @return true se carregamento bem-sucedido
+     */
+    bool getIcons(JsonDocument& icons);
+
+    /**
+     * @brief Carrega temas disponíveis
+     * @param themes JsonDocument para armazenar temas
+     * @return true se carregamento bem-sucedido
+     */
+    bool getThemes(JsonDocument& themes);
+
+private:
+    /**
+     * @brief Processa resposta unificada do endpoint /api/config/full
+     * @param response JsonDocument com resposta unificada
+     * @param config JsonDocument para armazenar configuração processada
+     * @return true se processamento bem-sucedido
+     */
+    bool processUnifiedResponse(const JsonDocument& response, JsonDocument& config);
+
+    /**
+     * @brief Carrega configuração usando múltiplas requisições (fallback)
+     * @param config JsonDocument para armazenar configuração
+     * @return true se carregamento bem-sucedido
+     */
+    bool loadLegacyConfiguration(JsonDocument& config);
 };
 
 #endif // SCREEN_API_CLIENT_H
