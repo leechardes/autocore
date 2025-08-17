@@ -179,9 +179,7 @@ const RelaysPage = () => {
     }
     
     try {
-      console.log('Salvando canal:', selectedChannel.id, formData)
       const result = await api.updateRelayChannel(selectedChannel.id, formData)
-      console.log('Canal salvo:', result)
       await loadData()
       setIsEditDialogOpen(false)
       resetForm()
@@ -322,8 +320,6 @@ const RelaysPage = () => {
     }
     
     try {
-      console.log('=== INICIANDO CRIAÇÃO DE PLACA ===')
-      console.log('Dados do formulário:', boardFormData)
       
       // Buscar o nome do dispositivo selecionado
       const selectedDevice = availableDevices.find(d => d.id == boardFormData.device_id)
@@ -335,30 +331,21 @@ const RelaysPage = () => {
         name: deviceName // Usar o nome do dispositivo
       }
       
-      console.log('Chamando api.createRelayBoard...')
       const result = await api.createRelayBoard(dataToSend)
-      console.log('✅ API retornou sucesso:', result)
       
-      console.log('Recarregando dados...')
       try {
         await loadData()
-        console.log('✅ Dados recarregados com sucesso')
       } catch (loadError) {
         console.error('❌ Erro recarregando dados:', loadError)
         // Continue mesmo se loadData falhar
       }
       
-      console.log('Fechando dialog e resetando formulário...')
       setIsBoardDialogOpen(false)
       resetBoardForm()
       
-      console.log('✅ PROCESSO CONCLUÍDO COM SUCESSO')
       alert(`Placa criada com sucesso para o dispositivo "${deviceName}"!`)
     } catch (error) {
       console.error('❌ ERRO NO PROCESSO:', error)
-      console.error('Tipo do erro:', typeof error)
-      console.error('Message:', error.message)
-      console.error('Stack:', error.stack)
       alert(`Erro ao criar placa: ${error.message}`)
     }
   }

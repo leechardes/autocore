@@ -382,6 +382,27 @@ class TelemetryRepository(BaseRepository):
                 TelemetryData.device_id == device_id
             ).order_by(TelemetryData.timestamp.desc()).limit(limit).all()
     
+    def get_latest_by_device(self, device_id: int, limit: int = 50) -> List[TelemetryData]:
+        """Busca telemetria mais recente agrupada por data_key (um valor por chave)"""
+        with SessionLocal() as session:
+            # Subquery para encontrar o timestamp mais recente para cada data_key
+            subquery = session.query(
+                TelemetryData.data_key,
+                func.max(TelemetryData.timestamp).label('max_timestamp')
+            ).filter(
+                TelemetryData.device_id == device_id
+            ).group_by(TelemetryData.data_key).subquery()
+            
+            # Query principal para buscar os registros completos
+            return session.query(TelemetryData).join(
+                subquery,
+                and_(
+                    TelemetryData.data_key == subquery.c.data_key,
+                    TelemetryData.timestamp == subquery.c.max_timestamp,
+                    TelemetryData.device_id == device_id
+                )
+            ).order_by(TelemetryData.data_key).limit(limit).all()
+    
     def get_by_timerange(self, device_id: int, hours: int = 24) -> List[TelemetryData]:
         """Busca telemetria por período"""
         with SessionLocal() as session:
@@ -461,6 +482,14 @@ class ConfigRepository(BaseRepository):
         with SessionLocal() as session:
             query = session.query(Screen)
             if visible_only:
+                query = query.filter(Screen.is_visible == True)
+            return query.order_by(Screen.position).all()
+    
+    def get_all_screens(self, include_hidden: bool = True) -> List[Screen]:
+        """Lista todas as telas incluindo ocultas - para modo preview"""
+        with SessionLocal() as session:
+            query = session.query(Screen)
+            if not include_hidden:
                 query = query.filter(Screen.is_visible == True)
             return query.order_by(Screen.position).all()
     

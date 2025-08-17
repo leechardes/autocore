@@ -69,7 +69,6 @@ const MacroActionEditor = ({ actions = [], onChange }) => {
     try {
       setLoadingChannels(true);
       const channels = await api.getBoardChannelsWithState(boardId);
-      console.log('Canais carregados:', channels); // Debug
       setBoardChannels(channels);
     } catch (error) {
       console.error('Erro carregando canais:', error);

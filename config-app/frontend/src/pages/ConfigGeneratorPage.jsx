@@ -63,7 +63,6 @@ const ConfigGeneratorPage = () => {
       setLoading(true)
       setError(null)
       
-      console.log('Carregando dados...')
       const [devicesData, screensData, boardsData, channelsData] = await Promise.all([
         api.getDevices(),
         api.getScreens(),
@@ -71,12 +70,6 @@ const ConfigGeneratorPage = () => {
         api.getRelayChannels()
       ])
       
-      console.log('Dados carregados:', {
-        devices: devicesData?.length || 0,
-        screens: screensData?.length || 0,
-        boards: boardsData?.length || 0,
-        channels: channelsData?.length || 0
-      })
       
       setDevices(devicesData || [])
       setScreens(screensData || [])
@@ -97,7 +90,6 @@ const ConfigGeneratorPage = () => {
   // Gerar configuração para dispositivo
   const generateConfig = async (device) => {
     try {
-      console.log('Gerando config para device:', device)
       setGenerating(true)
       setSelectedDevice(device)
 
@@ -105,14 +97,11 @@ const ConfigGeneratorPage = () => {
       let apiConfig = {}
       try {
         apiConfig = await api.generateDeviceConfig(device.uuid)
-        console.log('API config recebida:', apiConfig)
       } catch (error) {
-        console.log('API config não disponível, gerando localmente:', error)
       }
       
       // Filtrar dados baseado no dispositivo - verificar se screens existe
       const deviceScreens = screens ? screens.filter(s => s.device_id === device.id) : []
-      console.log('Device screens:', deviceScreens)
       
       // Buscar placas e canais do dispositivo - verificar se arrays existem
       const deviceBoards = relayBoards ? relayBoards.filter(b => b.device_id === device.id) : []
@@ -121,7 +110,6 @@ const ConfigGeneratorPage = () => {
         const boardChannels = relayChannels ? relayChannels.filter(c => c.board_id === board.id) : []
         deviceRelays.push(...boardChannels)
       }
-      console.log('Device boards:', deviceBoards, 'Device relays:', deviceRelays)
 
       // Construir configuração personalizada
       const config = {
@@ -395,7 +383,6 @@ settings:
           const config = await api.generateDeviceConfig(device.uuid)
           allConfigs[device.uuid] = config
         } catch (error) {
-          console.log(`Erro gerando config para ${device.uuid}`)
         }
       }
       

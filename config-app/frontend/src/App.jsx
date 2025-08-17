@@ -135,7 +135,6 @@ function App() {
   // Initialize app
   useEffect(() => {
     const initApp = async () => {
-      console.log('🚀 AutoCore Config App iniciando...')
       
       // Initialize theme
       const savedTheme = localStorage.getItem('theme')
@@ -149,7 +148,6 @@ function App() {
       await loadInitialData()
       
       setLoading(false)
-      console.log('✅ AutoCore Config App carregado')
     }
 
     initApp()

@@ -11,7 +11,7 @@ from contextlib import asynccontextmanager
 # Adiciona path para importar database
 sys.path.append(str(Path(__file__).parent.parent.parent / "database"))
 
-from fastapi import FastAPI, HTTPException, Depends, status, WebSocket, WebSocketDisconnect
+from fastapi import FastAPI, HTTPException, Depends, status, WebSocket, WebSocketDisconnect, Query
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel, Field
@@ -1146,20 +1146,276 @@ async def get_events(limit: int = 100):
         raise HTTPException(status_code=500, detail=str(e))
 
 # ====================================
+# HELPER FUNCTIONS - CONFIG
+# ====================================
+
+def get_preview_configuration():
+    """
+    Retorna configuração completa para modo preview
+    com exemplos de todos os tipos de componentes
+    """
+    try:
+        # Buscar todas as screens ativas para preview
+        all_screens = config.get_all_screens(include_hidden=False)
+        
+        # Dados simulados para telemetria
+        preview_telemetry = {
+            "speed": 45.5,
+            "rpm": 3200,
+            "engine_temp": 89.5,
+            "oil_pressure": 4.2,
+            "fuel_level": 75.8,
+            "battery_voltage": 13.8,
+            "intake_temp": 23.5,
+            "boost_pressure": 0.8,
+            "lambda": 0.95,
+            "tps": 35.2,
+            "ethanol": 27.5,
+            "gear": 3
+        }
+        
+        # Base config para preview
+        config_data = {
+            "version": "2.0.0",
+            "protocol_version": "2.2.0",
+            "timestamp": datetime.now().isoformat(),
+            "preview_mode": True,
+            "device": {
+                "id": 0,
+                "uuid": "preview",
+                "type": "esp32_display",
+                "name": "Preview Display",
+                "status": "online",
+                "ip_address": "192.168.1.100",
+                "mac_address": "AA:BB:CC:DD:EE:FF"
+            },
+            "system": {
+                "name": "AutoCore System - Preview",
+                "language": "pt-BR"
+            },
+            "telemetry": preview_telemetry
+        }
+        
+        # Adicionar todas as screens com dados expandidos
+        screens_data = []
+        for screen in all_screens:
+            screen_dict = {
+                "id": screen.id,
+                "name": screen.name,
+                "title": screen.title,
+                "icon": screen.icon,
+                "screen_type": screen.screen_type,
+                "parent_id": screen.parent_id,
+                "position": screen.position,
+                "columns_mobile": screen.columns_mobile or 2,
+                "columns_display_small": screen.columns_display_small or 2,
+                "columns_display_large": screen.columns_display_large or 3,
+                "columns_web": screen.columns_web or 4,
+                "is_visible": screen.is_visible,
+                "show_on_mobile": getattr(screen, 'show_on_mobile', True),
+                "show_on_display_small": screen.show_on_display_small,
+                "show_on_display_large": screen.show_on_display_large,
+                "show_on_web": getattr(screen, 'show_on_web', True),
+                "show_on_controls": getattr(screen, 'show_on_controls', False),
+                "items": []
+            }
+            
+            # Adicionar screen_items com dados expandidos
+            items = config.get_screen_items(screen.id)
+            for item in items:
+                if item.is_active:
+                    item_data = {
+                        "id": item.id,
+                        "item_type": item.item_type,
+                        "name": item.name,
+                        "label": item.label,
+                        "icon": item.icon,
+                        "position": item.position,
+                        "action_type": item.action_type,
+                        "action_target": item.action_target,
+                        "action_payload": item.action_payload,
+                        "relay_board_id": item.relay_board_id,
+                        "relay_channel_id": item.relay_channel_id,
+                        
+                        # Campos adicionais para Display/Gauge (simulados)
+                        "display_format": getattr(item, 'display_format', "gauge" if item.item_type == "gauge" else "text"),
+                        "value_source": getattr(item, 'value_source', f"telemetry.{item.name.lower()}" if item.item_type in ["gauge", "display"] else None),
+                        "unit": getattr(item, 'unit', item.data_unit),
+                        "min_value": getattr(item, 'min_value', 0),
+                        "max_value": getattr(item, 'max_value', 100),
+                        "color_ranges": getattr(item, 'color_ranges', [
+                            {"min": 0, "max": 30, "color": "#4CAF50"},
+                            {"min": 30, "max": 70, "color": "#FF9800"},
+                            {"min": 70, "max": 100, "color": "#F44336"}
+                        ] if item.item_type == "gauge" else None),
+                        "size": getattr(item, 'size', item.size_display_large or "medium"),
+                        "color_theme": getattr(item, 'color_theme', "primary"),
+                        "custom_colors": {
+                            "background": getattr(item, 'bg_color', None),
+                            "text": getattr(item, 'text_color', None),
+                            "border": getattr(item, 'border_color', None)
+                        }
+                    }
+                    
+                    # Expandir relay_board se existe
+                    if item.relay_board_id:
+                        try:
+                            board = relays.get_board_by_id(item.relay_board_id)
+                            if board:
+                                device = devices.get_by_id(board.device_id) if board.device_id else None
+                                item_data["relay_board"] = {
+                                    "id": board.id,
+                                    "device_id": board.device_id,
+                                    "device_uuid": device.uuid if device else None,
+                                    "device_name": device.name if device else None,
+                                    "device_ip": device.ip_address if device else None,
+                                    "device_type": device.type if device else None,
+                                    "total_channels": board.total_channels,
+                                    "board_model": board.board_model,
+                                    "is_active": board.is_active
+                                }
+                        except Exception as e:
+                            logger.warning(f"Erro ao expandir relay_board preview {item.relay_board_id}: {str(e)}")
+                    
+                    # Expandir relay_channel se existe
+                    if item.relay_channel_id:
+                        try:
+                            channel = relays.get_channel(item.relay_channel_id)
+                            if channel:
+                                item_data["relay_channel"] = {
+                                    "id": channel.id,
+                                    "board_id": channel.board_id,
+                                    "channel_number": channel.channel_number,
+                                    "name": channel.name,
+                                    "description": channel.description,
+                                    "function_type": channel.function_type,
+                                    "icon": channel.icon,
+                                    "color": channel.color,
+                                    "protection_mode": channel.protection_mode,
+                                    "max_activation_time": channel.max_activation_time,
+                                    "allow_in_macro": channel.allow_in_macro,
+                                    "is_active": channel.is_active
+                                }
+                        except Exception as e:
+                            logger.warning(f"Erro ao expandir relay_channel preview {item.relay_channel_id}: {str(e)}")
+                    
+                    screen_dict["items"].append(item_data)
+            
+            screens_data.append(screen_dict)
+        
+        config_data["screens"] = screens_data
+        
+        # Devices registry
+        all_devices = devices.get_all(active_only=True)
+        config_data["devices"] = [
+            {
+                "id": d.id,
+                "uuid": d.uuid,
+                "name": d.name,
+                "type": d.type,
+                "status": d.status,
+                "ip_address": d.ip_address,
+                "is_active": d.is_active
+            }
+            for d in all_devices
+        ]
+        
+        # Relay boards
+        boards = relays.get_boards(active_only=True)
+        config_data["relay_boards"] = [
+            {
+                "id": b.id,
+                "device_id": b.device_id,
+                "total_channels": b.total_channels,
+                "board_model": b.board_model,
+                "is_active": b.is_active
+            }
+            for b in boards
+        ]
+        
+        # Theme padrão
+        default_theme = config.get_default_theme()
+        if default_theme:
+            config_data["theme"] = {
+                "id": default_theme.id,
+                "name": default_theme.name,
+                "primary_color": default_theme.primary_color,
+                "secondary_color": default_theme.secondary_color,
+                "background_color": default_theme.background_color,
+                "surface_color": default_theme.surface_color,
+                "text_primary": default_theme.text_primary,
+                "text_secondary": default_theme.text_secondary,
+                "error_color": default_theme.error_color,
+                "warning_color": default_theme.warning_color,
+                "success_color": default_theme.success_color,
+                "info_color": default_theme.info_color
+            }
+        
+        return config_data
+    
+    except Exception as e:
+        logger.error(f"Error generating preview configuration: {e}")
+        logger.error(f"Tipo de erro: {type(e).__name__}")
+        
+        # Retornar configuração mínima em caso de erro
+        fallback_config = {
+            "version": "2.0.0",
+            "protocol_version": "2.2.0",
+            "timestamp": datetime.now().isoformat(),
+            "preview_mode": True,
+            "error": "Configuração preview indisponível",
+            "device": {
+                "id": 0,
+                "uuid": "preview",
+                "type": "esp32_display",
+                "name": "Preview Display",
+                "status": "online"
+            },
+            "screens": [],
+            "telemetry": {}
+        }
+        logger.warning("Retornando configuração preview mínima devido a erro")
+        return fallback_config
+
+# ====================================
 # ENDPOINTS - CONFIG
 # ====================================
 
 @app.get("/api/config/full/{device_uuid}", tags=["Config"])
-async def get_full_config(device_uuid: str):
+@app.get("/api/config/full", tags=["Config"])
+async def get_full_configuration(
+    device_uuid: Optional[str] = None, 
+    preview: bool = Query(False, description="Modo preview para visualizador")
+):
     """
-    Retorna configuração completa para um dispositivo ESP32
+    Retorna configuração completa para um dispositivo ESP32 ou modo preview
     Endpoint otimizado para reduzir número de requisições no ESP32
+    Suporta modo preview para visualizador frontend
     """
     try:
-        # Buscar dispositivo usando campos reais
+        # Validações de entrada
+        if device_uuid and len(device_uuid) > 100:
+            raise HTTPException(400, "Device UUID muito longo")
+        
+        # Verificar se é modo preview
+        is_preview_mode = (device_uuid == "preview") or preview or (device_uuid is None)
+        
+        if is_preview_mode:
+            logger.info("Gerando configuração preview")
+            # Modo preview: retornar configuração completa de exemplo
+            return get_preview_configuration()
+        
+        # Modo normal: validar e buscar dispositivo específico
+        if not device_uuid or device_uuid.strip() == "":
+            raise HTTPException(400, "Device UUID é obrigatório quando não está em modo preview")
+            
+        logger.info(f"Buscando configuração para dispositivo: {device_uuid}")
         device = devices.get_by_uuid(device_uuid)
         if not device:
             raise HTTPException(404, f"Device '{device_uuid}' not found")
+        
+        if not device.is_active:
+            raise HTTPException(400, f"Device '{device_uuid}' não está ativo")
         
         # Base config com campos existentes
         config_data = {
@@ -1197,11 +1453,16 @@ async def get_full_config(device_uuid: str):
                         "screen_type": screen.screen_type,
                         "parent_id": screen.parent_id,
                         "position": screen.position,
+                        "columns_mobile": screen.columns_mobile or 2,
                         "columns_display_small": screen.columns_display_small or 2,
                         "columns_display_large": screen.columns_display_large or 3,
+                        "columns_web": screen.columns_web or 4,
                         "is_visible": screen.is_visible,
+                        "show_on_mobile": getattr(screen, 'show_on_mobile', True),
                         "show_on_display_small": screen.show_on_display_small,
                         "show_on_display_large": screen.show_on_display_large,
+                        "show_on_web": getattr(screen, 'show_on_web', True),
+                        "show_on_controls": getattr(screen, 'show_on_controls', False),
                         "items": []
                     }
                     
@@ -1221,7 +1482,26 @@ async def get_full_config(device_uuid: str):
                                 "action_payload": item.action_payload,
                                 # Manter IDs para compatibilidade
                                 "relay_board_id": item.relay_board_id,
-                                "relay_channel_id": item.relay_channel_id
+                                "relay_channel_id": item.relay_channel_id,
+                                
+                                # Campos adicionais para Display/Gauge
+                                "display_format": getattr(item, 'display_format', "gauge" if item.item_type == "gauge" else "text"),
+                                "value_source": getattr(item, 'value_source', f"telemetry.{item.name.lower()}" if item.item_type in ["gauge", "display"] else None),
+                                "unit": getattr(item, 'unit', item.data_unit),
+                                "min_value": getattr(item, 'min_value', 0),
+                                "max_value": getattr(item, 'max_value', 100),
+                                "color_ranges": getattr(item, 'color_ranges', [
+                                    {"min": 0, "max": 30, "color": "#4CAF50"},
+                                    {"min": 30, "max": 70, "color": "#FF9800"},
+                                    {"min": 70, "max": 100, "color": "#F44336"}
+                                ] if item.item_type == "gauge" else None),
+                                "size": getattr(item, 'size', item.size_display_large or "medium"),
+                                "color_theme": getattr(item, 'color_theme', "primary"),
+                                "custom_colors": {
+                                    "background": getattr(item, 'bg_color', None),
+                                    "text": getattr(item, 'text_color', None),
+                                    "border": getattr(item, 'border_color', None)
+                                }
                             }
                             
                             # Expandir relay_board se existe
@@ -1318,14 +1598,37 @@ async def get_full_config(device_uuid: str):
                     "success_color": default_theme.success_color,
                     "info_color": default_theme.info_color
                 }
+            
+            # Adicionar telemetria em tempo real para dispositivos normais
+            try:
+                latest_telemetry = telemetry.get_latest_by_device(device.id, limit=50)
+                telemetry_data = {}
+                for t in latest_telemetry:
+                    telemetry_data[t.data_key] = t.data_value
+                config_data["telemetry"] = telemetry_data
+                logger.info(f"Telemetria adicionada para device {device.uuid}: {len(telemetry_data)} sinais")
+            except Exception as e:
+                logger.warning(f"Erro ao buscar telemetria para device {device.uuid}: {e}")
+                config_data["telemetry"] = {}
         
         return config_data
         
     except HTTPException:
         raise
     except Exception as e:
-        logger.error(f"Error generating full config for {device_uuid}: {e}")
-        raise HTTPException(500, f"Internal server error: {str(e)}")
+        error_msg = f"Erro ao gerar configuração completa"
+        if device_uuid:
+            error_msg += f" para dispositivo {device_uuid}"
+        logger.error(f"{error_msg}: {e}")
+        logger.error(f"Tipo de erro: {type(e).__name__}")
+        
+        # Tratamento específico para erros comuns
+        if "database" in str(e).lower():
+            raise HTTPException(503, "Erro de conexão com banco de dados")
+        elif "timeout" in str(e).lower():
+            raise HTTPException(504, "Timeout ao buscar configurações")
+        else:
+            raise HTTPException(500, f"Erro interno do servidor: {str(e)}")
 
 @app.get("/api/config/generate/{device_uuid}", tags=["Config"])
 async def generate_config(device_uuid: str):

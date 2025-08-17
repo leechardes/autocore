@@ -98,7 +98,6 @@ const MQTTMonitorPage = () => {
     const cleanupInterval = setInterval(() => {
       setMessages(prev => {
         if (prev.length > 500) {
-          console.log('Limpando mensagens antigas, mantendo últimas 500');
           return prev.slice(-500);
         }
         return prev;
@@ -183,12 +182,10 @@ const MQTTMonitorPage = () => {
   const connectWebSocket = () => {
     // Prevenir múltiplas conexões
     if (ws.current && ws.current.readyState === WebSocket.CONNECTING) {
-      console.log('WebSocket já está conectando...');
       return;
     }
     
     if (ws.current && ws.current.readyState === WebSocket.OPEN) {
-      console.log('WebSocket já está conectado');
       return;
     }
     
@@ -197,7 +194,6 @@ const MQTTMonitorPage = () => {
     // Usar variável de ambiente ou fallback para produção
     const wsPort = import.meta.env.VITE_API_PORT || '5000';
     const wsUrl = `ws://${host}:${wsPort}/ws/mqtt`;
-    console.log('Conectando WebSocket:', wsUrl);
     
     try {
       // Criar WebSocket sem headers extras
@@ -209,7 +205,6 @@ const MQTTMonitorPage = () => {
     }
     
     ws.current.onopen = () => {
-      console.log('WebSocket conectado');
       setConnected(true);
       toast.success('Conectado ao Monitor MQTT');
     };
@@ -226,12 +221,10 @@ const MQTTMonitorPage = () => {
         const data = JSON.parse(event.data);
         
         // Debug - ver mensagem recebida (comentar em produção)
-        // console.log('WebSocket message received:', data);
         
         // Debug detalhado para mensagens MQTT (remover depois que estiver funcionando)
         // if (data.type === 'mqtt_message' && data.data) {
         //   const msgData = data.data;
-        //   console.log('📨 MENSAGEM MQTT RECEBIDA:', {
         //     topic: msgData.topic,
         //     message_type: msgData.message_type,
         //     payload: msgData.payload
@@ -239,7 +232,6 @@ const MQTTMonitorPage = () => {
         //   
         //   // Verificar se é relacionado a relés
         //   if (msgData.topic && (msgData.topic.includes('relay') || msgData.message_type === 'relay_state')) {
-        //     console.log('🔍 É MENSAGEM DE RELÉ!');
         //   }
         // }
         
@@ -320,7 +312,6 @@ const MQTTMonitorPage = () => {
                     simulated_state: payloadData.channels[channel.channel_number.toString()] || false
                   }))
                 );
-                console.log('✅ Estado dos canais atualizado via MQTT para board:', currentSelectedBoard);
               }
             } catch (e) {
               console.error('Erro atualizando estado dos canais:', e);
@@ -350,7 +341,6 @@ const MQTTMonitorPage = () => {
     
     ws.current.onclose = (event) => {
       setConnected(false);
-      console.log('WebSocket fechado:', event.code, event.reason);
       
       // Só reconectar se não foi fechamento intencional
       if (event.code !== 1000) {
@@ -359,7 +349,6 @@ const MQTTMonitorPage = () => {
         // Reconectar após 5 segundos
         setTimeout(() => {
           if (!ws.current || ws.current.readyState === WebSocket.CLOSED) {
-            console.log('Tentando reconectar WebSocket...');
             connectWebSocket();
           }
         }, 5000);
@@ -441,7 +430,6 @@ const MQTTMonitorPage = () => {
   const copyMessage = async (msg) => {
     try {
       // Debug - ver estrutura da mensagem
-      console.log('Copiando mensagem:', msg);
       
       // Formatar a mensagem completa para copiar
       const timestamp = msg.timestamp ? new Date(msg.timestamp).toLocaleString('pt-BR') : 'N/A';
@@ -460,7 +448,6 @@ Payload:
 ${payload}
 ==================`;
       
-      console.log('Mensagem formatada:', formattedMessage);
       
       // Tentar usar a API moderna primeiro
       if (navigator.clipboard && window.isSecureContext) {
@@ -629,7 +616,6 @@ ${payload}
         const intervalId = setInterval(async () => {
           try {
             await api.post(`/simulators/relay/${boardId}/channel/${channelNumber}/heartbeat`);
-            console.log(`Heartbeat enviado para canal ${channelNumber}`);
           } catch (error) {
             console.error('Erro enviando heartbeat:', error);
             // Se falhar, para o heartbeat

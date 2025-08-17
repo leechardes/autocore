@@ -142,7 +142,6 @@ class MQTTService {
             
             if (response.ok) {
                 const result = await response.json();
-                console.log('✅ Mensagem MQTT publicada:', result);
                 return { success: true, result };
             } else {
                 const error = await response.text();

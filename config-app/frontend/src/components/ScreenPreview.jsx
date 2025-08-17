@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react'
+import React, { useState, useEffect, useRef } from 'react'
 import {
   Monitor,
   Smartphone,
@@ -28,23 +28,27 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Progress } from '@/components/ui/progress'
 import { Switch } from '@/components/ui/switch'
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogHeader,
-  DialogTitle,
-} from '@/components/ui/dialog'
 import api from '@/lib/api'
+import { 
+  adaptConfigToPreview, 
+  getColorForValue,
+  shouldShowItem,
+  getItemSize,
+  getScreenColumns
+} from '@/utils/previewAdapter'
 
 const ScreenPreview = ({ isOpen, onClose }) => {
+  const [fullConfig, setFullConfig] = useState(null)
   const [screens, setScreens] = useState([])
   const [currentScreen, setCurrentScreen] = useState(null)
   const [screenItems, setScreenItems] = useState([])
   const [loading, setLoading] = useState(false)
-  const [deviceType, setDeviceType] = useState('web')
+  const [isReady, setIsReady] = useState(false)
+  const loadingRef = useRef(false)
+  const [deviceType, setDeviceType] = useState('display_small') // Padrão Display P
   const [itemStates, setItemStates] = useState({})
   const [navigationHistory, setNavigationHistory] = useState([])
+  const [telemetry, setTelemetry] = useState({})
 
   // Tipos de dispositivo
   const deviceTypes = [
@@ -120,27 +124,59 @@ const ScreenPreview = ({ isOpen, onClose }) => {
     'radio': Wifi
   }
 
-  // Carregar telas
-  const loadScreens = async () => {
+  // Carregar configuração completa
+  const loadFullConfig = async () => {
+    // Evitar múltiplas chamadas simultâneas
+    if (loadingRef.current) {
+      return
+    }
+    
     try {
+      loadingRef.current = true
       setLoading(true)
-      const screensData = await api.getScreens()
-      setScreens(screensData || [])
       
-      // Selecionar primeira tela visível
-      const firstVisible = screensData.find(s => s.is_visible)
+      // Usar novo endpoint config/full
+      const configData = await api.getPreviewConfig()
+      
+      // Adaptar dados para o formato do preview
+      const adaptedConfig = adaptConfigToPreview(configData)
+      setFullConfig(adaptedConfig)
+      setScreens(adaptedConfig.screens || [])
+      setTelemetry(adaptedConfig.telemetry || {})
+      
+      // Selecionar primeira tela visível para o dispositivo atual
+      const deviceConfig = deviceTypes.find(d => d.id === deviceType)
+      const firstVisible = adaptedConfig.screens.find(s => 
+        s.is_visible && s[deviceConfig.show]
+      )
       if (firstVisible) {
-        await navigateToScreen(firstVisible)
+        // Passar a config adaptada diretamente
+        await navigateToScreen(firstVisible, adaptedConfig)
       }
+      
+      // Marcar como pronto
+      setIsReady(true)
     } catch (error) {
-      console.error('Erro carregando telas:', error)
+      console.error('❌ Erro carregando configuração:', error)
+      // Fallback: tentar carregar telas individualmente
+      try {
+        const screensData = await api.getScreens()
+        setScreens(screensData || [])
+        const firstVisible = screensData.find(s => s.is_visible)
+        if (firstVisible) {
+          await navigateToScreen(firstVisible)
+        }
+      } catch (fallbackError) {
+        console.error('❌ Erro no fallback:', fallbackError)
+      }
     } finally {
       setLoading(false)
+      loadingRef.current = false
     }
   }
 
   // Navegar para tela
-  const navigateToScreen = async (screen) => {
+  const navigateToScreen = async (screen, configOverride = null) => {
     if (!screen) return
     
     const device = deviceTypes.find(d => d.id === deviceType)
@@ -154,27 +190,44 @@ const ScreenPreview = ({ isOpen, onClose }) => {
     try {
       setLoading(true)
       
-      // Carregar itens da tela
-      const items = await api.get(`/screens/${screen.id}/items`)
-      setScreenItems(items || [])
+      // Usar config passada ou a do state
+      const configToUse = configOverride || fullConfig
+      
+      // Se temos dados do config/full, usar os itens já carregados
+      let items = []
+      if (configToUse && configToUse.screens) {
+        const fullScreen = configToUse.screens.find(s => s.id === screen.id)
+        items = fullScreen?.items || []
+      } else {
+        // Fallback: carregar itens individualmente
+        items = await api.getScreenItems(screen.id)
+      }
+      
+      // Filtrar itens ativos e visíveis no dispositivo atual
+      const visibleItems = items.filter(item => 
+        shouldShowItem(item, deviceType)
+      )
+      
+      setScreenItems(visibleItems)
       
       // Atualizar navegação
       setCurrentScreen(screen)
       setNavigationHistory(prev => [...prev, screen.id])
       
-      // Inicializar estados dos itens
+      // Inicializar estados dos itens baseados nos dados reais
       const states = {}
-      items.forEach(item => {
+      visibleItems.forEach(item => {
         if (item.item_type === 'switch' || item.item_type === 'button') {
           states[item.id] = false
         } else if (item.item_type === 'gauge' || item.item_type === 'display') {
-          states[item.id] = Math.floor(Math.random() * 100) // Valor demo
+          // Usar valor atual da telemetria se disponível
+          states[item.id] = item.currentValue || item.formattedValue || 0
         }
       })
       setItemStates(states)
       
     } catch (error) {
-      console.error('Erro carregando itens:', error)
+      console.error('❌ Erro carregando itens:', error)
     } finally {
       setLoading(false)
     }
@@ -195,16 +248,44 @@ const ScreenPreview = ({ isOpen, onClose }) => {
     }
   }
 
-  // Inicializar
+  // Inicializar - usar useEffect corretamente
   useEffect(() => {
     if (isOpen) {
-      loadScreens()
+      if (!fullConfig && !loadingRef.current) {
+        loadFullConfig()
+      }
+    } else {
+      // Resetar quando fechar
+      setIsReady(false)
+      setFullConfig(null)
+      setScreens([])
+      setCurrentScreen(null)
+      setScreenItems([])
     }
   }, [isOpen])
+  
+
+  // Recarregar quando mudar tipo de dispositivo
+  useEffect(() => {
+    if (isOpen && fullConfig) {
+      // Reselecionar primeira tela visível para o novo dispositivo
+      const deviceConfig = deviceTypes.find(d => d.id === deviceType)
+      const firstVisible = fullConfig.screens.find(s => 
+        s.is_visible && s[deviceConfig.show]
+      )
+      
+      if (firstVisible && currentScreen?.id !== firstVisible.id) {
+        setNavigationHistory([]) // Reset histórico
+        navigateToScreen(firstVisible)
+      } else if (currentScreen) {
+        // Recarregar tela atual com novo dispositivo
+        navigateToScreen(currentScreen)
+      }
+    }
+  }, [deviceType])
 
   // Executar ação do item
   const handleItemAction = (item) => {
-    console.log('Ação executada:', item)
     
     // Parse do payload se existir
     let payload = {}
@@ -254,7 +335,7 @@ const ScreenPreview = ({ isOpen, onClose }) => {
   // Renderizar item
   const renderItem = (item) => {
     const device = deviceTypes.find(d => d.id === deviceType)
-    const itemSize = item[device.size] || 'normal'
+    const itemSize = getItemSize(item, deviceType)
     const IconComponent = iconMap[item.icon] || Circle
     const isActive = itemStates[item.id] || false
     
@@ -327,39 +408,66 @@ const ScreenPreview = ({ isOpen, onClose }) => {
         )
         
       case 'gauge':
-        const value = itemStates[item.id] || 0
+        const gaugeValue = item.currentValue || itemStates[item.id] || 0
+        const minValue = item.min_value || 0
+        const maxValue = item.max_value || 100
+        const percentage = Math.min(100, Math.max(0, ((gaugeValue - minValue) / (maxValue - minValue)) * 100))
+        const gaugeColor = getColorForValue(gaugeValue, item.color_ranges)
+        
         return (
-          <Card key={item.id} className={`${sizeClass} p-4`}>
+          <Card key={item.id} className={`${sizeClass} p-4 hover:shadow-lg transition-shadow`}>
             <div className="space-y-2">
               <div className="flex items-center justify-between">
                 <span className="text-sm font-medium">{item.label}</span>
                 <IconComponent className="h-4 w-4 text-muted-foreground" />
               </div>
               <div className="space-y-1">
-                <Progress value={value} className="h-2" />
+                <Progress 
+                  value={percentage} 
+                  className="h-3"
+                  style={{ 
+                    '--progress-background': gaugeColor 
+                  }}
+                />
                 <div className="flex justify-between text-xs text-muted-foreground">
-                  <span>0</span>
+                  <span>{minValue}</span>
                   <span className="font-medium text-foreground">
-                    {value}{item.data_unit || '%'}
+                    {item.formattedValue || `${gaugeValue}${item.unit || ''}`}
                   </span>
-                  <span>100</span>
+                  <span>{maxValue}</span>
                 </div>
               </div>
+              {item.color_ranges && item.color_ranges.length > 0 && (
+                <div className="flex gap-1 mt-2">
+                  {item.color_ranges.map((range, idx) => (
+                    <div 
+                      key={idx}
+                      className="h-1 flex-1 rounded"
+                      style={{ backgroundColor: range.color }}
+                      title={`${range.min} - ${range.max}`}
+                    />
+                  ))}
+                </div>
+              )}
             </div>
           </Card>
         )
         
       case 'display':
-        const displayValue = itemStates[item.id] || 0
+        const displayValue = item.currentValue !== undefined ? item.currentValue : itemStates[item.id] || 0
+        const formattedValue = item.formattedValue || `${displayValue}${item.unit || ''}`
         const fontSize = itemSize === 'large' ? 'text-3xl' : itemSize === 'small' ? 'text-xl' : 'text-2xl'
         const iconSize = itemSize === 'large' ? 'h-10 w-10' : itemSize === 'small' ? 'h-6 w-6' : 'h-8 w-8'
         const padding = itemSize === 'large' ? 'p-6' : itemSize === 'small' ? 'p-3' : 'p-4'
         
-        // Cores baseadas no tipo de dado
-        let valueColor = ''
-        if (item.name === 'temp' && displayValue > 90) valueColor = 'text-red-500'
-        else if (item.name === 'fuel' && displayValue < 20) valueColor = 'text-orange-500'
-        else if (item.name === 'rpm' && displayValue > 4000) valueColor = 'text-yellow-500'
+        // Cores baseadas no valor e ranges definidos
+        let valueColor = getColorForValue(displayValue, item.color_ranges)
+        if (valueColor === '#3B82F6') { // Se é cor padrão, aplicar lógica de cores por tipo
+          if (item.name === 'temp' && displayValue > 90) valueColor = '#EF4444'
+          else if (item.name === 'fuel' && displayValue < 20) valueColor = '#F97316'
+          else if (item.name === 'rpm' && displayValue > 4000) valueColor = '#EAB308'
+          else valueColor = 'currentColor'
+        }
         
         return (
           <Card key={item.id} className={`${sizeClass} ${padding} hover:shadow-lg transition-shadow`}>
@@ -368,12 +476,17 @@ const ScreenPreview = ({ isOpen, onClose }) => {
                 <div className="text-xs text-muted-foreground uppercase tracking-wider">
                   {item.label}
                 </div>
-                <div className={`${fontSize} font-bold ${valueColor} tabular-nums`}>
-                  {item.data_format === 'percentage' ? 
-                    `${displayValue}${item.data_unit || '%'}` :
-                    `${displayValue.toLocaleString()} ${item.data_unit || ''}`
-                  }
+                <div 
+                  className={`${fontSize} font-bold tabular-nums`}
+                  style={{ color: valueColor }}
+                >
+                  {formattedValue}
                 </div>
+                {item.relay_board && item.relay_channel && (
+                  <div className="text-[10px] text-muted-foreground mt-1">
+                    {item.deviceName} - {item.channelName}
+                  </div>
+                )}
               </div>
               <IconComponent className={`${iconSize} text-muted-foreground`} />
             </div>
@@ -388,153 +501,218 @@ const ScreenPreview = ({ isOpen, onClose }) => {
   // Obter configurações do dispositivo atual
   const getCurrentDevice = () => deviceTypes.find(d => d.id === deviceType)
 
+  // Fallback: Se está aberto mas não carregou, forçar carregamento
+  if (isOpen && !fullConfig && !loadingRef.current) {
+    loadFullConfig()
+  }
+
+  
   if (!isOpen) return null
 
-  return (
-    <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="max-w-[95vw] h-[90vh] p-0">
-        <div className="flex h-full">
-          {/* Sidebar com controles */}
-          <div className="w-64 border-r bg-muted/10 p-4 space-y-4">
-            <div>
-              <h3 className="text-sm font-medium mb-2">Tipo de Dispositivo</h3>
-              <div className="space-y-2">
-                {deviceTypes.map(type => {
-                  const Icon = type.icon
-                  return (
-                    <Button
-                      key={type.id}
-                      variant={deviceType === type.id ? 'default' : 'outline'}
-                      className="w-full justify-start"
-                      onClick={() => setDeviceType(type.id)}
-                    >
-                      <Icon className="mr-2 h-4 w-4" />
-                      {type.name}
-                    </Button>
-                  )
-                })}
-              </div>
-            </div>
-
-            <div className="border-t pt-4">
-              <h3 className="text-sm font-medium mb-2">Telas Disponíveis</h3>
-              <div className="space-y-1 max-h-[300px] overflow-y-auto">
-                {screens
-                  .filter(s => s.is_visible && s[getCurrentDevice().show])
-                  .map(screen => (
-                    <Button
-                      key={screen.id}
-                      variant={currentScreen?.id === screen.id ? 'secondary' : 'ghost'}
-                      className="w-full justify-start text-xs"
-                      onClick={() => navigateToScreen(screen)}
-                    >
-                      {screen.title}
-                    </Button>
-                  ))}
-              </div>
-            </div>
-
-            <div className="border-t pt-4">
-              <h3 className="text-sm font-medium mb-2">Informações</h3>
-              <div className="space-y-2 text-xs text-muted-foreground">
-                <div>
-                  <span className="font-medium">Tela:</span> {currentScreen?.title || 'Nenhuma'}
-                </div>
-                <div>
-                  <span className="font-medium">Colunas:</span> {currentScreen?.[getCurrentDevice().columns] || 0}
-                </div>
-                <div>
-                  <span className="font-medium">Itens:</span> {screenItems.length}
-                </div>
-                <div>
-                  <span className="font-medium">Dimensões:</span> {getCurrentDevice().width} x {getCurrentDevice().height}
-                </div>
-              </div>
-            </div>
+  // Se não está pronto, mostrar loading
+  if (!isReady) {
+    return (
+      <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50">
+        <div className="bg-white dark:bg-gray-900 p-8 rounded-lg">
+          <div className="flex items-center gap-4">
+            <div className="h-8 w-8 animate-spin rounded-full border-2 border-primary border-t-transparent" />
+            <span>Carregando preview...</span>
           </div>
+        </div>
+      </div>
+    )
+  }
 
-          {/* Área de preview */}
-          <div className="flex-1 p-6 bg-muted/5 overflow-auto">
-            <div className="flex flex-col items-center justify-center h-full">
-              {/* Container do dispositivo */}
-              <div 
-                className="bg-background border-2 border-border rounded-lg shadow-xl overflow-hidden"
-                style={{
-                  width: getCurrentDevice().width,
-                  maxWidth: '100%',
-                  height: getCurrentDevice().height,
-                  maxHeight: '100%'
-                }}
-              >
-                {/* Header do dispositivo */}
-                <div className="bg-card border-b px-4 py-2 flex items-center justify-between">
-                  <div className="flex items-center gap-2">
-                    {navigationHistory.length > 1 && (
+  // Modal completo com conteúdo
+  return (
+    <div className="fixed inset-0 z-50 overflow-y-auto">
+      {/* Overlay */}
+      <div 
+        className="fixed inset-0 bg-black bg-opacity-50 transition-opacity"
+        onClick={onClose}
+      />
+      
+      {/* Modal Content */}
+      <div className="fixed inset-0 flex items-center justify-center p-4">
+        <div 
+          className="relative bg-white dark:bg-gray-900 rounded-lg shadow-xl max-w-[95vw] h-[90vh] w-full overflow-hidden"
+          onClick={(e) => e.stopPropagation()}
+        >
+          {/* Header com botão fechar */}
+          <div className="absolute top-4 right-4 z-10">
+            <button
+              onClick={onClose}
+              className="p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors"
+            >
+              <X className="h-5 w-5" />
+            </button>
+          </div>
+          
+          <div className="flex h-full">
+            {/* Sidebar com controles */}
+            <div className="w-64 border-r bg-gray-50 dark:bg-gray-800 p-4 space-y-4 overflow-y-auto">
+              <div>
+                <h3 className="text-sm font-medium mb-2">Tipo de Dispositivo</h3>
+                <div className="space-y-2">
+                  {deviceTypes.map(type => {
+                    const Icon = type.icon
+                    return (
                       <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={goBack}
+                        key={type.id}
+                        variant={deviceType === type.id ? 'default' : 'outline'}
+                        className="w-full justify-start"
+                        onClick={() => setDeviceType(type.id)}
                       >
-                        <ChevronLeft className="h-4 w-4" />
+                        <Icon className="mr-2 h-4 w-4" />
+                        {type.name}
                       </Button>
-                    )}
-                    <h2 className="font-semibold text-sm">
-                      {currentScreen?.title || 'Selecione uma tela'}
-                    </h2>
-                  </div>
-                  <Badge variant="outline" className="text-xs">
-                    {getCurrentDevice().name}
-                  </Badge>
+                    )
+                  })}
                 </div>
+              </div>
 
-                {/* Conteúdo da tela */}
-                <div className="p-4 overflow-auto h-[calc(100%-48px)]">
-                  {loading ? (
-                    <div className="flex items-center justify-center h-full">
-                      <div className="h-8 w-8 animate-spin rounded-full border-2 border-primary border-t-transparent" />
-                    </div>
-                  ) : screenItems.length === 0 ? (
-                    <div className="flex flex-col items-center justify-center h-full text-muted-foreground">
-                      <Monitor className="h-12 w-12 mb-2" />
-                      <p className="text-sm">Nenhum item nesta tela</p>
-                    </div>
-                  ) : (
-                    <div 
-                      className={`grid gap-3`}
-                      style={{
-                        gridTemplateColumns: `repeat(${currentScreen?.[getCurrentDevice().columns] || 2}, 1fr)`
-                      }}
-                    >
-                      {screenItems
-                        .filter(item => item.is_active)
-                        .sort((a, b) => a.position - b.position)
-                        .map(item => renderItem(item))}
-                    </div>
+              <div className="border-t pt-4">
+                <h3 className="text-sm font-medium mb-2">Telas Disponíveis</h3>
+                <div className="space-y-1 max-h-[300px] overflow-y-auto">
+                  {screens
+                    .filter(s => s.is_visible && s[getCurrentDevice().show])
+                    .map(screen => (
+                      <Button
+                        key={screen.id}
+                        variant={currentScreen?.id === screen.id ? 'secondary' : 'ghost'}
+                        className="w-full justify-start text-xs"
+                        onClick={() => navigateToScreen(screen)}
+                      >
+                        {screen.title}
+                      </Button>
+                    ))}
+                </div>
+              </div>
+
+              <div className="border-t pt-4">
+                <h3 className="text-sm font-medium mb-2">Informações</h3>
+                <div className="space-y-2 text-xs text-gray-600 dark:text-gray-400">
+                  <div>
+                    <span className="font-medium">Tela:</span> {currentScreen?.title || 'Nenhuma'}
+                  </div>
+                  <div>
+                    <span className="font-medium">Colunas:</span> {getScreenColumns(currentScreen, deviceType)}
+                  </div>
+                  <div>
+                    <span className="font-medium">Itens:</span> {screenItems.length}
+                  </div>
+                  <div>
+                    <span className="font-medium">Dimensões:</span> {getCurrentDevice().width} x {getCurrentDevice().height}
+                  </div>
+                  {fullConfig && (
+                    <>
+                      <div className="border-t pt-2 mt-2">
+                        <span className="font-medium text-green-600">✅ Config/Full:</span> {fullConfig.preview_mode ? 'Preview' : 'Real'}
+                      </div>
+                      <div>
+                        <span className="font-medium">Telemetria:</span> {Object.keys(telemetry).length} valores
+                      </div>
+                    </>
                   )}
                 </div>
               </div>
+            </div>
 
-              {/* Controles de simulação */}
-              <div className="mt-4 flex items-center gap-4">
-                <Badge variant="secondary">
-                  Modo Preview - Ações não são enviadas aos dispositivos
-                </Badge>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => {
-                    setItemStates({})
-                    navigateToScreen(currentScreen)
+            {/* Área de preview */}
+            <div className="flex-1 p-6 bg-gray-50 dark:bg-gray-950 overflow-auto">
+              <div className="flex flex-col items-center justify-center h-full">
+                {/* Container do dispositivo */}
+                <div 
+                  className="bg-white dark:bg-gray-900 border-2 border-gray-200 dark:border-gray-700 rounded-lg shadow-xl overflow-hidden"
+                  style={{
+                    width: getCurrentDevice().width,
+                    maxWidth: '100%',
+                    height: getCurrentDevice().height,
+                    maxHeight: '100%'
                   }}
                 >
-                  Resetar Estados
-                </Button>
+                  {/* Header do dispositivo */}
+                  <div className="bg-gray-100 dark:bg-gray-800 border-b px-4 py-2 flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      {navigationHistory.length > 1 && (
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={goBack}
+                        >
+                          <ChevronLeft className="h-4 w-4" />
+                        </Button>
+                      )}
+                      <h2 className="font-semibold text-sm">
+                        {currentScreen?.title || 'Selecione uma tela'}
+                      </h2>
+                    </div>
+                    <Badge variant="outline" className="text-xs">
+                      {getCurrentDevice().name}
+                    </Badge>
+                  </div>
+
+                  {/* Conteúdo da tela */}
+                  <div className="p-4 overflow-auto h-[calc(100%-48px)]">
+                    {loading ? (
+                      <div className="flex items-center justify-center h-full">
+                        <div className="h-8 w-8 animate-spin rounded-full border-2 border-primary border-t-transparent" />
+                      </div>
+                    ) : screenItems.length === 0 ? (
+                      <div className="flex flex-col items-center justify-center h-full text-gray-500">
+                        <Monitor className="h-12 w-12 mb-2" />
+                        <p className="text-sm">Nenhum item nesta tela</p>
+                      </div>
+                    ) : (
+                      <div 
+                        className="grid gap-3"
+                        style={{
+                          gridTemplateColumns: `repeat(${getScreenColumns(currentScreen, deviceType)}, 1fr)`
+                        }}
+                      >
+                        {screenItems
+                          .sort((a, b) => (a.position || 0) - (b.position || 0))
+                          .map(item => renderItem(item))}
+                      </div>
+                    )}
+                  </div>
+                </div>
+
+                {/* Controles de simulação */}
+                <div className="mt-4 flex items-center gap-4 flex-wrap">
+                  <Badge variant="secondary">
+                    {fullConfig ? '✅ Config/Full Preview' : '⚠️ Modo Fallback'} - Ações não são enviadas aos dispositivos
+                  </Badge>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => {
+                      setItemStates({})
+                      if (currentScreen) {
+                        navigateToScreen(currentScreen)
+                      }
+                    }}
+                  >
+                    Resetar Estados
+                  </Button>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => {
+                      setFullConfig(null)
+                      setTelemetry({})
+                      loadFullConfig()
+                    }}
+                  >
+                    Recarregar Config
+                  </Button>
+                </div>
               </div>
             </div>
           </div>
         </div>
-      </DialogContent>
-    </Dialog>
+      </div>
+    </div>
   )
 }
 
