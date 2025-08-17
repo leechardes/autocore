@@ -19,6 +19,7 @@
 // UI components
 #include "ui/ScreenManager.h"
 #include "ui/ScreenFactory.h"
+#include "ui/IconManager.h"
 
 // Navigation
 #include "navigation/Navigator.h"
@@ -34,6 +35,7 @@
 
 // Network (API support)
 #include "network/ScreenApiClient.h"
+#include "network/DeviceRegistration.h"
 
 // Commands
 #include "commands/CommandSender.h"
@@ -43,6 +45,7 @@
 
 // Include device configuration
 #include "config/DeviceConfig.h"
+#include "utils/DeviceUtils.h"
 
 // Display
 static TFT_eSPI tft = TFT_eSPI();
@@ -70,6 +73,7 @@ StatusReporter* statusReporter = nullptr;
 CommandSender* commandSender = nullptr;
 ButtonStateManager* buttonStateManager = nullptr;
 ScreenApiClient* screenApiClient = nullptr;
+IconManager* iconManager = nullptr;
 
 // State
 static bool configReceived = false;
@@ -107,6 +111,27 @@ void button_read(lv_indev_drv_t * indev_drv, lv_indev_data_t * data) {
     }
     
     data->key = last_key;
+}
+
+/**
+ * Callback executado após WiFi conectar com sucesso
+ */
+void onWiFiConnected() {
+    logger->info("WiFi connected! Starting device registration...");
+    
+    // Executar smart registration
+    if (DeviceRegistration::performSmartRegistration()) {
+        logger->info("Device registration completed successfully");
+        
+        // Tentar carregar credenciais MQTT dinâmicas
+        if (mqttClient && mqttClient->loadDynamicCredentials()) {
+            logger->info("Dynamic MQTT credentials loaded successfully");
+        } else {
+            logger->info("Using static MQTT configuration");
+        }
+    } else {
+        logger->warning("Device registration failed, using static configuration");
+    }
 }
 
 /**
@@ -171,10 +196,17 @@ void setupMQTT() {
     logger->debug("MQTT Broker: '" + String(MQTT_BROKER) + "'");
     logger->debug("MQTT Port: " + String(MQTT_PORT));
     
-    mqttClient = new MQTTClient(DEVICE_UUID, MQTT_BROKER, MQTT_PORT);
+    String deviceUUID = DeviceUtils::getDeviceUUID();
+    logger->info("Device UUID: " + deviceUUID);
+    
+    mqttClient = new MQTTClient(deviceUUID, MQTT_BROKER, MQTT_PORT);
+    
+    // Executar device registration e carregar credenciais MQTT dinâmicas
+    onWiFiConnected();
+    
     configReceiver = new ConfigReceiver(mqttClient, configManager, screenApiClient);
-    statusReporter = new StatusReporter(mqttClient, DEVICE_UUID);
-    commandSender = new CommandSender(mqttClient, logger, DEVICE_UUID);
+    statusReporter = new StatusReporter(mqttClient, deviceUUID);
+    commandSender = new CommandSender(mqttClient, logger, deviceUUID);
     buttonStateManager = new ButtonStateManager(mqttClient, screenManager);
     
     // Show connecting screen
@@ -198,6 +230,18 @@ void setupMQTT() {
         configReceiver->enableHotReload([]() {
             logger->info("Hot reload triggered! Rebuilding UI...");
             
+            // Update icons from configuration if available
+            if (iconManager && configManager->hasConfig()) {
+                JsonDocument config = configManager->getConfig();
+                if (config["icons"].is<JsonObject>()) {
+                    iconManager->loadFromConfig(config["icons"].as<JsonObject>());
+                    logger->info("Icons updated during hot reload");
+                } else if (screenApiClient) {
+                    // Try to load icons from API if not in config
+                    iconManager->loadFromApi(screenApiClient);
+                }
+            }
+            
             // Rebuild UI with new configuration
             if (screenManager && configManager->hasConfig()) {
                 screenManager->buildFromConfig(configManager->getConfig());
@@ -219,6 +263,22 @@ void setupMQTT() {
         logger->info("Loading initial configuration...");
         if (configReceiver->loadConfiguration()) {
             logger->info("Initial configuration loaded successfully");
+            
+            // Load icons after initial configuration
+            if (iconManager) {
+                JsonDocument config = configManager->getConfig();
+                if (config["icons"].is<JsonObject>()) {
+                    iconManager->loadFromConfig(config["icons"].as<JsonObject>());
+                    logger->info("Icons loaded from configuration");
+                } else if (screenApiClient) {
+                    // Try to load icons from API
+                    if (iconManager->loadFromApi(screenApiClient)) {
+                        logger->info("Icons loaded from API");
+                    } else {
+                        logger->warning("Failed to load icons from API, using defaults");
+                    }
+                }
+            }
         } else {
             logger->warning("Failed to load initial configuration, will retry periodically");
         }
@@ -297,6 +357,7 @@ void setupUI() {
     screenManager = new ScreenManager();
     navigator = new Navigator(screenManager);
     buttonHandler = new ButtonHandler(BTN_PREV_PIN, BTN_SELECT_PIN, BTN_NEXT_PIN);
+    iconManager = new IconManager();
     
     // Configure button callbacks
     buttonHandler->onPrevious([](){ navigator->navigatePrevious(); });
@@ -304,6 +365,7 @@ void setupUI() {
     buttonHandler->onNext([](){ navigator->navigateNext(); });
     
     logger->info("UI components ready");
+    logger->info("IconManager initialized with " + String(iconManager->getIconCount()) + " default icons");
 }
 
 /**
@@ -347,7 +409,15 @@ void setup() {
     
     logger = new Logger(logLevel);
     logger->info("=== AutoCore HMI Display v2 ===");
-    logger->info("Device ID: " + String(DEVICE_UUID));
+    
+    // Generate and log device info
+    String deviceUUID = DeviceUtils::getDeviceUUID();
+    String deviceInfo = DeviceUtils::getChipInfo();
+    String macAddress = DeviceUtils::getMACAddress();
+    
+    logger->info("Device UUID: " + deviceUUID);
+    logger->info("MAC Address: " + macAddress);
+    logger->info("Chip Info: " + deviceInfo);
     logger->info("Version: " + String(DEVICE_VERSION));
     logger->info("WiFi SSID: " + String(WIFI_SSID));
     logger->info("MQTT Broker: " + String(MQTT_BROKER) + ":" + String(MQTT_PORT));

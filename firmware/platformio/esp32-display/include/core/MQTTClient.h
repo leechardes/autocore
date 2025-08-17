@@ -13,6 +13,7 @@
 #include <functional>
 #include <map>
 #include "MQTTProtocol.h"
+#include "network/DeviceRegistration.h"
 
 typedef std::function<void(const String& topic, const String& payload)> MessageCallback;
 
@@ -23,6 +24,10 @@ private:
     String deviceId;
     String broker;
     uint16_t port;
+    
+    // Credenciais dinâmicas da API
+    MQTTCredentials dynamicCredentials;
+    bool useDynamicCredentials;
     
     std::map<String, MessageCallback> callbacks;
     bool connected;
@@ -57,6 +62,10 @@ public:
     
     void setCallback(const String& topic, MessageCallback callback);
     void removeCallback(const String& topic);
+    
+    // Métodos para credenciais dinâmicas
+    void setDynamicCredentials(const MQTTCredentials& creds);
+    bool loadDynamicCredentials();
     
     String getDeviceId() const { return deviceId; }
 };

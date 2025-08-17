@@ -15,7 +15,7 @@ extern Logger* logger;
 MQTTClient* MQTTClient::instance = nullptr;
 
 MQTTClient::MQTTClient(const String& deviceId, const String& broker, uint16_t port) 
-    : deviceId(deviceId), broker(broker), port(port), connected(false), lastReconnectAttempt(0), lastStatusPublish(0) {
+    : deviceId(deviceId), broker(broker), port(port), useDynamicCredentials(false), connected(false), lastReconnectAttempt(0), lastStatusPublish(0) {
     
     instance = this;
     client = new PubSubClient(wifiClient);
@@ -47,7 +47,38 @@ MQTTClient::~MQTTClient() {
 bool MQTTClient::connect() {
     if (isConnected()) return true;
     
-    logger->info("Connecting to MQTT broker: " + broker + ":" + String(port));
+    // Determinar quais credenciais usar
+    String effectiveBroker = broker;
+    uint16_t effectivePort = port;
+    String username = "";
+    String password = "";
+    
+    if (useDynamicCredentials) {
+        effectiveBroker = dynamicCredentials.broker_host;
+        effectivePort = dynamicCredentials.broker_port;
+        username = dynamicCredentials.username;
+        password = dynamicCredentials.password;
+        
+        logger->info("Using dynamic MQTT credentials from API");
+    } else {
+        // Usar credenciais estáticas do DeviceConfig.h
+        username = MQTT_USER;
+        password = MQTT_PASSWORD;
+        
+        logger->info("Using static MQTT credentials from config");
+    }
+    
+    logger->info("Connecting to MQTT broker: " + effectiveBroker + ":" + String(effectivePort));
+    
+    // Configurar servidor MQTT com credenciais efetivas
+    IPAddress ip;
+    if (ip.fromString(effectiveBroker)) {
+        client->setServer(ip, effectivePort);
+        logger->debug("MQTT server configured with IP: " + ip.toString() + ":" + String(effectivePort));
+    } else {
+        client->setServer(effectiveBroker.c_str(), effectivePort);
+        logger->debug("MQTT server configured with hostname: " + effectiveBroker + ":" + String(effectivePort));
+    }
     
     // Generate client ID v2.2.0 compliant
     String clientId = "AutoCore-" + MQTTProtocol::getDeviceUUID() + "-" + String(random(0xffff), HEX);
@@ -69,7 +100,18 @@ bool MQTTClient::connect() {
     serializeJson(willDoc, willMessage);
     
     // Attempt connection with QoS 1, Retain true for LWT
-    if (client->connect(clientId.c_str(), willTopic.c_str(), 1, true, willMessage.c_str())) {
+    bool connectionResult = false;
+    if (!username.isEmpty() && !password.isEmpty()) {
+        // Conectar com autenticação
+        logger->debug("MQTT connecting with authentication: " + username);
+        connectionResult = client->connect(clientId.c_str(), username.c_str(), password.c_str(), willTopic.c_str(), 1, true, willMessage.c_str());
+    } else {
+        // Conectar sem autenticação
+        logger->debug("MQTT connecting without authentication");
+        connectionResult = client->connect(clientId.c_str(), willTopic.c_str(), 1, true, willMessage.c_str());
+    }
+    
+    if (connectionResult) {
         connected = true;
         logger->info("MQTT connected as: " + clientId);
         
@@ -355,4 +397,26 @@ void MQTTClient::publishStatus() {
     publish(topic, payload, true);
     
     logger->debug("Status v2.2.0 publicado");
+}
+
+void MQTTClient::setDynamicCredentials(const MQTTCredentials& creds) {
+    dynamicCredentials = creds;
+    useDynamicCredentials = true;
+    
+    logger->info("Dynamic MQTT credentials set");
+    logger->debug("  Broker: " + creds.broker_host + ":" + String(creds.broker_port));
+    logger->debug("  Username: " + creds.username);
+    logger->debug("  Topic prefix: " + creds.topic_prefix);
+}
+
+bool MQTTClient::loadDynamicCredentials() {
+    MQTTCredentials creds;
+    if (DeviceRegistration::loadMQTTCredentials(creds)) {
+        setDynamicCredentials(creds);
+        return true;
+    }
+    
+    logger->warning("Failed to load dynamic MQTT credentials, using static config");
+    useDynamicCredentials = false;
+    return false;
 }
