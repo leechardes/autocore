@@ -136,42 +136,61 @@ std::unique_ptr<ScreenBase> ScreenFactory::createScreen(JsonObject& config) {
                 String itemType = item["item_type"].as<String>();
                 String actionType = item["action_type"].as<String>();
                 
+                // CORREÇÃO: Converter para lowercase para compatibilidade
+                itemType.toLowerCase();
+                actionType.toLowerCase();
+                
                 // Debug log melhorado
                 logger->debug("=== Creating item ===");
-                logger->debug("  Type: " + itemType + " | Action: " + actionType);
+                logger->debug("  Type: " + itemType + " | Action: " + actionType + " (converted to lowercase)");
                 logger->debug("  Label: " + item["label"].as<String>());
                 logger->debug("  Size: " + sizeStr + " (slots needed: " + String(slotsNeeded) + ")");
                 logger->debug("  Position: " + String(item["position"] | 0));
+                logger->debug("  Data Source: " + item["data_source"].as<String>());
+                logger->debug("  Data Path: " + item["data_path"].as<String>());
                 
                 NavButton* navBtn = nullptr;
                 
-                // Mapear tipos da API para tipos internos
-                if (itemType == "button" && (actionType == "relay" || actionType == "relay_toggle")) {
+                // Mapear tipos da API para tipos internos (NOVOS ENUMS LOWERCASE)
+                if (itemType == "button" && actionType == "relay_control") {
                     logger->debug("  -> Creating RelayItem (button for relay control)");
                     navBtn = ScreenFactory::createRelayItem(content->getObject(), item);
                 } else if (itemType == "button" && actionType == "navigation") {
                     logger->debug("  -> Creating NavigationItem (button for screen navigation)");
                     navBtn = ScreenFactory::createNavigationItem(content->getObject(), item);
-                } else if (itemType == "button" && actionType == "preset") {
-                    logger->debug("  -> Creating ActionItem (button for preset actions)");
+                } else if (itemType == "button" && (actionType == "command" || actionType == "macro")) {
+                    logger->debug("  -> Creating ActionItem (button for command/macro actions)");
                     navBtn = ScreenFactory::createActionItem(content->getObject(), item);
-                } else if (itemType == "switch") {
-                    logger->debug("  -> Creating SwitchItem (native LVGL switch widget)");
-                    // Switches nativos LVGL para melhor UX
+                } else if (itemType == "switch" && actionType == "relay_control") {
+                    logger->debug("  -> Creating SwitchItem (native LVGL switch widget for relay)");
+                    // Switches nativos LVGL para controle de relé
                     navBtn = ScreenFactory::createSwitchItem(content->getObject(), item);
                 } else if (itemType == "gauge") {
-                    logger->debug("  -> Creating GaugeItem (gauge/meter widget)");
-                    // Gauges/meters nativos LVGL
+                    logger->debug("  -> Creating GaugeItem (gauge/meter widget for data display)");
+                    // Gauges/meters nativos LVGL (action_type é null para displays)
                     navBtn = ScreenFactory::createGaugeItem(content->getObject(), item);
                 } else if (itemType == "display") {
-                    logger->debug("  -> Creating DisplayItem (read-only data display)");
-                    // Items de display são apenas informativos, criar como label
-                    navBtn = ScreenFactory::createDisplayItem(content->getObject(), item);
+                    // CORREÇÃO: Items com type="display" devem criar GAUGES, não display simples
+                    String dataSource = item["data_source"].as<String>();
+                    String dataPath = item["data_path"].as<String>();
+                    
+                    if (!dataSource.isEmpty() && !dataPath.isEmpty()) {
+                        logger->debug("  -> Creating GaugeItem for display type (data visualization)");
+                        navBtn = ScreenFactory::createGaugeItem(content->getObject(), item);
+                    } else {
+                        logger->debug("  -> Creating DisplayItem (read-only data display, no gauge data)");
+                        navBtn = ScreenFactory::createDisplayItem(content->getObject(), item);
+                    }
                 } else {
                     logger->warning("  -> UNKNOWN item combination: " + itemType + "/" + actionType);
-                    logger->warning("     Available combinations:");
-                    logger->warning("     - button/relay_toggle, button/navigation, button/preset");
-                    logger->warning("     - switch (with action_type), gauge, display");
+                    logger->warning("     Valid combinations (BACKEND FORMAT - case insensitive):");
+                    logger->warning("     - button/relay_control, button/navigation, button/command, button/macro");
+                    logger->warning("     - switch/relay_control, gauge (null action), display (data visualization)");
+                    logger->warning("     Item details: name=" + item["name"].as<String>() + ", label=" + item["label"].as<String>());
+                    
+                    // Fallback: Tentar criar pelo menos um botão simples
+                    logger->warning("  -> Creating fallback button");
+                    navBtn = ScreenFactory::createActionItem(content->getObject(), item);
                 }
                 
                 if (navBtn) {
@@ -193,7 +212,7 @@ std::unique_ptr<ScreenBase> ScreenFactory::createScreen(JsonObject& config) {
                     currentPageSlots += slotsNeeded;
                     
                     // Registrar botão para receber status se for tipo que precisa
-                    if ((itemType == "button" || itemType == "switch") && actionType == "relay") {
+                    if ((itemType == "button" || itemType == "switch") && actionType == "relay_control") {
                         extern ButtonStateManager* buttonStateManager;
                         if (buttonStateManager) {
                             buttonStateManager->registerButton(navBtn);
@@ -327,8 +346,11 @@ NavButton* ScreenFactory::createRelayItem(lv_obj_t* parent, JsonObject& config) 
     
     // Verificar se relay board existe no registry
     if (!DeviceRegistry::getInstance()->hasRelayBoard(relay_board_id)) {
-        logger->warning("Relay board not found in registry: " + String(relay_board_id));
-        // Visual de desabilitado - usar estado OFF
+        logger->warning("Relay board not found in registry: " + String(relay_board_id) + 
+                       " for button: " + item["name"].as<String>() + " (" + label + ")");
+        logger->info("Available relay boards in registry:");
+        // TODO: Adicionar método para listar boards disponíveis
+        // Visual de desabilitado - usar estado OFF 
         btn->setState(false);
         return btn;
     }
@@ -862,20 +884,46 @@ NavButton* ScreenFactory::createGaugeItem(lv_obj_t* parent, JsonObject& config) 
     String dataPath = config["data_path"].as<String>();
     String dataUnit = config["data_unit"].as<String>();
     
-    // Parse configurações específicas do gauge do action_payload
-    float minValue = parseActionPayload(config, "min_value", 0);
-    float maxValue = parseActionPayload(config, "max_value", 100);
-    float warningThreshold = parseActionPayload(config, "warning_threshold", maxValue * 0.8f);
-    float criticalThreshold = parseActionPayload(config, "critical_threshold", maxValue * 0.95f);
-    
-    // Tipo de gauge (circular ou linear)
+    // Parse configurações específicas do gauge do action_payload ou usar padrões
+    float minValue = 0;
+    float maxValue = 100;
+    float warningThreshold = 80;
+    float criticalThreshold = 95;
     String gaugeType = "circular"; // default
-    if (config["action_payload"].is<String>()) {
+    
+    // Tentar obter configurações do action_payload se existir
+    if (config["action_payload"].is<String>() && !config["action_payload"].as<String>().isEmpty()) {
+        minValue = parseActionPayload(config, "min_value", 0);
+        maxValue = parseActionPayload(config, "max_value", 100);
+        warningThreshold = parseActionPayload(config, "warning_threshold", maxValue * 0.8f);
+        criticalThreshold = parseActionPayload(config, "critical_threshold", maxValue * 0.95f);
+        
         JsonDocument payloadDoc;
         if (deserializeJson(payloadDoc, config["action_payload"].as<String>()) == DeserializationError::Ok) {
             JsonObject payload = payloadDoc.as<JsonObject>();
             gaugeType = payload["gauge_type"] | "circular";
         }
+    } else {
+        // Para items type="display" sem action_payload, usar configurações inteligentes baseadas no data_path
+        if (dataPath.indexOf("temp") >= 0) {
+            maxValue = 120; // Temperatura
+            warningThreshold = 90;
+            criticalThreshold = 110;
+        } else if (dataPath.indexOf("rpm") >= 0) {
+            maxValue = 6000; // RPM
+            warningThreshold = 4500;
+            criticalThreshold = 5500;
+        } else if (dataPath.indexOf("pressure") >= 0) {
+            maxValue = 100; // Pressão
+            warningThreshold = 80;
+            criticalThreshold = 95;
+        } else if (dataPath.indexOf("voltage") >= 0) {
+            minValue = 10;
+            maxValue = 15; // Voltagem
+            warningThreshold = 12;
+            criticalThreshold = 11;
+        }
+        logger->debug("Using intelligent defaults for gauge without action_payload");
     }
     
     if (logger) {
@@ -1269,7 +1317,8 @@ NavButton* ScreenFactory::createSwitchItem(lv_obj_t* parent, JsonObject& config)
         
         // Verificar se relay board existe
         if (!DeviceRegistry::getInstance()->hasRelayBoard(relay_board_id)) {
-            logger->warning("Switch relay board not found: " + String(relay_board_id));
+            logger->warning("Switch relay board not found: " + String(relay_board_id) + 
+                           " for switch: " + id + " (" + label + ")");
             // Desabilitar switch visualmente
             lv_obj_add_state(lvSwitch, LV_STATE_DISABLED);
         }

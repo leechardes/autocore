@@ -20,8 +20,8 @@ void Container::addChild(lv_obj_t* child) {
         // Verificar se parent está correto antes de adicionar
         lv_obj_t* childParent = lv_obj_get_parent(child);
         if (childParent != obj) {
-            Serial.printf("[Container] WARNING: Child parent mismatch. Expected %p, got %p\n", obj, childParent);
-            // Se necessário, corrigir o parent
+            Serial.printf("[Container] INFO: Correcting child parent. Expected %p, got %p\n", obj, childParent);
+            // CORREÇÃO: Sempre corrigir o parent para evitar problemas de layout
             lv_obj_set_parent(child, obj);
         }
         
