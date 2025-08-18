@@ -10,8 +10,9 @@ NavButton::NavButton(lv_obj_t* parent, const String& text, const String& iconId,
     
     // Serial.printf("[NavButton] Creating button '%s' with id '%s'\n", text.c_str(), buttonId.c_str());
     
-    // Definir tamanho mínimo padrão
-    lv_obj_set_size(button, 80, 60);
+    // CORREÇÃO: Não definir tamanho fixo aqui - será definido pelo GridContainer
+    // baseado no size_display_small do componente
+    // lv_obj_set_size(button, 80, 60);  // REMOVIDO
     
     createLayout(text, iconId);
     applyTheme();

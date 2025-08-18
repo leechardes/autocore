@@ -75,8 +75,31 @@ void GridContainer::updateLayout() {
             continue;
         }
         
-        // Por padrão, todos os componentes ocupam 1 slot
+        // CORREÇÃO: Obter tamanho real do componente usando user_data
         ComponentSize size = SIZE_NORMAL;
+        
+        // Tentar obter o tamanho do user_data (definido pelo ScreenFactory)
+        void* userData = lv_obj_get_user_data(children[i]);
+        if (userData) {
+            // Se for um NavButton, obter o tamanho dele
+            // Se for um container de gauge/display, verificar tamanho visual
+            lv_coord_t objWidth = lv_obj_get_width(children[i]);
+            lv_coord_t objHeight = lv_obj_get_height(children[i]);
+            
+            // Determinar tamanho baseado nas dimensões do objeto
+            if (objWidth >= 110 || objHeight >= 90) {
+                size = SIZE_LARGE;
+            } else if (objWidth <= 70 || objHeight <= 60) {
+                size = SIZE_SMALL;
+            } else {
+                size = SIZE_NORMAL;
+            }
+            
+            logger->debug("[GridContainer] Component " + String(i) + " detected size: " + 
+                         String(objWidth) + "x" + String(objHeight) + " -> " + 
+                         (size == SIZE_SMALL ? "SMALL" : (size == SIZE_LARGE ? "LARGE" : "NORMAL")));
+        }
+        
         int slotsNeeded = Layout::getSlotsForSize(size);
         
         // Verificar se cabe na linha atual
@@ -95,6 +118,15 @@ void GridContainer::updateLayout() {
         // Calcular posição e tamanho do componente
         Point position = Layout::calculateGridPosition(currentCol, currentRow, cellSize);
         Size componentSize = Layout::calculateComponentSize(size, cellSize);
+        
+        // CORREÇÃO: Garantir tamanhos mínimos e máximos para evitar componentes muito pequenos
+        if (componentSize.width < 60) componentSize.width = 60;
+        if (componentSize.height < 50) componentSize.height = 50;
+        
+        // Para componentes large, garantir que tenham tamanho suficiente
+        if (size == SIZE_LARGE) {
+            if (componentSize.width < 140) componentSize.width = 140;
+        }
         
         // APLICAR POSIÇÃO E TAMANHO
         lv_obj_set_size(children[i], componentSize.width, componentSize.height);

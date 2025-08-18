@@ -35,7 +35,9 @@ public:
     
     // Novos métodos para widgets melhorados
     static NavButton* createSwitchItem(lv_obj_t* parent, JsonObject& config);
+    static lv_obj_t* createSwitchDirectly(lv_obj_t* parent, JsonObject& config);
     static NavButton* createGaugeItem(lv_obj_t* parent, JsonObject& config);
+    static lv_obj_t* createGaugeDirectly(lv_obj_t* parent, JsonObject& config);
     
     // Métodos auxiliares para gauges
     static lv_obj_t* createCircularGauge(lv_obj_t* parent, JsonObject& config, float minVal, float maxVal);

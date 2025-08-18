@@ -163,12 +163,22 @@ std::unique_ptr<ScreenBase> ScreenFactory::createScreen(JsonObject& config) {
                     navBtn = ScreenFactory::createActionItem(content->getObject(), item);
                 } else if (itemType == "switch" && actionType == "relay_control") {
                     logger->debug("  -> Creating SwitchItem (native LVGL switch widget for relay)");
-                    // Switches nativos LVGL para controle de relé
-                    navBtn = ScreenFactory::createSwitchItem(content->getObject(), item);
+                    // CORREÇÃO: Switches são tratados como objetos diretos, não NavButtons
+                    lv_obj_t* switchObj = ScreenFactory::createSwitchDirectly(content->getObject(), item);
+                    if (switchObj) {
+                        content->addChild(switchObj);
+                        currentPageSlots += slotsNeeded;
+                    }
+                    continue; // Pular o resto do loop, switch já foi adicionado
                 } else if (itemType == "gauge") {
                     logger->debug("  -> Creating GaugeItem (gauge/meter widget for data display)");
-                    // Gauges/meters nativos LVGL (action_type é null para displays)
-                    navBtn = ScreenFactory::createGaugeItem(content->getObject(), item);
+                    // SOLUÇÃO: Criar gauge diretamente sem NavButton wrapper
+                    lv_obj_t* gaugeObj = ScreenFactory::createGaugeDirectly(content->getObject(), item);
+                    if (gaugeObj) {
+                        content->addChild(gaugeObj);
+                        currentPageSlots += slotsNeeded;
+                    }
+                    continue; // Pular o resto do loop, gauge já foi adicionado
                 } else if (itemType == "display") {
                     // CORREÇÃO: Items com type="display" devem criar GAUGES, não display simples
                     String dataSource = item["data_source"].as<String>();
@@ -176,7 +186,13 @@ std::unique_ptr<ScreenBase> ScreenFactory::createScreen(JsonObject& config) {
                     
                     if (!dataSource.isEmpty() && !dataPath.isEmpty()) {
                         logger->debug("  -> Creating GaugeItem for display type (data visualization)");
-                        navBtn = ScreenFactory::createGaugeItem(content->getObject(), item);
+                        // SOLUÇÃO: Criar gauge diretamente sem NavButton wrapper
+                        lv_obj_t* gaugeObj = ScreenFactory::createGaugeDirectly(content->getObject(), item);
+                        if (gaugeObj) {
+                            content->addChild(gaugeObj);
+                            currentPageSlots += slotsNeeded;
+                        }
+                        continue; // Pular o resto do loop, gauge já foi adicionado
                     } else {
                         logger->debug("  -> Creating DisplayItem (read-only data display, no gauge data)");
                         navBtn = ScreenFactory::createDisplayItem(content->getObject(), item);
@@ -196,10 +212,19 @@ std::unique_ptr<ScreenBase> ScreenFactory::createScreen(JsonObject& config) {
                 if (navBtn) {
                     lv_obj_t* btnObj = navBtn->getObject();
                     
+                    // CORREÇÃO: Aplicar tamanho correto baseado em size_display_small
+                    ComponentSize compSize = Layout::parseComponentSize(sizeStr);
+                    Size cellSize = {86, 72}; // Tamanho base
+                    Size componentSize = Layout::calculateComponentSize(compSize, cellSize);
+                    
+                    // Aplicar tamanho ao botão
+                    lv_obj_set_size(btnObj, componentSize.width, componentSize.height);
+                    
                     // Debug: verificar o objeto antes de adicionar
                     logger->debug("Adding NavButton object to content container");
                     logger->debug("  Button object: " + String((long)btnObj, HEX));
-                    logger->debug("  Button parent: " + String((long)lv_obj_get_parent(btnObj), HEX)); 
+                    logger->debug("  Button size: " + String(componentSize.width) + "x" + String(componentSize.height));
+                    logger->debug("  Size string: " + sizeStr);
                     logger->debug("  Content object: " + String((long)content->getObject(), HEX));
                     
                     // Adicionar ao container
@@ -347,7 +372,7 @@ NavButton* ScreenFactory::createRelayItem(lv_obj_t* parent, JsonObject& config) 
     // Verificar se relay board existe no registry
     if (!DeviceRegistry::getInstance()->hasRelayBoard(relay_board_id)) {
         logger->warning("Relay board not found in registry: " + String(relay_board_id) + 
-                       " for button: " + item["name"].as<String>() + " (" + label + ")");
+                       " for button: " + config["name"].as<String>() + " (" + label + ")");
         logger->info("Available relay boards in registry:");
         // TODO: Adicionar método para listar boards disponíveis
         // Visual de desabilitado - usar estado OFF 
@@ -876,7 +901,8 @@ float ScreenFactory::parseActionPayload(JsonObject& config, const String& key, f
     return payload[key] | defaultValue;
 }
 
-NavButton* ScreenFactory::createGaugeItem(lv_obj_t* parent, JsonObject& config) {
+// Nova função para criar display digital ao invés de gauge analógico
+lv_obj_t* ScreenFactory::createGaugeDirectly(lv_obj_t* parent, JsonObject& config) {
     String label = config["label"].as<String>();
     String icon = config["icon"].as<String>();
     String id = config["name"].as<String>();
@@ -884,86 +910,98 @@ NavButton* ScreenFactory::createGaugeItem(lv_obj_t* parent, JsonObject& config) 
     String dataPath = config["data_path"].as<String>();
     String dataUnit = config["data_unit"].as<String>();
     
-    // Parse configurações específicas do gauge do action_payload ou usar padrões
-    float minValue = 0;
-    float maxValue = 100;
-    float warningThreshold = 80;
-    float criticalThreshold = 95;
-    String gaugeType = "circular"; // default
+    // CORREÇÃO: Criar display digital ao invés de gauge analógico
+    // Criar container principal com tamanho correto baseado em size_display_small
+    lv_obj_t* container = lv_obj_create(parent);
     
-    // Tentar obter configurações do action_payload se existir
-    if (config["action_payload"].is<String>() && !config["action_payload"].as<String>().isEmpty()) {
-        minValue = parseActionPayload(config, "min_value", 0);
-        maxValue = parseActionPayload(config, "max_value", 100);
-        warningThreshold = parseActionPayload(config, "warning_threshold", maxValue * 0.8f);
-        criticalThreshold = parseActionPayload(config, "critical_threshold", maxValue * 0.95f);
-        
-        JsonDocument payloadDoc;
-        if (deserializeJson(payloadDoc, config["action_payload"].as<String>()) == DeserializationError::Ok) {
-            JsonObject payload = payloadDoc.as<JsonObject>();
-            gaugeType = payload["gauge_type"] | "circular";
-        }
-    } else {
-        // Para items type="display" sem action_payload, usar configurações inteligentes baseadas no data_path
-        if (dataPath.indexOf("temp") >= 0) {
-            maxValue = 120; // Temperatura
-            warningThreshold = 90;
-            criticalThreshold = 110;
-        } else if (dataPath.indexOf("rpm") >= 0) {
-            maxValue = 6000; // RPM
-            warningThreshold = 4500;
-            criticalThreshold = 5500;
-        } else if (dataPath.indexOf("pressure") >= 0) {
-            maxValue = 100; // Pressão
-            warningThreshold = 80;
-            criticalThreshold = 95;
-        } else if (dataPath.indexOf("voltage") >= 0) {
-            minValue = 10;
-            maxValue = 15; // Voltagem
-            warningThreshold = 12;
-            criticalThreshold = 11;
-        }
-        logger->debug("Using intelligent defaults for gauge without action_payload");
+    // Determinar tamanho baseado no size_display_small
+    String itemSize = config["size_display_small"] | "normal";
+    lv_coord_t width = 86;
+    lv_coord_t height = 72;
+    
+    if (itemSize == "small") {
+        width = 70;
+        height = 60;
+    } else if (itemSize == "large") {
+        width = 140;  // CORREÇÃO: Tamanho large deve ser bem maior para ocupar 2 slots
+        height = 90;
     }
     
     if (logger) {
-        logger->debug("Creating gauge: " + label + " (" + gaugeType + ") range: " + 
-                     String(minValue) + "-" + String(maxValue));
+        logger->debug("Creating digital display with size_display_small: " + itemSize + 
+                     " -> " + String(width) + "x" + String(height));
     }
     
-    // Criar widget gauge baseado no tipo
-    lv_obj_t* gauge = nullptr;
-    if (gaugeType == "circular") {
-        gauge = createCircularGauge(parent, config, minValue, maxValue);
-    } else {
-        gauge = createLinearGauge(parent, config, minValue, maxValue);
+    // Configurar container
+    lv_obj_set_size(container, width, height);
+    theme_apply_card(container);
+    lv_obj_clear_flag(container, LV_OBJ_FLAG_SCROLLABLE);
+    
+    // Layout vertical para o container
+    lv_obj_set_flex_flow(container, LV_FLEX_FLOW_COLUMN);
+    lv_obj_set_flex_align(container, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER);
+    
+    // Ícone pequeno no topo (se houver)
+    if (iconManager && !icon.isEmpty()) {
+        lv_obj_t* iconLabel = lv_label_create(container);
+        String iconSymbol = iconManager->getIconSymbol(icon);
+        lv_label_set_text(iconLabel, iconSymbol.c_str());
+        lv_obj_set_style_text_font(iconLabel, &lv_font_montserrat_14, 0);
+        theme_apply_label_small(iconLabel);
     }
     
-    if (!gauge) {
-        logger->error("Failed to create gauge widget");
-        return nullptr;
+    // Valor grande no centro (display digital)
+    lv_obj_t* valueLabel = lv_label_create(container);
+    lv_label_set_text(valueLabel, "---");
+    lv_obj_set_style_text_font(valueLabel, &lv_font_montserrat_20, 0);
+    lv_obj_set_style_text_color(valueLabel, COLOR_GAUGE_NORMAL, 0);
+    lv_obj_set_width(valueLabel, lv_pct(90));
+    lv_obj_set_style_text_align(valueLabel, LV_TEXT_ALIGN_CENTER, 0);
+    
+    // Unidade pequena (se houver)
+    if (!dataUnit.isEmpty()) {
+        lv_obj_t* unitLabel = lv_label_create(container);
+        lv_label_set_text(unitLabel, dataUnit.c_str());
+        lv_obj_set_style_text_font(unitLabel, &lv_font_montserrat_10, 0);
+        theme_apply_label_small(unitLabel);
     }
     
-    // Criar NavButton wrapper para compatibilidade
-    auto navBtn = new NavButton(gauge, label, icon, id);
-    navBtn->setButtonType(NavButton::TYPE_GAUGE);
-    navBtn->setDisplayConfig(dataSource, dataPath, dataUnit);
-    navBtn->setLVGLObject(gauge);
+    // Label/título pequeno embaixo
+    lv_obj_t* titleLabel = lv_label_create(container);
+    lv_label_set_text(titleLabel, label.c_str());
+    lv_obj_set_style_text_font(titleLabel, &lv_font_montserrat_10, 0);
+    lv_obj_set_width(titleLabel, lv_pct(90));
+    lv_obj_set_style_text_align(titleLabel, LV_TEXT_ALIGN_CENTER, 0);
+    lv_label_set_long_mode(titleLabel, LV_LABEL_LONG_WRAP);
+    theme_apply_label_small(titleLabel);
     
-    // Registrar no DataBinder para atualizações automáticas
-    if (!dataBinder) {
-        dataBinder = new DataBinder();
-        if (logger) {
-            logger->info("DataBinder: Initialized global instance");
-        }
-    }
+    // Armazenar referência do valueLabel para atualizações
+    lv_obj_set_user_data(container, valueLabel);
     
-    // Apenas registrar se tem dados válidos para binding
+    // Registrar no DataBinder para atualizações automáticas se necessário
     if (!dataSource.isEmpty() && !dataPath.isEmpty()) {
-        dataBinder->bindWidget(gauge, navBtn, config);
+        if (!dataBinder) {
+            dataBinder = new DataBinder();
+            if (logger) {
+                logger->info("DataBinder: Initialized global instance");
+            }
+        }
+        // Por enquanto não registrar no databinder sem NavButton
+        // dataBinder->bindWidget(container, nullptr, config);
     }
     
-    return navBtn;
+    if (logger) {
+        logger->debug("Created digital display: " + label + " size: " + String(width) + "x" + String(height));
+    }
+    
+    return container; // Retornar o display digital
+}
+
+// Função original createGaugeItem - mantida para compatibilidade
+NavButton* ScreenFactory::createGaugeItem(lv_obj_t* parent, JsonObject& config) {
+    // Por compatibilidade, criar o gauge e retornar nullptr
+    lv_obj_t* gauge = createGaugeDirectly(parent, config);
+    return nullptr; // Não criar NavButton wrapper
 }
 
 lv_obj_t* ScreenFactory::createCircularGauge(lv_obj_t* parent, JsonObject& config, float minVal, float maxVal) {
@@ -1248,7 +1286,7 @@ lv_coord_t ScreenFactory::calculateItemSize(const String& size, bool isWidth) {
     }
 }
 
-NavButton* ScreenFactory::createSwitchItem(lv_obj_t* parent, JsonObject& config) {
+lv_obj_t* ScreenFactory::createSwitchDirectly(lv_obj_t* parent, JsonObject& config) {
     String label = config["label"].as<String>();
     String icon = config["icon"].as<String>();
     String id = config["name"].as<String>();
@@ -1266,6 +1304,26 @@ NavButton* ScreenFactory::createSwitchItem(lv_obj_t* parent, JsonObject& config)
     // Criar container customizado para switch no estilo card
     lv_obj_t* container = lv_obj_create(parent);
     theme_apply_card(container);
+    
+    // CORREÇÃO: Aplicar tamanho correto baseado em config
+    String itemSize = config["size_display_small"] | "normal";
+    lv_coord_t width = 86;
+    lv_coord_t height = 72;
+    
+    if (itemSize == "small") {
+        width = 70;
+        height = 60;
+    } else if (itemSize == "large") {
+        width = 140;
+        height = 90;
+    }
+    
+    lv_obj_set_size(container, width, height);
+    
+    if (logger) {
+        logger->debug("Creating switch with size_display_small: " + itemSize + 
+                     " -> " + String(width) + "x" + String(height));
+    }
     
     // Layout horizontal: [Icon] [Label] -------- [Switch]
     
@@ -1305,17 +1363,27 @@ NavButton* ScreenFactory::createSwitchItem(lv_obj_t* parent, JsonObject& config)
     lv_obj_set_style_bg_color(lvSwitch, COLOR_TEXT_OFF, LV_PART_KNOB);
     lv_obj_set_style_bg_color(lvSwitch, COLOR_TEXT_ON, LV_PART_KNOB | LV_STATE_CHECKED);
     
-    // Criar NavButton wrapper para manter compatibilidade
-    auto navBtn = new NavButton(container, label, icon, id);
-    navBtn->setButtonType(NavButton::TYPE_SWITCH);
-    navBtn->setLVGLObject(lvSwitch); // Associar widget switch
+    // CORREÇÃO: Retornar container diretamente como um pseudo-NavButton
+    // Para switches, não usamos NavButton wrapper - criamos pseudo-objeto
     
-    // Configurar relay se válido
+    // Armazenar informações necessárias no user_data do container para compatibilidade
+    struct SwitchInfo {
+        uint8_t relay_board_id;
+        uint8_t relay_channel_id;
+        String label;
+        String id;
+    };
+    
+    SwitchInfo* switchInfo = new SwitchInfo();
+    switchInfo->relay_board_id = relay_board_id;
+    switchInfo->relay_channel_id = relay_channel_id;
+    switchInfo->label = label;
+    switchInfo->id = id;
+    
+    lv_obj_set_user_data(container, switchInfo);
+    
+    // Verificar se relay board existe
     if (relay_board_id > 0 && relay_channel_id > 0) {
-        String device = "relay_board_" + String(relay_board_id);
-        navBtn->setRelayConfig(device, relay_channel_id, "toggle");
-        
-        // Verificar se relay board existe
         if (!DeviceRegistry::getInstance()->hasRelayBoard(relay_board_id)) {
             logger->warning("Switch relay board not found: " + String(relay_board_id) + 
                            " for switch: " + id + " (" + label + ")");
@@ -1330,43 +1398,37 @@ NavButton* ScreenFactory::createSwitchItem(lv_obj_t* parent, JsonObject& config)
     // Callback do switch nativo
     lv_obj_add_event_cb(lvSwitch, [](lv_event_t* e) {
         lv_obj_t* sw = lv_event_get_target(e);
-        NavButton* btn = (NavButton*)lv_obj_get_user_data(sw);
+        SwitchInfo* switchInfo = (SwitchInfo*)lv_obj_get_user_data(sw);
         
-        if (btn && lv_event_get_code(e) == LV_EVENT_VALUE_CHANGED) {
+        if (switchInfo && lv_event_get_code(e) == LV_EVENT_VALUE_CHANGED) {
             bool isChecked = lv_obj_has_state(sw, LV_STATE_CHECKED);
-            btn->setState(isChecked);
             
             // Executar comando de relay
             extern CommandSender* commandSender;
-            extern ButtonStateManager* buttonStateManager;
             
-            if (commandSender && btn->getChannel() > 0) {
-                // Debounce check
-                if (btn->canSendCommand()) {
-                    String boardId = btn->getDeviceId();
-                    if (boardId.startsWith("relay_board_")) {
-                        boardId = boardId.substring(12); // Remove "relay_board_" prefix
-                    }
+            if (commandSender && switchInfo->relay_channel_id > 0) {
+                // Debounce simples
+                static unsigned long lastSwitchTime = 0;
+                unsigned long now = millis();
+                if (now - lastSwitchTime > 500) { // 500ms debounce
+                    lastSwitchTime = now;
                     
-                    commandSender->sendRelayCommand(boardId, btn->getChannel(), 
+                    String boardId = String(switchInfo->relay_board_id);
+                    
+                    commandSender->sendRelayCommand(boardId, switchInfo->relay_channel_id, 
                                                   isChecked ? "on" : "off", "toggle");
                     
                     if (logger) {
                         logger->debug("Switch command sent: " + boardId + ":" + 
-                                    String(btn->getChannel()) + " = " + (isChecked ? "ON" : "OFF"));
+                                    String(switchInfo->relay_channel_id) + " = " + (isChecked ? "ON" : "OFF"));
                     }
-                }
-                
-                // Registrar para receber atualizações MQTT
-                if (buttonStateManager) {
-                    buttonStateManager->registerButton(btn);
                 }
             }
         }
-    }, LV_EVENT_VALUE_CHANGED, navBtn);
+    }, LV_EVENT_VALUE_CHANGED, switchInfo);
     
-    // Armazenar referência do NavButton no switch para o callback
-    lv_obj_set_user_data(lvSwitch, navBtn);
+    // Armazenar referência do switchInfo no switch para o callback
+    lv_obj_set_user_data(lvSwitch, switchInfo);
     
-    return navBtn;
+    return container; // CORREÇÃO: Retornar container ao invés de NavButton
 }
