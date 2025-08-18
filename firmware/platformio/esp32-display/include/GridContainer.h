@@ -20,6 +20,7 @@ public:
 private:
     void layoutSingleRow(int itemCount);
     void layoutGrid(int itemCount);
+    void layoutGridNew();  // Novo método usando sistema de grid 3x2
 };
 
 #endif

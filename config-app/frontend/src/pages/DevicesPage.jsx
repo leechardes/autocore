@@ -73,6 +73,7 @@ import {
   TabsTrigger,
 } from '@/components/ui/tabs'
 import api from '@/lib/api'
+import { DEVICE_TYPES, normalizeDeviceType } from '@/utils/normalizers'
 
 const DevicesPage = () => {
   const [devices, setDevices] = useState([])
@@ -84,7 +85,7 @@ const DevicesPage = () => {
   const [isConfigDialogOpen, setIsConfigDialogOpen] = useState(false)
   const [formData, setFormData] = useState({
     name: '',
-    type: 'esp32_relay',
+    type: 'ESP32_RELAY',
     ip_address: '',
     mac_address: '',
     location: '',
@@ -125,15 +126,16 @@ const DevicesPage = () => {
 
   // Device type icon e label
   const getDeviceTypeInfo = (type) => {
+    const normalizedType = normalizeDeviceType(type)
     const types = {
-      esp32_relay: { label: 'ESP32 Relé', icon: Power },
-      esp32_display: { label: 'ESP32 Display', icon: Activity },
-      esp32_sensor: { label: 'ESP32 Sensor', icon: Activity },
-      esp32_can: { label: 'ESP32 CAN Interface', icon: Settings },
-      esp32_control: { label: 'ESP32 Controle', icon: Settings }
+      ESP32_RELAY: { label: 'ESP32 Relé', icon: Power },
+      ESP32_DISPLAY: { label: 'ESP32 Display', icon: Activity },
+      ESP32_SENSOR: { label: 'ESP32 Sensor', icon: Activity },
+      ESP32_CAN: { label: 'ESP32 CAN Interface', icon: Settings },
+      ESP32_CONTROL: { label: 'ESP32 Controle', icon: Settings }
     }
     
-    return types[type] || { label: type, icon: Settings }
+    return types[normalizedType] || { label: normalizedType, icon: Settings }
   }
 
   // Localizações pré-definidas
@@ -156,8 +158,9 @@ const DevicesPage = () => {
 
   // Configurações avançadas por tipo de dispositivo
   const getAdvancedFieldsByType = (type) => {
+    const normalizedType = normalizeDeviceType(type)
     const fields = {
-      esp32_relay: [
+      ESP32_RELAY: [
         { key: 'relay_count', label: 'Número de Relés', type: 'number', placeholder: '16', required: true },
         { key: 'board_model', label: 'Modelo da Placa', type: 'select', options: [
           { value: '16ch_standard', label: '16 Canais Standard' },
@@ -172,7 +175,7 @@ const DevicesPage = () => {
         ]},
         { key: 'max_current', label: 'Corrente Máxima (A)', type: 'number', placeholder: '10' }
       ],
-      esp32_display: [
+      ESP32_DISPLAY: [
         { key: 'screen_size', label: 'Tamanho da Tela', type: 'select', options: [
           { value: '2.4inch', label: '2.4 polegadas' },
           { value: '2.8inch', label: '2.8 polegadas' },
@@ -236,41 +239,42 @@ const DevicesPage = () => {
       ]
     }
     
-    return fields[type] || []
+    return fields[normalizedType] || []
   }
 
   // Capacidades por tipo de dispositivo
   const getCapabilitiesByType = (type) => {
+    const normalizedType = normalizeDeviceType(type)
     const capabilities = {
-      esp32_relay: [
+      ESP32_RELAY: [
         { key: 'relay_control', label: 'Controle de Relés', description: 'Permite controlar relés remotamente' },
         { key: 'status_report', label: 'Relatório de Status', description: 'Envia status dos relés periodicamente' },
         { key: 'ota_update', label: 'Atualização OTA', description: 'Permite atualização de firmware remota' },
         { key: 'timer_control', label: 'Controle por Timer', description: 'Programação de horários para relés' },
         { key: 'interlock', label: 'Intertravamento', description: 'Previne ativação simultânea de relés conflitantes' }
       ],
-      esp32_display: [
+      ESP32_DISPLAY: [
         { key: 'touch_input', label: 'Entrada Touch', description: 'Aceita entrada por toque na tela' },
         { key: 'screen_render', label: 'Renderização de Tela', description: 'Renderiza interfaces gráficas' },
         { key: 'brightness_control', label: 'Controle de Brilho', description: 'Ajuste de brilho da tela' },
         { key: 'screen_rotation', label: 'Rotação de Tela', description: 'Suporta rotação da interface' },
         { key: 'multi_page', label: 'Múltiplas Páginas', description: 'Navegação entre diferentes telas' }
       ],
-      esp32_sensor: [
+      ESP32_SENSOR: [
         { key: 'data_logging', label: 'Log de Dados', description: 'Armazena histórico de leituras' },
         { key: 'alert_threshold', label: 'Alertas por Limite', description: 'Envia alertas quando valores excedem limites' },
         { key: 'calibration', label: 'Calibração', description: 'Suporta calibração de sensores' },
         { key: 'multi_sensor', label: 'Múltiplos Sensores', description: 'Leitura de vários sensores simultaneamente' },
         { key: 'data_filtering', label: 'Filtragem de Dados', description: 'Aplica filtros para reduzir ruído' }
       ],
-      esp32_can: [
+      ESP32_CAN: [
         { key: 'can_read', label: 'Leitura CAN', description: 'Lê mensagens do barramento CAN' },
         { key: 'can_write', label: 'Escrita CAN', description: 'Envia mensagens para o barramento CAN' },
         { key: 'obd2', label: 'Protocolo OBD2', description: 'Suporta diagnóstico OBD2' },
         { key: 'can_filter', label: 'Filtro CAN', description: 'Filtra mensagens por ID' },
         { key: 'can_bridge', label: 'Bridge CAN', description: 'Ponte entre CAN e MQTT' }
       ],
-      esp32_control: [
+      ESP32_CONTROL: [
         { key: 'button_input', label: 'Entrada de Botões', description: 'Leitura de botões físicos' },
         { key: 'led_output', label: 'Controle de LEDs', description: 'Controla LEDs indicadores' },
         { key: 'encoder_input', label: 'Entrada de Encoder', description: 'Leitura de encoders rotativos' },
@@ -279,7 +283,7 @@ const DevicesPage = () => {
       ]
     }
     
-    return capabilities[type] || []
+    return capabilities[normalizedType] || []
   }
 
   // Salvar dispositivo
@@ -325,7 +329,7 @@ const DevicesPage = () => {
   const resetForm = () => {
     setFormData({
       name: '',
-      type: 'esp32_relay',
+      type: 'ESP32_RELAY',
       ip_address: '',
       mac_address: '',
       location: '',
@@ -340,7 +344,7 @@ const DevicesPage = () => {
     setSelectedDevice(device)
     setFormData({
       name: device.name || '',
-      type: device.type || 'esp32_relay',
+      type: normalizeDeviceType(device.type) || 'ESP32_RELAY',
       ip_address: device.ip_address || '',
       mac_address: device.mac_address || '',
       location: device.location || '',
@@ -354,7 +358,7 @@ const DevicesPage = () => {
     setSelectedDevice(device)
     setFormData({
       name: device.name || '',
-      type: device.type || 'esp32_relay',
+      type: normalizeDeviceType(device.type) || 'ESP32_RELAY',
       ip_address: device.ip_address || '',
       mac_address: device.mac_address || '',
       location: device.location || '',
@@ -423,11 +427,11 @@ const DevicesPage = () => {
               }}
               className="w-full h-10 px-3 py-2 text-sm bg-background border border-input rounded-md"
             >
-              <option value="esp32_relay">ESP32 Relé</option>
-              <option value="esp32_display">ESP32 Display</option>
-              <option value="esp32_sensor">ESP32 Sensor</option>
-              <option value="esp32_can">ESP32 CAN Interface</option>
-              <option value="esp32_control">ESP32 Controle</option>
+              {DEVICE_TYPES.map(deviceType => (
+                <option key={deviceType.value} value={deviceType.value}>
+                  {deviceType.label}
+                </option>
+              ))}
             </select>
           </div>
           
@@ -735,7 +739,7 @@ const DevicesPage = () => {
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold text-blue-600">
-              {devices.filter(d => d.type === 'esp32_relay').length}
+              {devices.filter(d => normalizeDeviceType(d.type) === 'ESP32_RELAY').length}
             </div>
             <p className="text-xs text-muted-foreground">Placas de relé</p>
           </CardContent>
@@ -748,7 +752,7 @@ const DevicesPage = () => {
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold text-green-600">
-              {devices.filter(d => d.type === 'esp32_display').length}
+              {devices.filter(d => normalizeDeviceType(d.type) === 'ESP32_DISPLAY').length}
             </div>
             <p className="text-xs text-muted-foreground">Telas e displays</p>
           </CardContent>
@@ -761,7 +765,7 @@ const DevicesPage = () => {
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold text-purple-600">
-              {devices.filter(d => d.type === 'esp32_can').length}
+              {devices.filter(d => normalizeDeviceType(d.type) === 'ESP32_CAN').length}
             </div>
             <p className="text-xs text-muted-foreground">Interfaces CAN</p>
           </CardContent>
@@ -774,7 +778,7 @@ const DevicesPage = () => {
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold text-orange-600">
-              {devices.filter(d => d.type === 'esp32_sensor').length}
+              {devices.filter(d => normalizeDeviceType(d.type) === 'ESP32_SENSOR').length}
             </div>
             <p className="text-xs text-muted-foreground">Módulos sensores</p>
           </CardContent>
@@ -787,7 +791,7 @@ const DevicesPage = () => {
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold text-teal-600">
-              {devices.filter(d => d.type === 'esp32_control').length}
+              {devices.filter(d => normalizeDeviceType(d.type) === 'ESP32_CONTROL').length}
             </div>
             <p className="text-xs text-muted-foreground">Painéis de controle</p>
           </CardContent>

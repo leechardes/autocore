@@ -109,3 +109,98 @@ int Layout::getItemsInPage(int page, int totalItems) {
         return totalItems - (page * 6);
     }
 }
+
+// ============================================================================
+// NOVOS MÉTODOS PARA GRID 3x2 CONFIGURÁVEL
+// ============================================================================
+
+Size Layout::calculateGridCellSize(Size containerSize) {
+    Size cellSize;
+    
+    // Calcular tamanho de cada célula do grid
+    // Considerando gaps entre células
+    cellSize.width = (containerSize.width - (GRID_COLS - 1) * GAP) / GRID_COLS;
+    cellSize.height = (containerSize.height - (GRID_ROWS - 1) * GAP) / GRID_ROWS;
+    
+    // Garantir tamanhos mínimos
+    if (cellSize.width < 50) cellSize.width = 50;
+    if (cellSize.height < 40) cellSize.height = 40;
+    
+    return cellSize;
+}
+
+Point Layout::calculateGridPosition(int col, int row, Size cellSize) {
+    Point position;
+    
+    // Calcular posição baseada na coluna e linha
+    // Importante: GAP deve ser aplicado apenas ENTRE células, não antes da primeira
+    if (col == 0) {
+        position.x = 0;
+    } else {
+        position.x = col * cellSize.width + (col * GAP);
+    }
+    
+    if (row == 0) {
+        position.y = 0;
+    } else {
+        position.y = row * cellSize.height + (row * GAP);
+    }
+    
+    return position;
+}
+
+ComponentSize Layout::parseComponentSize(const String& sizeStr) {
+    if (sizeStr == "small") return SIZE_SMALL;
+    if (sizeStr == "large") return SIZE_LARGE;
+    if (sizeStr == "full") return SIZE_FULL;
+    return SIZE_NORMAL; // default
+}
+
+int Layout::getSlotsForSize(ComponentSize size) {
+    switch (size) {
+        case SIZE_SMALL:  return SLOT_SMALL;
+        case SIZE_NORMAL: return SLOT_NORMAL;
+        case SIZE_LARGE:  return SLOT_LARGE;
+        case SIZE_FULL:   return SLOT_FULL;
+        default:          return SLOT_NORMAL;
+    }
+}
+
+Size Layout::calculateComponentSize(ComponentSize size, Size cellSize) {
+    Size componentSize;
+    
+    switch (size) {
+        case SIZE_SMALL:
+        case SIZE_NORMAL:
+            componentSize.width = cellSize.width;
+            componentSize.height = cellSize.height;
+            break;
+            
+        case SIZE_LARGE:
+            // Ocupa 2 células horizontalmente
+            componentSize.width = (cellSize.width * 2) + GAP;
+            componentSize.height = cellSize.height;
+            break;
+            
+        case SIZE_FULL:
+            // Ocupa toda a linha
+            componentSize.width = (cellSize.width * GRID_COLS) + (GAP * (GRID_COLS - 1));
+            componentSize.height = cellSize.height;
+            break;
+            
+        default:
+            componentSize = cellSize;
+            break;
+    }
+    
+    return componentSize;
+}
+
+int Layout::calculateTotalPagesSlots(int totalSlots) {
+    if (totalSlots <= 0) return 0;
+    return (totalSlots + CURRENT_MAX_SLOTS - 1) / CURRENT_MAX_SLOTS; // Arredonda para cima
+}
+
+bool Layout::canFitInPage(int currentSlots, int newComponentSlots) {
+    return (currentSlots + newComponentSlots) <= CURRENT_MAX_SLOTS;
+}

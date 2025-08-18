@@ -13,6 +13,7 @@ from api.models.device import (
     DeviceResponse, DeviceCreate, DeviceUpdate, 
     AvailableDeviceResponse
 )
+from utils.normalizers import compare_device_types
 
 router = APIRouter()
 
@@ -50,7 +51,7 @@ async def get_available_relay_devices():
     try:
         # Buscar todos os dispositivos ESP32_RELAY
         all_devices = devices.get_all()
-        relay_devices = [d for d in all_devices if d.type == 'esp32_relay']
+        relay_devices = [d for d in all_devices if compare_device_types(d.type, 'esp32_relay')]
         
         # Buscar device_ids que já têm placas de relé
         existing_boards = relays.get_boards()

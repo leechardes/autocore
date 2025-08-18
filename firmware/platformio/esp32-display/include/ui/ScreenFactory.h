@@ -33,6 +33,22 @@ public:
     // Create display item (read-only information)
     static NavButton* createDisplayItem(lv_obj_t* parent, JsonObject& config);
     
+    // Novos métodos para widgets melhorados
+    static NavButton* createSwitchItem(lv_obj_t* parent, JsonObject& config);
+    static NavButton* createGaugeItem(lv_obj_t* parent, JsonObject& config);
+    
+    // Métodos auxiliares para gauges
+    static lv_obj_t* createCircularGauge(lv_obj_t* parent, JsonObject& config, float minVal, float maxVal);
+    static lv_obj_t* createLinearGauge(lv_obj_t* parent, JsonObject& config, float minVal, float maxVal);
+    
+    // Utilitários para formatting e cores
+    static String formatDisplayValue(float value, JsonObject& config);
+    static void applyDynamicColors(lv_obj_t* obj, JsonObject& config, float value);
+    static lv_coord_t calculateItemSize(const String& size, bool isWidth);
+    
+    // Parse action_payload JSON string (público para DataBinder)
+    static float parseActionPayload(JsonObject& config, const String& key, float defaultValue);
+    
     // Legacy methods (to be removed after full migration)
     static lv_obj_t* createScreenLegacy(JsonObject& config);
     static lv_obj_t* createButton(lv_obj_t* parent, JsonObject& config);

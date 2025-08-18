@@ -12,7 +12,9 @@ public:
         TYPE_RELAY,
         TYPE_ACTION,
         TYPE_MODE,
-        TYPE_DISPLAY
+        TYPE_DISPLAY,
+        TYPE_SWITCH,    // Novo: Para switches nativos LVGL
+        TYPE_GAUGE      // Novo: Para gauges/meters
     };
 
 private:
@@ -43,6 +45,10 @@ private:
     String dataSource;      // Fonte dos dados (can, sensors, etc)
     String dataPath;        // Caminho dos dados
     String dataUnit;        // Unidade dos dados
+    
+    // Para widgets nativos LVGL (switches, gauges)
+    lv_obj_t* lvglWidget = nullptr;  // Widget LVGL nativo (switch, meter, etc)
+    lv_obj_t* valueLabel = nullptr;  // Label para exibir valores (displays, gauges)
     
     // Controle de debounce para comandos
     unsigned long lastCommandTime = 0;
@@ -145,6 +151,13 @@ public:
         }
         return false;
     }
+    
+    // Novos métodos para widgets LVGL nativos
+    void setLVGLObject(lv_obj_t* obj) { lvglWidget = obj; }
+    lv_obj_t* getLVGLObject() { return lvglWidget; }
+    
+    void setValueLabel(lv_obj_t* label) { valueLabel = label; }
+    lv_obj_t* getValueLabel() { return valueLabel; }
 };
 
 #endif

@@ -4,15 +4,61 @@ Definição declarativa das tabelas - fonte única de verdade
 """
 from datetime import datetime
 from typing import Optional
+from enum import Enum as PyEnum
 from sqlalchemy import (
     create_engine, Column, Integer, String, Boolean, 
-    Float, Text, DateTime, ForeignKey, UniqueConstraint, Index
+    Float, Text, DateTime, ForeignKey, UniqueConstraint, 
+    Index, Enum, CheckConstraint
 )
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import relationship, sessionmaker
 from sqlalchemy.sql import func
 
 Base = declarative_base()
+
+# ====================================
+# ENUMS
+# ====================================
+
+class ItemType(PyEnum):
+    """Tipos de itens da interface"""
+    DISPLAY = 'display'
+    BUTTON = 'button'
+    SWITCH = 'switch'
+    GAUGE = 'gauge'
+
+class ActionType(PyEnum):
+    """Tipos de ação para itens interativos"""
+    RELAY_CONTROL = 'relay_control'
+    COMMAND = 'command'
+    MACRO = 'macro'
+    NAVIGATION = 'navigation'
+
+class DeviceType(PyEnum):
+    """Tipos de dispositivos ESP32"""
+    ESP32_RELAY = 'esp32_relay'
+    ESP32_DISPLAY = 'esp32_display'
+    ESP32_DISPLAY_SMALL = 'esp32_display_small'
+    ESP32_DISPLAY_LARGE = 'esp32_display_large'
+
+class DeviceStatus(PyEnum):
+    """Status dos dispositivos"""
+    ONLINE = 'online'
+    OFFLINE = 'offline'
+    ERROR = 'error'
+    MAINTENANCE = 'maintenance'
+
+class FunctionType(PyEnum):
+    """Tipos de função dos relés"""
+    TOGGLE = 'toggle'
+    MOMENTARY = 'momentary'
+    PULSE = 'pulse'
+
+class ProtectionMode(PyEnum):
+    """Modos de proteção dos relés"""
+    NONE = 'none'
+    CONFIRM = 'confirm'
+    PASSWORD = 'password'
 
 # ====================================
 # CORE MODELS
@@ -25,12 +71,12 @@ class Device(Base):
     id = Column(Integer, primary_key=True)
     uuid = Column(String(36), unique=True, nullable=False)
     name = Column(String(100), nullable=False)
-    type = Column(String(50), nullable=False)  # esp32_relay, esp32_display, etc
+    type = Column(Enum(DeviceType), nullable=False)
     mac_address = Column(String(17), unique=True, nullable=True)
     ip_address = Column(String(15), nullable=True)
     firmware_version = Column(String(20), nullable=True)
     hardware_version = Column(String(20), nullable=True)
-    status = Column(String(20), default='offline')
+    status = Column(Enum(DeviceStatus), default=DeviceStatus.OFFLINE, nullable=False)
     last_seen = Column(DateTime, nullable=True)
     configuration_json = Column(Text, nullable=True)
     capabilities_json = Column(Text, nullable=True)
@@ -78,10 +124,10 @@ class RelayChannel(Base):
     channel_number = Column(Integer, nullable=False)
     name = Column(String(100), nullable=False)
     description = Column(Text, nullable=True)
-    function_type = Column(String(50), nullable=True)  # toggle, momentary, pulse
+    function_type = Column(Enum(FunctionType), nullable=True)
     icon = Column(String(50), nullable=True)
     color = Column(String(7), nullable=True)  # Hex color
-    protection_mode = Column(String(20), nullable=True)  # none, confirm, password
+    protection_mode = Column(Enum(ProtectionMode), default=ProtectionMode.NONE, nullable=False)
     max_activation_time = Column(Integer, nullable=True)  # segundos
     allow_in_macro = Column(Boolean, default=True)  # Permitir usar em macros
     is_active = Column(Boolean, default=True)
@@ -146,7 +192,7 @@ class ScreenItem(Base):
     
     id = Column(Integer, primary_key=True)
     screen_id = Column(Integer, ForeignKey('screens.id', ondelete='CASCADE'), nullable=False)
-    item_type = Column(String(50), nullable=False)  # button, switch, gauge, display
+    item_type = Column(Enum(ItemType), nullable=False)
     name = Column(String(100), nullable=False)
     label = Column(String(100), nullable=False)
     icon = Column(String(50), nullable=True)
@@ -159,7 +205,7 @@ class ScreenItem(Base):
     size_web = Column(String(20), default='normal')
     
     # Configuração de ação
-    action_type = Column(String(50), nullable=True)
+    action_type = Column(Enum(ActionType), nullable=True)
     action_target = Column(String(200), nullable=True)
     action_payload = Column(Text, nullable=True)
     
@@ -179,8 +225,26 @@ class ScreenItem(Base):
     # Relacionamentos
     screen = relationship("Screen", back_populates="items")
     
-    # Índices
+    # Constraints e Índices
     __table_args__ = (
+        # Check constraint para consistência entre item_type e action_type
+        CheckConstraint(
+            "(item_type IN ('display', 'gauge') AND action_type IS NULL) OR "
+            "(item_type IN ('button', 'switch') AND action_type IS NOT NULL)",
+            name='check_item_action_consistency'
+        ),
+        # Check constraint para relés obrigatórios em relay_control
+        CheckConstraint(
+            "action_type != 'relay_control' OR "
+            "(action_type = 'relay_control' AND relay_board_id IS NOT NULL AND relay_channel_id IS NOT NULL)",
+            name='check_relay_control_requirements'
+        ),
+        # Check constraint para dados obrigatórios em displays/gauges
+        CheckConstraint(
+            "item_type NOT IN ('display', 'gauge') OR "
+            "(item_type IN ('display', 'gauge') AND data_source IS NOT NULL AND data_path IS NOT NULL)",
+            name='check_display_data_requirements'
+        ),
         Index('idx_screen_items_screen_pos', 'screen_id', 'position'),
     )
 

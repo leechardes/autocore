@@ -11,6 +11,7 @@ sys.path.append(str(Path(__file__).parent.parent.parent.parent / "database"))
 from shared.repositories import devices, relays, events
 from api.models.relay import RelayChannelResponse, RelayBoardCreate, RelayBoardResponse
 from api.models.common import SuccessResponse
+from utils.normalizers import compare_device_types
 
 router = APIRouter()
 
@@ -70,7 +71,7 @@ async def create_relay_board(board_data: RelayBoardCreate):
             raise HTTPException(status_code=404, detail="Dispositivo não encontrado")
         
         # Verificar se é ESP32_RELAY
-        if device.type != 'esp32_relay':
+        if not compare_device_types(device.type, 'esp32_relay'):
             raise HTTPException(status_code=400, detail="Dispositivo deve ser do tipo esp32_relay")
         
         # Verificar se device_id já tem placa cadastrada

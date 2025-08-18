@@ -1,6 +1,8 @@
 // AutoCore Config App - Preview Data Adapter
 // Adapta dados do endpoint /api/config/full para o formato esperado pelo preview
 
+import { normalizeItemType, compareItemTypes } from './normalizers'
+
 /**
  * Adapta a resposta do config/full para o formato do preview
  * @param {Object} configData - Dados do endpoint /api/config/full
@@ -57,7 +59,7 @@ function adaptScreenItems(items, telemetry) {
     }
 
     // Para itens de display e gauge, calcular valor baseado na telemetria
-    if (item.item_type === 'display' || item.item_type === 'gauge') {
+    if (compareItemTypes(item.item_type, 'DISPLAY') || compareItemTypes(item.item_type, 'GAUGE')) {
       adaptedItem.currentValue = getCurrentValue(item, telemetry)
       adaptedItem.formattedValue = formatDisplayValue(
         adaptedItem.currentValue,

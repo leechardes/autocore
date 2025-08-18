@@ -44,6 +44,14 @@ import { Label } from '@/components/ui/label'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Card } from '@/components/ui/card'
 import api from '@/lib/api'
+import { 
+  normalizeItemType, 
+  normalizeActionType, 
+  compareItemTypes,
+  compareActionTypes,
+  ITEM_TYPES,
+  ACTION_TYPES 
+} from '@/utils/normalizers'
 
 const ScreenItemsManager = ({ screen, isOpen, onClose, onUpdate }) => {
   const [items, setItems] = useState([])
@@ -52,7 +60,7 @@ const ScreenItemsManager = ({ screen, isOpen, onClose, onUpdate }) => {
   const [isItemDialogOpen, setIsItemDialogOpen] = useState(false)
   
   const [formData, setFormData] = useState({
-    item_type: 'button',
+    item_type: 'BUTTON',
     name: '',
     label: '',
     icon: 'circle',
@@ -61,7 +69,7 @@ const ScreenItemsManager = ({ screen, isOpen, onClose, onUpdate }) => {
     size_display_small: 'normal',
     size_display_large: 'normal',
     size_web: 'normal',
-    action_type: 'relay_toggle',
+    action_type: 'RELAY_CONTROL',
     action_target: '',
     action_payload: '',
     data_source: '',
@@ -75,13 +83,15 @@ const ScreenItemsManager = ({ screen, isOpen, onClose, onUpdate }) => {
   const [selectedBoardId, setSelectedBoardId] = useState('')
   const [selectedChannelId, setSelectedChannelId] = useState('')
 
-  // Tipos de item disponíveis
-  const itemTypes = [
-    { value: 'button', label: 'Botão', icon: Grid3x3 },
-    { value: 'switch', label: 'Switch', icon: ToggleLeft },
-    { value: 'gauge', label: 'Medidor', icon: Gauge },
-    { value: 'display', label: 'Display', icon: Monitor }
-  ]
+  // Tipos de item disponíveis (usando constantes do normalizer)
+  const itemTypes = ITEM_TYPES.map(type => ({
+    value: type.value,
+    label: type.label,
+    icon: type.value === 'BUTTON' ? Grid3x3 :
+          type.value === 'SWITCH' ? ToggleLeft :
+          type.value === 'GAUGE' ? Gauge :
+          type.value === 'DISPLAY' ? Monitor : Grid3x3
+  }))
 
   // Tamanhos disponíveis
   const sizes = [
@@ -91,15 +101,8 @@ const ScreenItemsManager = ({ screen, isOpen, onClose, onUpdate }) => {
     { value: 'full', label: 'Largura Total' }
   ]
 
-  // Tipos de ação
-  const actionTypes = [
-    { value: 'relay_toggle', label: 'Alternar Relé' },
-    { value: 'relay_on', label: 'Ligar Relé' },
-    { value: 'relay_off', label: 'Desligar Relé' },
-    { value: 'screen_navigate', label: 'Navegar para Tela' },
-    { value: 'macro_execute', label: 'Executar Macro' },
-    { value: 'none', label: 'Sem Ação' }
-  ]
+  // Tipos de ação (usando constantes do normalizer)
+  const actionTypes = ACTION_TYPES
 
   // Fontes de dados
   const dataSources = [
@@ -183,7 +186,7 @@ const ScreenItemsManager = ({ screen, isOpen, onClose, onUpdate }) => {
       }
       
       setFormData({
-        item_type: item.item_type || 'button',
+        item_type: normalizeItemType(item.item_type) || 'BUTTON',
         name: item.name || '',
         label: item.label || '',
         icon: item.icon || 'circle',
@@ -192,7 +195,7 @@ const ScreenItemsManager = ({ screen, isOpen, onClose, onUpdate }) => {
         size_display_small: item.size_display_small || 'normal',
         size_display_large: item.size_display_large || 'normal',
         size_web: item.size_web || 'normal',
-        action_type: item.action_type || 'relay_toggle',
+        action_type: normalizeActionType(item.action_type) || 'RELAY_CONTROL',
         action_target: item.action_target || '',
         action_payload: item.action_payload || '',
         data_source: item.data_source || '',
@@ -207,7 +210,7 @@ const ScreenItemsManager = ({ screen, isOpen, onClose, onUpdate }) => {
       setSelectedChannelId('')
       const nextPosition = items.length + 1
       setFormData({
-        item_type: 'button',
+        item_type: 'BUTTON',
         name: '',
         label: '',
         icon: 'circle',
@@ -216,7 +219,7 @@ const ScreenItemsManager = ({ screen, isOpen, onClose, onUpdate }) => {
         size_display_small: 'normal',
         size_display_large: 'normal',
         size_web: 'normal',
-        action_type: 'relay_toggle',
+        action_type: 'RELAY_CONTROL',
         action_target: '',
         action_payload: '',
         data_source: '',
@@ -238,7 +241,7 @@ const ScreenItemsManager = ({ screen, isOpen, onClose, onUpdate }) => {
       let dataToSave = { ...formData }
       
       // Se for ação de relé, usar os campos dedicados
-      if (formData.action_type?.startsWith('relay')) {
+      if (compareActionTypes(formData.action_type, 'RELAY_CONTROL')) {
         // Usar campos dedicados para board e channel
         if (selectedBoardId) {
           dataToSave.relay_board_id = parseInt(selectedBoardId)
@@ -249,15 +252,7 @@ const ScreenItemsManager = ({ screen, isOpen, onClose, onUpdate }) => {
         }
         
         // action_payload agora só precisa do tipo de ação
-        const payloadObj = {}
-        if (formData.action_type === 'relay_toggle') {
-          payloadObj.toggle = true
-        } else if (formData.action_type === 'relay_momentary') {
-          payloadObj.momentary = true
-        } else if (formData.action_type === 'relay_pulse') {
-          payloadObj.pulse = true
-        }
-        
+        const payloadObj = { action: 'toggle' } // Padrão para RELAY_CONTROL
         dataToSave.action_payload = JSON.stringify(payloadObj)
         
         // action_target fica livre para outros usos
@@ -303,7 +298,8 @@ const ScreenItemsManager = ({ screen, isOpen, onClose, onUpdate }) => {
 
   // Ícone do tipo de item
   const getItemIcon = (type) => {
-    const typeData = itemTypes.find(t => t.value === type)
+    const normalizedType = normalizeItemType(type)
+    const typeData = itemTypes.find(t => t.value === normalizedType)
     const IconComponent = typeData?.icon || Grid3x3
     return <IconComponent className="h-4 w-4" />
   }
@@ -396,7 +392,7 @@ const ScreenItemsManager = ({ screen, isOpen, onClose, onUpdate }) => {
                         <TableCell>
                           <div className="flex items-center gap-2">
                             {getItemIcon(item.item_type)}
-                            <span className="text-sm">{item.item_type}</span>
+                            <span className="text-sm">{normalizeItemType(item.item_type)}</span>
                           </div>
                         </TableCell>
                         <TableCell>
@@ -404,7 +400,7 @@ const ScreenItemsManager = ({ screen, isOpen, onClose, onUpdate }) => {
                         </TableCell>
                         <TableCell>
                           <span className="text-sm">
-                            {item.action_type || 'Nenhuma'}
+                            {normalizeActionType(item.action_type) || 'Nenhuma'}
                           </span>
                         </TableCell>
                         <TableCell>
@@ -635,10 +631,10 @@ const ScreenItemsManager = ({ screen, isOpen, onClose, onUpdate }) => {
                     </select>
                   </div>
 
-                  {formData.action_type && formData.action_type !== 'none' && (
+                  {formData.action_type && formData.action_type !== 'NONE' && (
                     <>
                       {/* Se for ação de relé, mostrar seleção de placa e canal */}
-                      {formData.action_type.startsWith('relay') ? (
+                      {compareActionTypes(formData.action_type, 'RELAY_CONTROL') ? (
                         <>
                           <div className="space-y-2">
                             <Label>Placa de Relé</Label>
@@ -686,8 +682,8 @@ const ScreenItemsManager = ({ screen, isOpen, onClose, onUpdate }) => {
                             value={formData.action_target}
                             onChange={(e) => setFormData({...formData, action_target: e.target.value})}
                             placeholder={
-                              formData.action_type === 'screen_navigate' ? 'screen_name' :
-                              formData.action_type === 'mqtt_publish' ? 'topic' :
+                              compareActionTypes(formData.action_type, 'NAVIGATION') ? 'screen_name' :
+                              compareActionTypes(formData.action_type, 'COMMAND') ? 'command' :
                               'target'
                             }
                           />
@@ -695,7 +691,7 @@ const ScreenItemsManager = ({ screen, isOpen, onClose, onUpdate }) => {
                       )}
 
                       {/* Payload JSON manual apenas para não-relé */}
-                      {!formData.action_type.startsWith('relay') && (
+                      {!compareActionTypes(formData.action_type, 'RELAY_CONTROL') && (
                         <div className="space-y-2">
                           <Label>Payload (JSON opcional)</Label>
                           <Input

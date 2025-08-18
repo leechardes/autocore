@@ -16,7 +16,8 @@ from sqlalchemy import create_engine, func, and_, or_
 from src.models.models import (
     Base, Device, RelayBoard, RelayChannel, 
     TelemetryData, EventLog, Screen, ScreenItem,
-    Theme, CANSignal, Macro, User, Icon
+    Theme, CANSignal, Macro, User, Icon,
+    DeviceType, DeviceStatus, FunctionType, ProtectionMode, ItemType, ActionType
 )
 
 # Configuração da sessão
@@ -86,15 +87,20 @@ class DeviceRepository(BaseRepository):
     def create(self, device_data: Dict) -> Device:
         """Cria novo dispositivo"""
         with SessionLocal() as session:
+            # Converter strings para enums se necessário
+            device_type = device_data['type']
+            if isinstance(device_type, str):
+                device_type = DeviceType(device_type)
+            
             device = Device(
                 uuid=device_data['uuid'],
                 name=device_data['name'],
-                type=device_data['type'],
+                type=device_type,
                 mac_address=device_data.get('mac_address'),
                 ip_address=device_data.get('ip_address'),
                 firmware_version=device_data.get('firmware_version'),
                 hardware_version=device_data.get('hardware_version'),
-                status='offline',
+                status=DeviceStatus.OFFLINE,
                 configuration_json=json.dumps(device_data.get('configuration', {})),
                 capabilities_json=json.dumps(device_data.get('capabilities', {}))
             )
@@ -108,6 +114,9 @@ class DeviceRepository(BaseRepository):
         with SessionLocal() as session:
             device = session.query(Device).filter(Device.id == device_id).first()
             if device:
+                # Converter string para enum se necessário
+                if isinstance(status, str):
+                    status = DeviceStatus(status)
                 device.status = status
                 device.last_seen = datetime.now()
                 if ip_address:
@@ -134,7 +143,7 @@ class DeviceRepository(BaseRepository):
         """Lista dispositivos online"""
         with SessionLocal() as session:
             return session.query(Device).filter(
-                Device.status == 'online',
+                Device.status == DeviceStatus.ONLINE,
                 Device.is_active == True
             ).order_by(Device.last_seen.desc()).all()
     
@@ -205,13 +214,19 @@ class RelayRepository(BaseRepository):
                 if 'description' in config_data:
                     channel.description = config_data['description']
                 if 'function_type' in config_data:
-                    channel.function_type = config_data['function_type']
+                    function_type = config_data['function_type']
+                    if isinstance(function_type, str):
+                        function_type = FunctionType(function_type)
+                    channel.function_type = function_type
                 if 'icon' in config_data:
                     channel.icon = config_data['icon']
                 if 'color' in config_data:
                     channel.color = config_data['color']
                 if 'protection_mode' in config_data:
-                    channel.protection_mode = config_data['protection_mode']
+                    protection_mode = config_data['protection_mode']
+                    if isinstance(protection_mode, str):
+                        protection_mode = ProtectionMode(protection_mode)
+                    channel.protection_mode = protection_mode
                 if 'allow_in_macro' in config_data:
                     channel.allow_in_macro = config_data['allow_in_macro']
                 
@@ -668,9 +683,66 @@ class ConfigRepository(BaseRepository):
             session.refresh(screen)
             return screen
     
+    def validate_screen_item(self, item_data: Dict) -> Dict:
+        """Valida dados de um item de tela"""
+        errors = []
+        
+        # Validação de tipo obrigatório
+        if 'item_type' not in item_data:
+            errors.append("item_type é obrigatório")
+        else:
+            try:
+                item_type = ItemType(item_data['item_type']) if isinstance(item_data['item_type'], str) else item_data['item_type']
+            except ValueError:
+                errors.append(f"item_type inválido: {item_data['item_type']}")
+                return {'valid': False, 'errors': errors}
+            
+            # Validações específicas por tipo
+            if item_type in [ItemType.DISPLAY, ItemType.GAUGE]:
+                # Displays e gauges não devem ter action_type
+                if item_data.get('action_type'):
+                    errors.append(f"{item_type.value} não deve ter action_type")
+                
+                # Displays e gauges devem ter data_source e data_path
+                if not item_data.get('data_source'):
+                    errors.append(f"{item_type.value} deve ter data_source")
+                if not item_data.get('data_path'):
+                    errors.append(f"{item_type.value} deve ter data_path")
+                    
+            elif item_type in [ItemType.BUTTON, ItemType.SWITCH]:
+                # Buttons e switches devem ter action_type
+                if not item_data.get('action_type'):
+                    errors.append(f"{item_type.value} deve ter action_type")
+                else:
+                    try:
+                        action_type = ActionType(item_data['action_type']) if isinstance(item_data['action_type'], str) else item_data['action_type']
+                        
+                        # Se action_type for relay_control, deve ter relay info
+                        if action_type == ActionType.RELAY_CONTROL:
+                            if not item_data.get('relay_board_id'):
+                                errors.append("relay_control deve ter relay_board_id")
+                            if not item_data.get('relay_channel_id'):
+                                errors.append("relay_control deve ter relay_channel_id")
+                                
+                    except ValueError:
+                        errors.append(f"action_type inválido: {item_data['action_type']}")
+        
+        return {'valid': len(errors) == 0, 'errors': errors}
+    
     def create_screen_item(self, item_data: Dict) -> ScreenItem:
-        """Cria novo item de tela"""
+        """Cria novo item de tela com validação"""
+        # Validar dados primeiro
+        validation = self.validate_screen_item(item_data)
+        if not validation['valid']:
+            raise ValueError(f"Dados inválidos: {', '.join(validation['errors'])}")
+        
         with SessionLocal() as session:
+            # Converter strings para enums se necessário
+            if isinstance(item_data.get('item_type'), str):
+                item_data['item_type'] = ItemType(item_data['item_type'])
+            if isinstance(item_data.get('action_type'), str):
+                item_data['action_type'] = ActionType(item_data['action_type'])
+            
             item = ScreenItem(
                 screen_id=item_data['screen_id'],
                 item_type=item_data['item_type'],

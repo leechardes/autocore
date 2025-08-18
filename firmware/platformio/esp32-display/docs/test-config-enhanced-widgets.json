@@ -1,0 +1,144 @@
+{
+  "device_id": "display_test_001",
+  "firmware_version": "v2.1.0",
+  "screens": [
+    {
+      "id": 1,
+      "name": "enhanced_dashboard",
+      "title": "Dashboard Avançado",
+      "columns_display_small": 2,
+      "items": [
+        {
+          "id": 101,
+          "item_type": "gauge",
+          "name": "gauge_engine_rpm",
+          "label": "RPM Motor",
+          "icon": "gauge",
+          "position": 1,
+          "size_display_small": "large",
+          "data_source": "can_signal",
+          "data_path": "engine_rpm",
+          "data_unit": "RPM",
+          "action_payload": "{\"min_value\": 0, \"max_value\": 6000, \"warning_threshold\": 4500, \"critical_threshold\": 5500, \"gauge_type\": \"circular\"}"
+        },
+        {
+          "id": 102,
+          "item_type": "gauge",
+          "name": "gauge_fuel_level",
+          "label": "Combustível",
+          "icon": "droplets",
+          "position": 2,
+          "size_display_small": "normal",
+          "data_source": "can_signal",
+          "data_path": "fuel_level",
+          "data_unit": "%",
+          "action_payload": "{\"min_value\": 0, \"max_value\": 100, \"warning_threshold\": 20, \"critical_threshold\": 10, \"gauge_type\": \"linear\"}"
+        },
+        {
+          "id": 103,
+          "item_type": "display",
+          "name": "display_coolant_temp",
+          "label": "Temperatura Motor",
+          "icon": "thermometer",
+          "position": 3,
+          "size_display_small": "normal",
+          "data_source": "can_signal",
+          "data_path": "coolant_temp",
+          "data_unit": "°C",
+          "data_format": "temperature"
+        },
+        {
+          "id": 104,
+          "item_type": "display",
+          "name": "display_oil_pressure",
+          "label": "Pressão Óleo",
+          "icon": "wind",
+          "position": 4,
+          "size_display_small": "normal",
+          "data_source": "can_signal",
+          "data_path": "oil_pressure",
+          "data_unit": "PSI",
+          "data_format": "pressure"
+        },
+        {
+          "id": 105,
+          "item_type": "switch",
+          "name": "switch_main_lights",
+          "label": "Luzes Principais",
+          "icon": "lightbulb",
+          "position": 5,
+          "size_display_small": "normal",
+          "action_type": "relay",
+          "relay_board_id": 1,
+          "relay_channel_id": 1
+        },
+        {
+          "id": 106,
+          "item_type": "switch",
+          "name": "switch_aux_power",
+          "label": "Energia Auxiliar",
+          "icon": "power",
+          "position": 6,
+          "size_display_small": "normal",
+          "action_type": "relay",
+          "relay_board_id": 1,
+          "relay_channel_id": 2
+        },
+        {
+          "id": 107,
+          "item_type": "display",
+          "name": "display_battery_voltage",
+          "label": "Bateria",
+          "icon": "battery",
+          "position": 7,
+          "size_display_small": "small",
+          "data_source": "can_signal",
+          "data_path": "battery_voltage",
+          "data_unit": "V",
+          "data_format": "voltage"
+        },
+        {
+          "id": 108,
+          "item_type": "display",
+          "name": "display_speed",
+          "label": "Velocidade",
+          "icon": "gauge",
+          "position": 8,
+          "size_display_small": "small",
+          "data_source": "telemetry",
+          "data_path": "speed",
+          "data_unit": "km/h",
+          "data_format": "%.0f"
+        }
+      ]
+    }
+  ],
+  "relay_boards": [
+    {
+      "id": 1,
+      "name": "Main Control Board",
+      "device_id": "relay_001",
+      "channels": [
+        {
+          "id": 1,
+          "name": "Main Lights",
+          "state": false
+        },
+        {
+          "id": 2,
+          "name": "Auxiliary Power",
+          "state": false
+        }
+      ]
+    }
+  ],
+  "icons": {
+    "gauge": "\uf3fd",
+    "thermometer": "\uf2c7",
+    "droplets": "\uf043",
+    "lightbulb": "\uf0eb",
+    "power": "\uf011",
+    "battery": "\uf240",
+    "wind": "\uf72e"
+  }
+}

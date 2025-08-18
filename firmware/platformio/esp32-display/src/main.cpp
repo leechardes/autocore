@@ -20,6 +20,7 @@
 #include "ui/ScreenManager.h"
 #include "ui/ScreenFactory.h"
 #include "ui/IconManager.h"
+#include "ui/DataBinder.h"
 
 // Navigation
 #include "navigation/Navigator.h"
@@ -487,6 +488,12 @@ void lv_tick_task(void * pvParameters) {
 void loop() {
     // Handle LVGL
     lv_task_handler();
+    
+    // Update dynamic widgets (gauges, displays) with fresh data
+    extern DataBinder* dataBinder;
+    if (dataBinder) {
+        dataBinder->updateAll();
+    }
     
     // Handle buttons
     buttonHandler->update();

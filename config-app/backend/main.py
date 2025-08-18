@@ -37,6 +37,15 @@ from services.mqtt_monitor import mqtt_monitor
 from api.routes import simulators, macros
 from api import mqtt_routes, protocol_routes
 
+# Import normalizers
+from utils.normalizers import (
+    normalize_device_type, 
+    normalize_item_type, 
+    normalize_action_type,
+    compare_device_types,
+    compare_item_types
+)
+
 # ====================================
 # CONFIGURAÇÃO
 # ====================================
@@ -253,7 +262,7 @@ async def get_available_relay_devices():
     try:
         # Buscar todos os dispositivos ESP32_RELAY ativos
         all_devices = devices.get_all(active_only=True)
-        relay_devices = [d for d in all_devices if d.type == 'esp32_relay' and d.is_active]
+        relay_devices = [d for d in all_devices if compare_device_types(d.type, 'esp32_relay') and d.is_active]
         
         # Buscar device_ids que já têm placas de relé
         existing_boards = relays.get_boards(active_only=True)
@@ -759,7 +768,7 @@ async def create_relay_board(board_data: dict):
             raise HTTPException(status_code=404, detail="Dispositivo não encontrado")
         
         # Verificar se é ESP32_RELAY
-        if device.type != 'esp32_relay':
+        if not compare_device_types(device.type, 'esp32_relay'):
             raise HTTPException(status_code=400, detail="Dispositivo deve ser do tipo esp32_relay")
         
         # Verificar se device_id já tem placa cadastrada
@@ -1238,8 +1247,8 @@ def get_preview_configuration():
                         "relay_channel_id": item.relay_channel_id,
                         
                         # Campos adicionais para Display/Gauge (simulados)
-                        "display_format": getattr(item, 'display_format', "gauge" if item.item_type == "gauge" else "text"),
-                        "value_source": getattr(item, 'value_source', f"telemetry.{item.name.lower()}" if item.item_type in ["gauge", "display"] else None),
+                        "display_format": getattr(item, 'display_format', "gauge" if compare_item_types(item.item_type, "gauge") else "text"),
+                        "value_source": getattr(item, 'value_source', f"telemetry.{item.name.lower()}" if normalize_item_type(item.item_type) in ["GAUGE", "DISPLAY"] else None),
                         "unit": getattr(item, 'unit', item.data_unit),
                         "min_value": getattr(item, 'min_value', 0),
                         "max_value": getattr(item, 'max_value', 100),
@@ -1247,7 +1256,7 @@ def get_preview_configuration():
                             {"min": 0, "max": 30, "color": "#4CAF50"},
                             {"min": 30, "max": 70, "color": "#FF9800"},
                             {"min": 70, "max": 100, "color": "#F44336"}
-                        ] if item.item_type == "gauge" else None),
+                        ] if compare_item_types(item.item_type, "gauge") else None),
                         "size": getattr(item, 'size', item.size_display_large or "medium"),
                         "color_theme": getattr(item, 'color_theme', "primary"),
                         "custom_colors": {
@@ -1438,7 +1447,8 @@ async def get_full_configuration(
         }
         
         # Se for display, adicionar configurações específicas
-        if device.type in ["hmi_display", "esp32-display", "esp32_display"]:
+        normalized_device_type = normalize_device_type(device.type)
+        if normalized_device_type in ["HMI_DISPLAY", "ESP32_DISPLAY"]:
             # Screens com campos reais
             screens_data = []
             all_screens = config.get_screens()
@@ -1485,8 +1495,8 @@ async def get_full_configuration(
                                 "relay_channel_id": item.relay_channel_id,
                                 
                                 # Campos adicionais para Display/Gauge
-                                "display_format": getattr(item, 'display_format', "gauge" if item.item_type == "gauge" else "text"),
-                                "value_source": getattr(item, 'value_source', f"telemetry.{item.name.lower()}" if item.item_type in ["gauge", "display"] else None),
+                                "display_format": getattr(item, 'display_format', "gauge" if compare_item_types(item.item_type, "gauge") else "text"),
+                                "value_source": getattr(item, 'value_source', f"telemetry.{item.name.lower()}" if normalize_item_type(item.item_type) in ["GAUGE", "DISPLAY"] else None),
                                 "unit": getattr(item, 'unit', item.data_unit),
                                 "min_value": getattr(item, 'min_value', 0),
                                 "max_value": getattr(item, 'max_value', 100),
@@ -1494,7 +1504,7 @@ async def get_full_configuration(
                                     {"min": 0, "max": 30, "color": "#4CAF50"},
                                     {"min": 30, "max": 70, "color": "#FF9800"},
                                     {"min": 70, "max": 100, "color": "#F44336"}
-                                ] if item.item_type == "gauge" else None),
+                                ] if compare_item_types(item.item_type, "gauge") else None),
                                 "size": getattr(item, 'size', item.size_display_large or "medium"),
                                 "color_theme": getattr(item, 'color_theme', "primary"),
                                 "custom_colors": {
@@ -1639,7 +1649,7 @@ async def generate_config(device_uuid: str):
             raise HTTPException(status_code=404, detail="Dispositivo não encontrado")
         
         # Gera configuração baseada no tipo do dispositivo
-        if device.type == "esp32_relay":
+        if compare_device_types(device.type, "esp32_relay"):
             boards = relays.get_boards_by_device(device.id)
             channels = []
             for board in boards:
@@ -1666,7 +1676,7 @@ async def generate_config(device_uuid: str):
                 "relay_channels": channels
             }
         
-        elif device.type == "esp32_display":
+        elif compare_device_types(device.type, "esp32_display"):
             screens_data = config.get_screens()
             return {
                 "device_uuid": device.uuid,

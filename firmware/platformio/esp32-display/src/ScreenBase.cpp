@@ -29,10 +29,20 @@ void ScreenBase::createLayout() {
     // Criar header
     header = new Header(screen);
     
-    // Criar área de conteúdo
+    // Criar área de conteúdo com GridContainer configurado para 3x2
     content = new GridContainer(screen);
     content->setSize(Layout::DISPLAY_WIDTH, Layout::CONTENT_HEIGHT);
     content->setPosition(0, Layout::HEADER_HEIGHT);
+    
+    // Configurar grid para 3x2 explicitamente
+    content->setGridSize(3, 2);
+    content->setAdaptive(true); // Usar modo adaptativo por padrão
+    
+    if (logger) {
+        logger->info("[ScreenBase] Created GridContainer with size " + 
+                    String(Layout::DISPLAY_WIDTH) + "x" + String(Layout::CONTENT_HEIGHT) + 
+                    " at position (0," + String(Layout::HEADER_HEIGHT) + ")");
+    }
     
     // Criar barra de navegação
     navBar = new NavigationBar(screen);

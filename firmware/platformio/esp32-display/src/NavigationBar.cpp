@@ -1,6 +1,9 @@
 #include "NavigationBar.h"
 #include "ui/Theme.h"
 #include "Layout.h"
+#include "core/Logger.h"
+
+extern Logger* logger;
 
 NavigationBar::NavigationBar(lv_obj_t* parent) {
     container = lv_obj_create(parent);
@@ -48,6 +51,13 @@ void NavigationBar::createButton(lv_obj_t*& btn, const char* label, NavigationDi
         NavigationBar* navbar = (NavigationBar*)lv_event_get_user_data(e);
         NavigationDirection dir = (NavigationDirection)(intptr_t)lv_obj_get_user_data(lv_event_get_target(e));
         
+        // Log do clique
+        extern Logger* logger;
+        if (logger) {
+            String dirStr = (dir == NAV_PREV) ? "PREV" : (dir == NAV_HOME) ? "HOME" : "NEXT";
+            logger->info("[NavigationBar] Button clicked: " + dirStr);
+        }
+        
         if (navbar->navigationCallback) {
             navbar->navigationCallback(dir);
         }
@@ -76,13 +86,22 @@ void NavigationBar::applyButtonTheme(lv_obj_t* btn, bool enabled) {
 }
 
 void NavigationBar::setPrevEnabled(bool enabled) {
+    if (logger) {
+        logger->debug("[NavigationBar] setPrevEnabled: " + String(enabled ? "true" : "false"));
+    }
     applyButtonTheme(prevBtn, enabled);
 }
 
 void NavigationBar::setHomeEnabled(bool enabled) {
+    if (logger) {
+        logger->debug("[NavigationBar] setHomeEnabled: " + String(enabled ? "true" : "false"));
+    }
     applyButtonTheme(homeBtn, enabled);
 }
 
 void NavigationBar::setNextEnabled(bool enabled) {
+    if (logger) {
+        logger->debug("[NavigationBar] setNextEnabled: " + String(enabled ? "true" : "false"));
+    }
     applyButtonTheme(nextBtn, enabled);
 }

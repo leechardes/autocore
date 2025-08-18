@@ -36,6 +36,12 @@ import {
   getItemSize,
   getScreenColumns
 } from '@/utils/previewAdapter'
+import { 
+  normalizeItemType, 
+  normalizeActionType, 
+  compareItemTypes,
+  compareActionTypes 
+} from '@/utils/normalizers'
 
 const ScreenPreview = ({ isOpen, onClose }) => {
   const [fullConfig, setFullConfig] = useState(null)
@@ -217,9 +223,9 @@ const ScreenPreview = ({ isOpen, onClose }) => {
       // Inicializar estados dos itens baseados nos dados reais
       const states = {}
       visibleItems.forEach(item => {
-        if (item.item_type === 'switch' || item.item_type === 'button') {
+        if (compareItemTypes(item.item_type, 'SWITCH') || compareItemTypes(item.item_type, 'BUTTON')) {
           states[item.id] = false
-        } else if (item.item_type === 'gauge' || item.item_type === 'display') {
+        } else if (compareItemTypes(item.item_type, 'GAUGE') || compareItemTypes(item.item_type, 'DISPLAY')) {
           // Usar valor atual da telemetria se disponível
           states[item.id] = item.currentValue || item.formattedValue || 0
         }
@@ -298,7 +304,7 @@ const ScreenPreview = ({ isOpen, onClose }) => {
     }
     
     // Ação baseada no tipo
-    if (item.action_type === 'relay') {
+    if (compareActionTypes(item.action_type, 'RELAY_CONTROL')) {
       // Para relés, verificar se é toggle ou momentary
       if (payload.momentary) {
         // Momentary - ativa temporariamente
@@ -313,7 +319,7 @@ const ScreenPreview = ({ isOpen, onClose }) => {
           [item.id]: !prev[item.id]
         }))
       }
-    } else if (item.item_type === 'switch' || item.item_type === 'button') {
+    } else if (compareItemTypes(item.item_type, 'SWITCH') || compareItemTypes(item.item_type, 'BUTTON')) {
       // Toggle padrão
       setItemStates(prev => ({
         ...prev,
@@ -321,8 +327,8 @@ const ScreenPreview = ({ isOpen, onClose }) => {
       }))
     }
     
-    // Navegar para tela se a ação for screen_navigate
-    if (item.action_type === 'screen_navigate' && item.action_target) {
+    // Navegar para tela se a ação for navigation
+    if (compareActionTypes(item.action_type, 'NAVIGATION') && item.action_target) {
       const targetScreen = screens.find(s => s.name === item.action_target)
       if (targetScreen) {
         navigateToScreen(targetScreen)
@@ -370,8 +376,8 @@ const ScreenPreview = ({ isOpen, onClose }) => {
     // Altura do botão baseada no tamanho
     const heightClass = itemSize === 'large' ? 'h-24' : itemSize === 'small' ? 'h-16' : 'h-20'
     
-    switch (item.item_type) {
-      case 'button':
+    switch (normalizeItemType(item.item_type)) {
+      case 'BUTTON':
         return (
           <Button
             key={item.id}
@@ -391,7 +397,7 @@ const ScreenPreview = ({ isOpen, onClose }) => {
           </Button>
         )
         
-      case 'switch':
+      case 'SWITCH':
         return (
           <Card key={item.id} className={`${sizeClass} p-4`}>
             <div className="flex items-center justify-between">
@@ -407,7 +413,7 @@ const ScreenPreview = ({ isOpen, onClose }) => {
           </Card>
         )
         
-      case 'gauge':
+      case 'GAUGE':
         const gaugeValue = item.currentValue || itemStates[item.id] || 0
         const minValue = item.min_value || 0
         const maxValue = item.max_value || 100
@@ -453,7 +459,7 @@ const ScreenPreview = ({ isOpen, onClose }) => {
           </Card>
         )
         
-      case 'display':
+      case 'DISPLAY':
         const displayValue = item.currentValue !== undefined ? item.currentValue : itemStates[item.id] || 0
         const formattedValue = item.formattedValue || `${displayValue}${item.unit || ''}`
         const fontSize = itemSize === 'large' ? 'text-3xl' : itemSize === 'small' ? 'text-xl' : 'text-2xl'

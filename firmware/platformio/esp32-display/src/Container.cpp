@@ -17,20 +17,32 @@ Container::~Container() {
 
 void Container::addChild(lv_obj_t* child) {
     if (child) {
-        // Não precisa setar parent se já foi criado com parent correto
-        // lv_obj_set_parent(child, obj);
+        // Verificar se parent está correto antes de adicionar
+        lv_obj_t* childParent = lv_obj_get_parent(child);
+        if (childParent != obj) {
+            Serial.printf("[Container] WARNING: Child parent mismatch. Expected %p, got %p\n", obj, childParent);
+            // Se necessário, corrigir o parent
+            lv_obj_set_parent(child, obj);
+        }
+        
         children.push_back(child);
-        // Serial.printf("[Container] Added child %p to container %p, total children: %d\n", 
-        //               child, obj, (int)children.size());
+        Serial.printf("[Container] Added child %p to container %p, total children: %d\n", 
+                      child, obj, (int)children.size());
         
-        // Verificar se o child foi adicionado corretamente
-        lv_obj_t* parent = lv_obj_get_parent(child);
-        // Serial.printf("[Container] Child parent: %p (should be %p)\n", parent, obj);
-        
-        // Forçar visibilidade
+        // Forçar visibilidade e garantir que o child não tem scroll
         lv_obj_clear_flag(child, LV_OBJ_FLAG_HIDDEN);
+        lv_obj_clear_flag(child, LV_OBJ_FLAG_SCROLLABLE);
+        lv_obj_set_scroll_dir(child, LV_DIR_NONE);
+        lv_obj_set_scrollbar_mode(child, LV_SCROLLBAR_MODE_OFF);
         
+        // Aplicar posição e tamanho inicial temporário
+        lv_obj_set_size(child, 50, 50);
+        lv_obj_set_pos(child, 0, 0);
+        
+        // Forçar atualização do layout
         updateLayout();
+        
+        Serial.printf("[Container] Child added successfully. Final children count: %d\n", (int)children.size());
     } else {
         Serial.println("[Container] ERROR: Tried to add null child!");
     }
@@ -81,5 +93,9 @@ void Container::applyTheme() {
     lv_obj_set_style_pad_bottom(obj, 5, 0);  // Margem inferior de 5px
     lv_obj_set_style_pad_left(obj, margin, 0);   // Margem esquerda
     lv_obj_set_style_pad_right(obj, margin, 0);  // Margem direita
+    
+    // GARANTIR QUE NÃO HÁ SCROLL EM NENHUMA SITUAÇÃO
     lv_obj_clear_flag(obj, LV_OBJ_FLAG_SCROLLABLE);
+    lv_obj_set_scroll_dir(obj, LV_DIR_NONE);  // Desabilitar scroll em todas as direções
+    lv_obj_set_scrollbar_mode(obj, LV_SCROLLBAR_MODE_OFF); // Desabilitar scrollbars
 }
