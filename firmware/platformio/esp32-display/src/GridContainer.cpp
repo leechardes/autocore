@@ -185,7 +185,9 @@ void GridContainer::updateLayout() {
             // Se passou do número de linhas, pare (componente será na próxima página)
             if (currentRow >= Layout::GRID_ROWS) {
                 logger->warning("[GridContainer] Component " + String(i) + " exceeds grid capacity, should be in next page");
-                break;
+                // IMPORTANTE: Ocultar componente que não cabe na página
+                lv_obj_add_flag(children[i], LV_OBJ_FLAG_HIDDEN);
+                continue;  // Continuar para processar próximos componentes (podem estar ocultos também)
             }
         }
         

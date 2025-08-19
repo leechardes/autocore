@@ -158,13 +158,22 @@ std::unique_ptr<ScreenBase> ScreenFactory::createScreen(JsonObject& config) {
                 
                 for (int j = 0; j < (int)sortedItems.size(); j++) {
                     JsonObject item = sortedItems[j].item;
-                    // CORREÇÃO: Usar campo "size" primeiro, depois "size_display_small"
-                    String sizeStr = item["size"].as<String>();
-                    if (sizeStr.isEmpty()) {
-                        sizeStr = item["size_display_small"] | "normal";
+                    // CORREÇÃO: Verificar múltiplos campos de size em ordem de prioridade
+                    String sizeStr = "";
+                    
+                    // 1. Tentar campo "size" (backend já corrigido retorna o correto)
+                    if (item["size"].is<JsonVariant>()) {
+                        sizeStr = item["size"].as<String>();
                     }
+                    
+                    // 2. Se não encontrou, tentar "size_display_small" (campo específico)
+                    if (sizeStr.isEmpty() && item["size_display_small"].is<JsonVariant>()) {
+                        sizeStr = item["size_display_small"].as<String>();
+                    }
+                    
+                    // 3. Default se ainda estiver vazio
                     if (sizeStr.isEmpty()) {
-                        sizeStr = "normal"; // default
+                        sizeStr = "normal";
                     }
                     ComponentSize size = Layout::parseComponentSize(sizeStr);
                     int slotsNeeded = Layout::getSlotsForSize(size);
@@ -189,13 +198,22 @@ std::unique_ptr<ScreenBase> ScreenFactory::createScreen(JsonObject& config) {
             for (int i = startIdx; i < (int)sortedItems.size(); i++) {
                 JsonObject item = sortedItems[i].item;
                 
-                // CORREÇÃO: Usar o campo "size" do JSON primeiro, depois "size_display_small"
-                String sizeStr = item["size"].as<String>();
-                if (sizeStr.isEmpty()) {
-                    sizeStr = item["size_display_small"] | "normal";
+                // CORREÇÃO: Verificar múltiplos campos de size em ordem de prioridade  
+                String sizeStr = "";
+                
+                // 1. Tentar campo "size" (backend já corrigido retorna o correto)
+                if (item["size"].is<JsonVariant>()) {
+                    sizeStr = item["size"].as<String>();
                 }
+                
+                // 2. Se não encontrou, tentar "size_display_small" (campo específico)
+                if (sizeStr.isEmpty() && item["size_display_small"].is<JsonVariant>()) {
+                    sizeStr = item["size_display_small"].as<String>();
+                }
+                
+                // 3. Default se ainda estiver vazio
                 if (sizeStr.isEmpty()) {
-                    sizeStr = "normal"; // default
+                    sizeStr = "normal";
                 }
                 ComponentSize size = Layout::parseComponentSize(sizeStr);
                 int slotsNeeded = Layout::getSlotsForSize(size);

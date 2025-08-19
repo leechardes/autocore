@@ -1475,6 +1475,18 @@ async def get_full_configuration(
         
         # Se for display, adicionar configurações específicas
         normalized_device_type = normalize_device_type(device.type)
+        
+        # Determinar tamanho do display baseado no dispositivo
+        # Por padrão, ESP32 usa display_small (320x240)
+        # Pode ser customizado baseado no nome ou propriedades do device
+        display_size_field = "size_display_small"  # Padrão para ESP32
+        if "large" in device.name.lower() or "7inch" in device.name.lower():
+            display_size_field = "size_display_large"
+        elif "mobile" in device.name.lower() or "phone" in device.name.lower():
+            display_size_field = "size_mobile"
+        elif "web" in device.name.lower() or "browser" in device.name.lower():
+            display_size_field = "size_web"
+            
         if normalized_device_type in ["hmi_display", "esp32_display"]:
             # Screens com campos reais
             all_screens = config.get_screens()
@@ -1531,7 +1543,13 @@ async def get_full_configuration(
                                     {"min": 30, "max": 70, "color": "#FF9800"},
                                     {"min": 70, "max": 100, "color": "#F44336"}
                                 ] if compare_item_types(item.item_type, "gauge") else None),
-                                "size": getattr(item, 'size', item.size_display_large or "medium"),
+                                # CORREÇÃO: Retornar size baseado no tipo do dispositivo
+                                "size_mobile": item.size_mobile,
+                                "size_display_small": item.size_display_small,
+                                "size_display_large": item.size_display_large,
+                                "size_web": item.size_web,
+                                # Usar o campo correto baseado no tipo de display
+                                "size": getattr(item, display_size_field, "normal"),
                                 "color_theme": getattr(item, 'color_theme', "primary"),
                                 "custom_colors": {
                                     "background": getattr(item, 'bg_color', None),
