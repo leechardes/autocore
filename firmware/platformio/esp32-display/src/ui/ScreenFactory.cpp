@@ -473,10 +473,34 @@ NavButton* ScreenFactory::createNavigationItem(lv_obj_t* parent, JsonObject& con
     String target = config["action_target"].as<String>();
     String id = config["name"].as<String>(); // API usa 'name' não 'id'
     
+    // IMPORTANTE: Ler o tamanho configurado
+    String sizeStr = "";
+    if (config["size"].is<JsonVariant>()) {
+        sizeStr = config["size"].as<String>();
+    }
+    if (sizeStr.isEmpty() && config["size_display_small"].is<JsonVariant>()) {
+        sizeStr = config["size_display_small"].as<String>();
+    }
+    if (sizeStr.isEmpty()) {
+        sizeStr = "normal";
+    }
+    
     // For navigation items in new structure, target is the screen ID
     // which might be numeric now
     auto btn = new NavButton(parent, label, icon, id);
     btn->setTarget(target);
+    
+    // IMPORTANTE: Armazenar ComponentSize no user_data do objeto LVGL interno
+    ComponentSize compSize = Layout::parseComponentSize(sizeStr);
+    lv_obj_t* btnObj = btn->getObject();
+    if (btnObj) {
+        lv_obj_set_user_data(btnObj, (void*)(intptr_t)compSize);
+        
+        if (logger) {
+            logger->debug("[ScreenFactory] Navigation button '" + label + "' size set to: " + sizeStr + 
+                        " (ComponentSize: " + String((int)compSize) + ")");
+        }
+    }
     
     // Adicionar callback de navegação
     if (!target.isEmpty()) {
@@ -496,6 +520,18 @@ NavButton* ScreenFactory::createRelayItem(lv_obj_t* parent, JsonObject& config) 
     String icon = config["icon"].as<String>();
     String id = config["name"].as<String>(); // API usa 'name' não 'id'
     
+    // IMPORTANTE: Ler o tamanho configurado
+    String sizeStr = "";
+    if (config["size"].is<JsonVariant>()) {
+        sizeStr = config["size"].as<String>();
+    }
+    if (sizeStr.isEmpty() && config["size_display_small"].is<JsonVariant>()) {
+        sizeStr = config["size_display_small"].as<String>();
+    }
+    if (sizeStr.isEmpty()) {
+        sizeStr = "normal";
+    }
+    
     // Extrair informações do relay
     uint8_t relay_board_id = config["relay_board_id"] | 0;
     uint8_t relay_channel_id = config["relay_channel_id"] | 0;
@@ -509,6 +545,18 @@ NavButton* ScreenFactory::createRelayItem(lv_obj_t* parent, JsonObject& config) 
     
     auto btn = new NavButton(parent, label, icon, id);
     btn->setButtonType(NavButton::TYPE_RELAY);
+    
+    // IMPORTANTE: Armazenar ComponentSize no user_data do objeto LVGL interno
+    ComponentSize compSize = Layout::parseComponentSize(sizeStr);
+    lv_obj_t* btnObj = btn->getObject();
+    if (btnObj) {
+        lv_obj_set_user_data(btnObj, (void*)(intptr_t)compSize);
+        
+        if (logger) {
+            logger->debug("[ScreenFactory] Relay button '" + label + "' size set to: " + sizeStr + 
+                        " (ComponentSize: " + String((int)compSize) + ")");
+        }
+    }
     
     // Manter compatibilidade com formato antigo
     String device = "relay_board_" + String(relay_board_id);
@@ -571,9 +619,33 @@ NavButton* ScreenFactory::createActionItem(lv_obj_t* parent, JsonObject& config)
     String actionType = config["action_type"].as<String>();
     String preset = config["action_payload"].as<String>(); // API usa 'action_payload'
     
+    // IMPORTANTE: Ler o tamanho configurado
+    String sizeStr = "";
+    if (config["size"].is<JsonVariant>()) {
+        sizeStr = config["size"].as<String>();
+    }
+    if (sizeStr.isEmpty() && config["size_display_small"].is<JsonVariant>()) {
+        sizeStr = config["size_display_small"].as<String>();
+    }
+    if (sizeStr.isEmpty()) {
+        sizeStr = "normal";
+    }
+    
     auto btn = new NavButton(parent, label, icon, id);
     btn->setButtonType(NavButton::TYPE_ACTION);
     btn->setActionConfig(actionType, preset);
+    
+    // IMPORTANTE: Armazenar ComponentSize no user_data do objeto LVGL interno
+    ComponentSize compSize = Layout::parseComponentSize(sizeStr);
+    lv_obj_t* btnObj = btn->getObject();
+    if (btnObj) {
+        lv_obj_set_user_data(btnObj, (void*)(intptr_t)compSize);
+        
+        if (logger) {
+            logger->debug("[ScreenFactory] Action button '" + label + "' size set to: " + sizeStr + 
+                        " (ComponentSize: " + String((int)compSize) + ")");
+        }
+    }
     
     // Configurar callback para envio de comando MQTT
     btn->setClickCallback([](NavButton* b) {
@@ -599,9 +671,33 @@ NavButton* ScreenFactory::createModeItem(lv_obj_t* parent, JsonObject& config) {
     String id = config["name"].as<String>(); // API usa 'name' não 'id'
     String mode = config["action_payload"].as<String>(); // API usa 'action_payload'
     
+    // IMPORTANTE: Ler o tamanho configurado
+    String sizeStr = "";
+    if (config["size"].is<JsonVariant>()) {
+        sizeStr = config["size"].as<String>();
+    }
+    if (sizeStr.isEmpty() && config["size_display_small"].is<JsonVariant>()) {
+        sizeStr = config["size_display_small"].as<String>();
+    }
+    if (sizeStr.isEmpty()) {
+        sizeStr = "normal";
+    }
+    
     auto btn = new NavButton(parent, label, icon, id);
     btn->setButtonType(NavButton::TYPE_MODE);
     btn->setModeConfig(mode);
+    
+    // IMPORTANTE: Armazenar ComponentSize no user_data do objeto LVGL interno
+    ComponentSize compSize = Layout::parseComponentSize(sizeStr);
+    lv_obj_t* btnObj = btn->getObject();
+    if (btnObj) {
+        lv_obj_set_user_data(btnObj, (void*)(intptr_t)compSize);
+        
+        if (logger) {
+            logger->debug("[ScreenFactory] Mode button '" + label + "' size set to: " + sizeStr + 
+                        " (ComponentSize: " + String((int)compSize) + ")");
+        }
+    }
     
     // Configurar callback para envio de comando MQTT
     btn->setClickCallback([](NavButton* b) {
@@ -686,7 +782,16 @@ NavButton* ScreenFactory::createDisplayItem(lv_obj_t* parent, JsonObject& config
     auto navBtn = new NavButton(container, label, icon, id);
     navBtn->setButtonType(NavButton::TYPE_DISPLAY);
     navBtn->setDisplayConfig(dataSource, dataPath, dataUnit);
-    navBtn->setValueLabel(valueLabel); // Armazenar referência para atualizações
+    navBtn->setValueLabel(valueLabel);
+    
+    // IMPORTANTE: Armazenar ComponentSize no user_data do container LVGL
+    ComponentSize compSize = Layout::parseComponentSize(itemSize);
+    lv_obj_set_user_data(container, (void*)(intptr_t)compSize);
+    
+    if (logger) {
+        logger->debug("[ScreenFactory] Display item '" + label + "' size set to: " + itemSize + 
+                    " (ComponentSize: " + String((int)compSize) + ")");
+    }
     
     // Registrar no DataBinder para atualizações automáticas se tem dados válidos
     if (!dataBinder) {
