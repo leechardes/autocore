@@ -263,19 +263,22 @@ std::unique_ptr<ScreenBase> ScreenFactory::createScreen(JsonObject& config) {
                     logger->info("[CREATE] RelayItem - name:'" + itemName + "', label:'" + itemLabel + "', icon:'" + itemIcon + "', size:'" + sizeStr + "'");
                     navBtn = ScreenFactory::createRelayItem(content->getObject(), item);
                     if (navBtn && navBtn->getObject()) {
-                        applyNavButtonDebugBorder(navBtn->getObject(), NAVBUTTON_COLOR_IDX_BUTTON, "RelayItem", itemName, itemLabel, itemIcon, sizeStr);
+                        // DEBUG REMOVIDO: Bordas coloridas desabilitadas
+                        // applyNavButtonDebugBorder(navBtn->getObject(), NAVBUTTON_COLOR_IDX_BUTTON, "RelayItem", itemName, itemLabel, itemIcon, sizeStr);
                     }
                 } else if (itemType == "button" && actionType == "navigation") {
                     logger->info("[CREATE] NavigationItem - name:'" + itemName + "', label:'" + itemLabel + "', icon:'" + itemIcon + "', size:'" + sizeStr + "'");
                     navBtn = ScreenFactory::createNavigationItem(content->getObject(), item);
                     if (navBtn && navBtn->getObject()) {
-                        applyNavButtonDebugBorder(navBtn->getObject(), NAVBUTTON_COLOR_IDX_BUTTON, "NavigationItem", itemName, itemLabel, itemIcon, sizeStr);
+                        // DEBUG REMOVIDO: Bordas coloridas desabilitadas
+                        // applyNavButtonDebugBorder(navBtn->getObject(), NAVBUTTON_COLOR_IDX_BUTTON, "NavigationItem", itemName, itemLabel, itemIcon, sizeStr);
                     }
                 } else if (itemType == "button" && (actionType == "command" || actionType == "macro")) {
                     logger->info("[CREATE] ActionItem - name:'" + itemName + "', label:'" + itemLabel + "', icon:'" + itemIcon + "', size:'" + sizeStr + "'");
                     navBtn = ScreenFactory::createActionItem(content->getObject(), item);
                     if (navBtn && navBtn->getObject()) {
-                        applyNavButtonDebugBorder(navBtn->getObject(), NAVBUTTON_COLOR_IDX_BUTTON, "ActionItem", itemName, itemLabel, itemIcon, sizeStr);
+                        // DEBUG REMOVIDO: Bordas coloridas desabilitadas
+                        // applyNavButtonDebugBorder(navBtn->getObject(), NAVBUTTON_COLOR_IDX_BUTTON, "ActionItem", itemName, itemLabel, itemIcon, sizeStr);
                     }
                 } else if (itemType == "switch" && actionType == "relay_control") {
                     logger->info("[CREATE] SwitchItem - name:'" + itemName + "', label:'" + itemLabel + "', icon:'" + itemIcon + "', size:'" + sizeStr + "'");
@@ -334,7 +337,8 @@ std::unique_ptr<ScreenBase> ScreenFactory::createScreen(JsonObject& config) {
                         logger->info("[CREATE] DisplayItem - name:'" + itemName + "', label:'" + itemLabel + "', icon:'" + itemIcon + "', size:'" + sizeStr + "'");
                         navBtn = ScreenFactory::createDisplayItem(content->getObject(), item);
                         if (navBtn && navBtn->getObject()) {
-                            applyNavButtonDebugBorder(navBtn->getObject(), NAVBUTTON_COLOR_IDX_BUTTON, "DisplayItem", itemName, itemLabel, itemIcon, sizeStr);
+                            // DEBUG REMOVIDO: Bordas coloridas desabilitadas
+                            // applyNavButtonDebugBorder(navBtn->getObject(), NAVBUTTON_COLOR_IDX_BUTTON, "DisplayItem", itemName, itemLabel, itemIcon, sizeStr);
                         }
                     }
                 } else {
@@ -347,7 +351,8 @@ std::unique_ptr<ScreenBase> ScreenFactory::createScreen(JsonObject& config) {
                     logger->info("[CREATE] FallbackItem - name:'" + itemName + "', label:'" + itemLabel + "', icon:'" + itemIcon + "', size:'" + sizeStr + "'");
                     navBtn = ScreenFactory::createActionItem(content->getObject(), item);
                     if (navBtn && navBtn->getObject()) {
-                        applyNavButtonDebugBorder(navBtn->getObject(), NAVBUTTON_COLOR_IDX_BUTTON, "FallbackItem", itemName, itemLabel, itemIcon, sizeStr);
+                        // DEBUG REMOVIDO: Bordas coloridas desabilitadas
+                        // applyNavButtonDebugBorder(navBtn->getObject(), NAVBUTTON_COLOR_IDX_BUTTON, "FallbackItem", itemName, itemLabel, itemIcon, sizeStr);
                     }
                 }
                 

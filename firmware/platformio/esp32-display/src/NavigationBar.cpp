@@ -74,10 +74,10 @@ void NavigationBar::createLayout() {
     createButton(homeBtn, LV_SYMBOL_HOME, NAV_HOME);
     createButton(nextBtn, LV_SYMBOL_RIGHT, NAV_NEXT);
     
-    // ADIÇÃO DEBUG: Aplicar bordas coloridas nos botões da navbar
-    applyNavbarDebugBorder(prevBtn, NAVBAR_COLOR_IDX_PREV, "Botão Prev");
-    applyNavbarDebugBorder(homeBtn, NAVBAR_COLOR_IDX_HOME, "Botão Home");
-    applyNavbarDebugBorder(nextBtn, NAVBAR_COLOR_IDX_NEXT, "Botão Next");
+    // DEBUG REMOVIDO: Bordas coloridas desabilitadas
+    // applyNavbarDebugBorder(prevBtn, NAVBAR_COLOR_IDX_PREV, "Botão Prev");
+    // applyNavbarDebugBorder(homeBtn, NAVBAR_COLOR_IDX_HOME, "Botão Home");
+    // applyNavbarDebugBorder(nextBtn, NAVBAR_COLOR_IDX_NEXT, "Botão Next");
 }
 
 void NavigationBar::createButton(lv_obj_t*& btn, const char* label, NavigationDirection dir) {

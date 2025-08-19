@@ -64,8 +64,8 @@ NavButton::NavButton(lv_obj_t* parent, const String& text, const String& iconId,
     createLayout(text, iconId);
     applyTheme();
     
-    // ADIÇÃO DEBUG: Aplicar borda LARANJA no NavButton
-    applyNavButtonDebugBorder(button, NAVBUTTON_COLOR_IDX_BUTTON, "NavButton", buttonId, text, iconId, "");
+    // DEBUG REMOVIDO: Bordas coloridas desabilitadas
+    // applyNavButtonDebugBorder(button, NAVBUTTON_COLOR_IDX_BUTTON, "NavButton", buttonId, text, iconId, "");
     
     // Verificar posição e tamanho final - removido
     
@@ -126,8 +126,8 @@ void NavButton::createLayout(const String& text, const String& iconId) {
     lv_label_set_text(icon, iconSymbol);
     lv_obj_set_style_text_font(icon, &lv_font_montserrat_20, 0);  // Voltando para 20 (maior)
     
-    // ADIÇÃO DEBUG: Aplicar borda ROXA no ícone
-    applyNavButtonDebugBorder(icon, NAVBUTTON_COLOR_IDX_ICON, "Icon", "", text, iconId, "");
+    // DEBUG REMOVIDO: Bordas coloridas desabilitadas
+    // applyNavButtonDebugBorder(icon, NAVBUTTON_COLOR_IDX_ICON, "Icon", "", text, iconId, "");
     
     // Label - remover acentos
     label = lv_label_create(button);
@@ -138,8 +138,8 @@ void NavButton::createLayout(const String& text, const String& iconId) {
     lv_obj_set_width(label, lv_pct(90));
     lv_obj_set_style_text_align(label, LV_TEXT_ALIGN_CENTER, 0);
     
-    // ADIÇÃO DEBUG: Aplicar borda VERDE NEON no label
-    applyNavButtonDebugBorder(label, NAVBUTTON_COLOR_IDX_LABEL, "Label", "", text, "", "");
+    // DEBUG REMOVIDO: Bordas coloridas desabilitadas
+    // applyNavButtonDebugBorder(label, NAVBUTTON_COLOR_IDX_LABEL, "Label", "", text, "", "");
 }
 
 void NavButton::applyTheme() {

@@ -81,8 +81,8 @@ void Header::createLayout() {
     lv_obj_set_style_pad_all(iconsContainer, 0, 0);
     lv_obj_clear_flag(iconsContainer, LV_OBJ_FLAG_SCROLLABLE);
     
-    // ADIÇÃO DEBUG: Aplicar borda ROSA CLARO no icons container
-    applyHeaderDebugBorder(iconsContainer, HEADER_COLOR_IDX_ICONS, "Icons Container");
+    // DEBUG REMOVIDO: Bordas coloridas desabilitadas
+    // applyHeaderDebugBorder(iconsContainer, HEADER_COLOR_IDX_ICONS, "Icons Container");
     
     // Layout flexível para ícones
     lv_obj_set_flex_flow(iconsContainer, LV_FLEX_FLOW_ROW);
@@ -101,8 +101,8 @@ void Header::createLayout() {
     lv_obj_set_style_bg_opa(spacer, LV_OPA_TRANSP, 0);
     lv_obj_set_style_border_width(spacer, 0, 0);
     
-    // ADIÇÃO DEBUG: Aplicar borda VERDE CLARO no spacer
-    applyHeaderDebugBorder(spacer, HEADER_COLOR_IDX_SPACER, "Icon Spacer");
+    // DEBUG REMOVIDO: Bordas coloridas desabilitadas
+    // applyHeaderDebugBorder(spacer, HEADER_COLOR_IDX_SPACER, "Icon Spacer");
     
     // MQTT Icon  
     mqttIcon = lv_label_create(iconsContainer);
