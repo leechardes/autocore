@@ -5,6 +5,41 @@
 
 extern Logger* logger;
 
+// Cores de debug para botões da navigation bar
+lv_color_t NAVBAR_DEBUG_COLORS[] = {
+    lv_color_make(255, 0, 128),    // PINK - Botão Prev
+    lv_color_make(128, 255, 0),    // VERDE LIMA - Botão Home
+    lv_color_make(0, 128, 255),    // AZUL ROYAL - Botão Next
+};
+
+const char* NAVBAR_COLOR_NAMES[] = {
+    "PINK", "VERDE_LIMA", "AZUL_ROYAL"
+};
+
+enum NavbarColorIndex {
+    NAVBAR_COLOR_IDX_PREV = 0,       // PINK
+    NAVBAR_COLOR_IDX_HOME = 1,       // VERDE LIMA
+    NAVBAR_COLOR_IDX_NEXT = 2        // AZUL ROYAL
+};
+
+/**
+ * Aplica borda colorida para debug em botões da navigation bar
+ */
+void applyNavbarDebugBorder(lv_obj_t* obj, NavbarColorIndex colorIndex, const String& buttonType) {
+    if (!obj || !logger) return;
+    
+    // Aplicar borda colorida para debug
+    lv_obj_set_style_border_width(obj, 2, 0);
+    lv_obj_set_style_border_color(obj, NAVBAR_DEBUG_COLORS[colorIndex], 0);
+    lv_obj_set_style_border_opa(obj, LV_OPA_100, 0);
+    
+    // Log informativo com tamanho do botão
+    lv_coord_t width = lv_obj_get_width(obj);
+    lv_coord_t height = lv_obj_get_height(obj);
+    logger->info("[NAVBAR DEBUG] " + buttonType + ": Borda " + String(NAVBAR_COLOR_NAMES[colorIndex]) + 
+                " (" + String(width) + "x" + String(height) + ")");
+}
+
 NavigationBar::NavigationBar(lv_obj_t* parent) {
     container = lv_obj_create(parent);
     createLayout();
@@ -36,6 +71,11 @@ void NavigationBar::createLayout() {
     createButton(prevBtn, LV_SYMBOL_LEFT, NAV_PREV);
     createButton(homeBtn, LV_SYMBOL_HOME, NAV_HOME);
     createButton(nextBtn, LV_SYMBOL_RIGHT, NAV_NEXT);
+    
+    // ADIÇÃO DEBUG: Aplicar bordas coloridas nos botões da navbar
+    applyNavbarDebugBorder(prevBtn, NAVBAR_COLOR_IDX_PREV, "Botão Prev");
+    applyNavbarDebugBorder(homeBtn, NAVBAR_COLOR_IDX_HOME, "Botão Home");
+    applyNavbarDebugBorder(nextBtn, NAVBAR_COLOR_IDX_NEXT, "Botão Next");
 }
 
 void NavigationBar::createButton(lv_obj_t*& btn, const char* label, NavigationDirection dir) {

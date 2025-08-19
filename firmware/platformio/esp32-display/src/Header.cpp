@@ -2,6 +2,44 @@
 #include "ui/Theme.h"
 #include "Layout.h"
 #include "utils/StringUtils.h"
+#include "core/Logger.h"
+
+extern Logger* logger;
+
+// Cores de debug para containers internos do header
+lv_color_t HEADER_DEBUG_COLORS[] = {
+    lv_color_make(255, 128, 255),  // ROSA CLARO - Icons Container
+    lv_color_make(255, 255, 128),  // AMARELO CLARO - Title Label
+    lv_color_make(128, 255, 128),  // VERDE CLARO - Spacer
+};
+
+const char* HEADER_COLOR_NAMES[] = {
+    "ROSA_CLARO", "AMARELO_CLARO", "VERDE_CLARO"
+};
+
+enum HeaderColorIndex {
+    HEADER_COLOR_IDX_ICONS = 0,      // ROSA CLARO
+    HEADER_COLOR_IDX_TITLE = 1,      // AMARELO CLARO
+    HEADER_COLOR_IDX_SPACER = 2      // VERDE CLARO
+};
+
+/**
+ * Aplica borda colorida para debug em elementos do header
+ */
+void applyHeaderDebugBorder(lv_obj_t* obj, HeaderColorIndex colorIndex, const String& elementType) {
+    if (!obj || !logger) return;
+    
+    // Aplicar borda colorida para debug
+    lv_obj_set_style_border_width(obj, 2, 0);
+    lv_obj_set_style_border_color(obj, HEADER_DEBUG_COLORS[colorIndex], 0);
+    lv_obj_set_style_border_opa(obj, LV_OPA_100, 0);
+    
+    // Log informativo com tamanho do elemento
+    lv_coord_t width = lv_obj_get_width(obj);
+    lv_coord_t height = lv_obj_get_height(obj);
+    logger->info("[HEADER DEBUG] " + elementType + ": Borda " + String(HEADER_COLOR_NAMES[colorIndex]) + 
+                " (" + String(width) + "x" + String(height) + ")");
+}
 
 Header::Header(lv_obj_t* parent) {
     container = lv_obj_create(parent);
@@ -41,6 +79,9 @@ void Header::createLayout() {
     lv_obj_set_style_pad_all(iconsContainer, 0, 0);
     lv_obj_clear_flag(iconsContainer, LV_OBJ_FLAG_SCROLLABLE);
     
+    // ADIÇÃO DEBUG: Aplicar borda ROSA CLARO no icons container
+    applyHeaderDebugBorder(iconsContainer, HEADER_COLOR_IDX_ICONS, "Icons Container");
+    
     // Layout flexível para ícones
     lv_obj_set_flex_flow(iconsContainer, LV_FLEX_FLOW_ROW);
     lv_obj_set_flex_align(iconsContainer, LV_FLEX_ALIGN_END, 
@@ -57,6 +98,9 @@ void Header::createLayout() {
     lv_obj_set_size(spacer, 10, 1);
     lv_obj_set_style_bg_opa(spacer, LV_OPA_TRANSP, 0);
     lv_obj_set_style_border_width(spacer, 0, 0);
+    
+    // ADIÇÃO DEBUG: Aplicar borda VERDE CLARO no spacer
+    applyHeaderDebugBorder(spacer, HEADER_COLOR_IDX_SPACER, "Icon Spacer");
     
     // MQTT Icon  
     mqttIcon = lv_label_create(iconsContainer);

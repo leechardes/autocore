@@ -287,10 +287,18 @@ async def get_available_relay_devices():
         raise HTTPException(status_code=500, detail=str(e))
 
 @app.get("/api/devices/{device_id}", response_model=DeviceResponse, tags=["Devices"])
-async def get_device(device_id: int):
-    """Busca dispositivo por ID"""
+async def get_device(device_id: str):
+    """Busca dispositivo por ID ou UUID"""
     try:
-        device = devices.get_by_id(device_id)
+        # Tentar primeiro como ID numérico
+        device = None
+        try:
+            numeric_id = int(device_id)
+            device = devices.get_by_id(numeric_id)
+        except ValueError:
+            # Se não é número, tentar como UUID
+            device = devices.get_by_uuid(device_id)
+        
         if not device:
             raise HTTPException(status_code=404, detail="Dispositivo não encontrado")
         
@@ -372,7 +380,17 @@ async def get_device_by_uuid(device_uuid: str):
 async def create_device(device: DeviceBase):
     """Cria novo dispositivo"""
     try:
+        logger.info(f"📡 POST /api/devices")
+        logger.info(f"   Payload recebido: {device.model_dump()}")
+        
+        # Verificar se dispositivo com mesmo UUID já existe
+        existing_device = devices.get_by_uuid(device.uuid)
+        if existing_device:
+            logger.warning(f"⚠️ Dispositivo com UUID {device.uuid} já existe")
+            raise HTTPException(status_code=409, detail=f"Dispositivo com UUID '{device.uuid}' já existe")
+        
         new_device = devices.create(device.model_dump())
+        logger.info(f"   ✅ Dispositivo criado com ID: {new_device.id}")
         
         # Registra evento
         events.log(
@@ -398,7 +416,12 @@ async def create_device(device: DeviceBase):
             created_at=new_device.created_at,
             updated_at=new_device.updated_at
         )
+    except HTTPException:
+        raise
     except Exception as e:
+        logger.error(f"❌ Erro ao criar dispositivo: {e}")
+        logger.error(f"   Tipo de erro: {type(e).__name__}")
+        logger.error(f"   Detalhes: {str(e)}")
         raise HTTPException(status_code=500, detail=str(e))
 
 @app.patch("/api/devices/{device_identifier}", response_model=DeviceResponse, tags=["Devices"])
@@ -1447,11 +1470,13 @@ async def get_full_configuration(
             }
         }
         
+        # Sempre adicionar campo screens (mesmo se vazio)
+        screens_data = []
+        
         # Se for display, adicionar configurações específicas
         normalized_device_type = normalize_device_type(device.type)
-        if normalized_device_type in ["HMI_DISPLAY", "ESP32_DISPLAY"]:
+        if normalized_device_type in ["hmi_display", "esp32_display"]:
             # Screens com campos reais
-            screens_data = []
             all_screens = config.get_screens()
             
             for screen in all_screens:
@@ -1561,66 +1586,67 @@ async def get_full_configuration(
                             screen_dict["items"].append(item_data)
                     
                     screens_data.append(screen_dict)
-            
-            config_data["screens"] = screens_data
-            
-            # Devices registry
-            all_devices = devices.get_all(active_only=True)
-            config_data["devices"] = [
-                {
-                    "id": d.id,
-                    "uuid": d.uuid,
-                    "name": d.name,
-                    "type": d.type,
-                    "status": d.status,
-                    "ip_address": d.ip_address,
-                    "is_active": d.is_active
-                }
-                for d in all_devices
-            ]
-            
-            # Relay boards com campos reais
-            boards = relays.get_boards(active_only=True)
-            config_data["relay_boards"] = [
-                {
-                    "id": b.id,
-                    "device_id": b.device_id,
-                    "total_channels": b.total_channels,
-                    "board_model": b.board_model,
-                    "is_active": b.is_active
-                }
-                for b in boards
-            ]
-            
-            # Theme padrão
-            default_theme = config.get_default_theme()
-            if default_theme:
-                config_data["theme"] = {
-                    "id": default_theme.id,
-                    "name": default_theme.name,
-                    "primary_color": default_theme.primary_color,
-                    "secondary_color": default_theme.secondary_color,
-                    "background_color": default_theme.background_color,
-                    "surface_color": default_theme.surface_color,
-                    "text_primary": default_theme.text_primary,
-                    "text_secondary": default_theme.text_secondary,
-                    "error_color": default_theme.error_color,
-                    "warning_color": default_theme.warning_color,
-                    "success_color": default_theme.success_color,
-                    "info_color": default_theme.info_color
-                }
-            
-            # Adicionar telemetria em tempo real para dispositivos normais
-            try:
-                latest_telemetry = telemetry.get_latest_by_device(device.id, limit=50)
-                telemetry_data = {}
-                for t in latest_telemetry:
-                    telemetry_data[t.data_key] = t.data_value
-                config_data["telemetry"] = telemetry_data
-                logger.info(f"Telemetria adicionada para device {device.uuid}: {len(telemetry_data)} sinais")
-            except Exception as e:
-                logger.warning(f"Erro ao buscar telemetria para device {device.uuid}: {e}")
-                config_data["telemetry"] = {}
+        
+        # Sempre incluir campo screens na resposta
+        config_data["screens"] = screens_data
+        
+        # Devices registry - sempre incluir
+        all_devices = devices.get_all(active_only=True)
+        config_data["devices"] = [
+            {
+                "id": d.id,
+                "uuid": d.uuid,
+                "name": d.name,
+                "type": enum_to_str(d.type),
+                "status": enum_to_str(d.status),
+                "ip_address": d.ip_address,
+                "is_active": d.is_active
+            }
+            for d in all_devices
+        ]
+        
+        # Relay boards - sempre incluir
+        boards = relays.get_boards(active_only=True)
+        config_data["relay_boards"] = [
+            {
+                "id": b.id,
+                "device_id": b.device_id,
+                "total_channels": b.total_channels,
+                "board_model": b.board_model,
+                "is_active": b.is_active
+            }
+            for b in boards
+        ]
+        
+        # Theme padrão - sempre incluir
+        default_theme = config.get_default_theme()
+        if default_theme:
+            config_data["theme"] = {
+                "id": default_theme.id,
+                "name": default_theme.name,
+                "primary_color": default_theme.primary_color,
+                "secondary_color": default_theme.secondary_color,
+                "background_color": default_theme.background_color,
+                "surface_color": default_theme.surface_color,
+                "text_primary": default_theme.text_primary,
+                "text_secondary": default_theme.text_secondary,
+                "error_color": default_theme.error_color,
+                "warning_color": default_theme.warning_color,
+                "success_color": default_theme.success_color,
+                "info_color": default_theme.info_color
+            }
+        
+        # Adicionar telemetria em tempo real para todos os dispositivos
+        try:
+            latest_telemetry = telemetry.get_latest_by_device(device.id, limit=50)
+            telemetry_data = {}
+            for t in latest_telemetry:
+                telemetry_data[t.data_key] = t.data_value
+            config_data["telemetry"] = telemetry_data
+            logger.info(f"Telemetria adicionada para device {device.uuid}: {len(telemetry_data)} sinais")
+        except Exception as e:
+            logger.warning(f"Erro ao buscar telemetria para device {device.uuid}: {e}")
+            config_data["telemetry"] = {}
         
         return config_data
         

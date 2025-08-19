@@ -374,6 +374,8 @@ bool DeviceRegistration::makeHttpRequest(const String& url, const String& method
             httpCode = http.POST(payload);
         } else if (method == "PUT") {
             httpCode = http.PUT(payload);
+        } else if (method == "PATCH") {
+            httpCode = http.PATCH(payload);
         }
         
         if (httpCode > 0) {

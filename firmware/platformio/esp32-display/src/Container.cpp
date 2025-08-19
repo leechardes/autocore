@@ -1,11 +1,54 @@
 #include "Container.h"
 #include "ui/Theme.h"
+#include "core/Logger.h"
 #include <algorithm>
 #include <Arduino.h>
 
-Container::Container(lv_obj_t* parent) : margin(10), gap(10) {
+extern Logger* logger;
+
+// Cores de debug para containers base
+lv_color_t BASE_CONTAINER_DEBUG_COLORS[] = {
+    lv_color_make(255, 255, 0),    // AMARELO BRILHANTE - Container Base
+    lv_color_make(255, 0, 255),    // MAGENTA - Child Container
+    lv_color_make(0, 255, 255),    // CIANO - Sub Container
+};
+
+const char* BASE_CONTAINER_COLOR_NAMES[] = {
+    "AMARELO_BRILHANTE", "MAGENTA", "CIANO"
+};
+
+enum BaseContainerColorIndex {
+    BASE_COLOR_IDX_MAIN = 0,         // AMARELO BRILHANTE
+    BASE_COLOR_IDX_CHILD = 1,        // MAGENTA
+    BASE_COLOR_IDX_SUB = 2           // CIANO
+};
+
+/**
+ * Aplica borda colorida para debug em containers base
+ */
+void applyBaseContainerDebugBorder(lv_obj_t* obj, BaseContainerColorIndex colorIndex, const String& containerType) {
+    if (!obj) return;
+    
+    // Aplicar borda colorida para debug
+    lv_obj_set_style_border_width(obj, 3, 0);
+    lv_obj_set_style_border_color(obj, BASE_CONTAINER_DEBUG_COLORS[colorIndex], 0);
+    lv_obj_set_style_border_opa(obj, LV_OPA_100, 0);
+    
+    // Log informativo com tamanho do container
+    if (logger) {
+        lv_coord_t width = lv_obj_get_width(obj);
+        lv_coord_t height = lv_obj_get_height(obj);
+        logger->info("[BASE CONTAINER DEBUG] " + containerType + ": Borda " + String(BASE_CONTAINER_COLOR_NAMES[colorIndex]) + 
+                    " (" + String(width) + "x" + String(height) + ")");
+    }
+}
+
+Container::Container(lv_obj_t* parent) : margin(5), gap(10) {
     obj = lv_obj_create(parent);
     applyTheme();
+    
+    // ADIÇÃO DEBUG: Aplicar borda AMARELO BRILHANTE no container base
+    applyBaseContainerDebugBorder(obj, BASE_COLOR_IDX_MAIN, "Container Base");
 }
 
 Container::~Container() {
@@ -89,10 +132,10 @@ void Container::setPosition(int x, int y) {
 void Container::applyTheme() {
     lv_obj_set_style_bg_color(obj, COLOR_BACKGROUND, 0);
     lv_obj_set_style_border_width(obj, 0, 0); // Sem borda
-    lv_obj_set_style_pad_top(obj, 0, 0);     // Sem margem superior
-    lv_obj_set_style_pad_bottom(obj, 5, 0);  // Margem inferior de 5px
-    lv_obj_set_style_pad_left(obj, margin, 0);   // Margem esquerda
-    lv_obj_set_style_pad_right(obj, margin, 0);  // Margem direita
+    lv_obj_set_style_pad_top(obj, 2, 0);     // Margem superior mínima: 2px
+    lv_obj_set_style_pad_bottom(obj, 2, 0);  // Margem inferior mínima: 2px
+    lv_obj_set_style_pad_left(obj, 5, 0);    // Margem esquerda reduzida: 5px
+    lv_obj_set_style_pad_right(obj, 5, 0);   // Margem direita reduzida: 5px
     
     // GARANTIR QUE NÃO HÁ SCROLL EM NENHUMA SITUAÇÃO
     lv_obj_clear_flag(obj, LV_OBJ_FLAG_SCROLLABLE);

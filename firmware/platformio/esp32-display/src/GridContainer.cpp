@@ -3,6 +3,53 @@
 
 extern Logger* logger;
 
+// Array de cores para bordas de debug - facilita identificação visual
+lv_color_t DEBUG_BORDER_COLORS[] = {
+    lv_color_make(255, 0, 0),    // Vermelho
+    lv_color_make(0, 255, 0),    // Verde
+    lv_color_make(0, 0, 255),    // Azul
+    lv_color_make(255, 255, 0),  // Amarelo
+    lv_color_make(255, 0, 255),  // Magenta
+    lv_color_make(0, 255, 255),  // Ciano
+    lv_color_make(255, 165, 0),  // Laranja
+    lv_color_make(128, 0, 128),  // Roxo
+    lv_color_make(255, 192, 203), // Rosa
+    lv_color_make(0, 128, 0)     // Verde Escuro
+};
+
+const char* DEBUG_COLOR_NAMES[] = {
+    "VERMELHO", "VERDE", "AZUL", "AMARELO", "MAGENTA", 
+    "CIANO", "LARANJA", "ROXO", "ROSA", "VERDE_ESCURO"
+};
+
+const int DEBUG_COLORS_COUNT = sizeof(DEBUG_BORDER_COLORS) / sizeof(DEBUG_BORDER_COLORS[0]);
+
+/**
+ * Aplica borda colorida para debug/identificação visual
+ * @param obj Objeto LVGL para aplicar a borda
+ * @param colorIndex Índice da cor no array de cores
+ * @param label Label/nome do componente para logs
+ */
+void applyDebugBorder(lv_obj_t* obj, int colorIndex, const String& label) {
+    if (!obj) return;
+    
+    // Usar modulo para não estourar o array
+    int safeColorIndex = colorIndex % DEBUG_COLORS_COUNT;
+    
+    // Aplicar borda colorida para debug
+    lv_obj_set_style_border_width(obj, 3, 0);  // 3px de largura
+    lv_obj_set_style_border_color(obj, DEBUG_BORDER_COLORS[safeColorIndex], 0);
+    lv_obj_set_style_border_opa(obj, LV_OPA_100, 0);  // Opacidade total
+    
+    // Log informativo com tamanho do container
+    if (logger) {
+        lv_coord_t width = lv_obj_get_width(obj);
+        lv_coord_t height = lv_obj_get_height(obj);
+        logger->info("[DEBUG BORDER] " + label + ": Borda " + String(DEBUG_COLOR_NAMES[safeColorIndex]) + 
+                    " (" + String(width) + "x" + String(height) + ")");
+    }
+}
+
 GridContainer::GridContainer(lv_obj_t* parent) : Container(parent) {
     // Container base já cria o objeto e aplica tema
 }
@@ -26,11 +73,11 @@ void GridContainer::updateLayout() {
     int containerWidth = lv_obj_get_width(obj);
     int containerHeight = lv_obj_get_height(obj);
     
-    // Se o container não tem tamanho definido, forçar tamanho padrão
+    // CORREÇÃO: Se o container não tem tamanho definido, forçar tamanho otimizado
     if (containerWidth <= 10 || containerHeight <= 10) {
-        // Usar tamanho padrão do conteúdo
-        containerWidth = Layout::DISPLAY_WIDTH - (2 * Layout::MARGIN);
-        containerHeight = Layout::CONTENT_HEIGHT - Layout::MARGIN;
+        // Usar quase todo o espaço disponível (margem mínima)
+        containerWidth = Layout::DISPLAY_WIDTH - 10;  // 5px margem cada lado
+        containerHeight = Layout::CONTENT_HEIGHT - 5;  // 5px margem total
         
         // Definir tamanho explicitamente
         lv_obj_set_size(obj, containerWidth, containerHeight);
@@ -45,9 +92,9 @@ void GridContainer::updateLayout() {
     int contentWidth = lv_obj_get_content_width(obj);
     int contentHeight = lv_obj_get_content_height(obj);
     
-    // Se content area for muito pequena, usar valores mínimos
-    if (contentWidth < 100) contentWidth = Layout::DISPLAY_WIDTH - 40;
-    if (contentHeight < 80) contentHeight = Layout::CONTENT_HEIGHT - 40;
+    // CORREÇÃO: Se content area for muito pequena, usar valores otimizados
+    if (contentWidth < 100) contentWidth = Layout::DISPLAY_WIDTH - 10;  // Reduzido de 40 para 10
+    if (contentHeight < 80) contentHeight = Layout::CONTENT_HEIGHT - 10; // Reduzido de 40 para 10
     
     logger->info("[GridContainer] Content area: " + String(contentWidth) + "x" + String(contentHeight));
     
@@ -58,7 +105,12 @@ void GridContainer::updateLayout() {
     
     // Calcular tamanho das células do grid 3x2
     Size cellSize = Layout::calculateGridCellSize(containerSize);
-    logger->info("[GridContainer] Grid cell size: " + String(cellSize.width) + "x" + String(cellSize.height));
+    
+    logger->info("[GRID DEBUG] Cell calculation:");
+    logger->info("[GRID DEBUG]   Container: " + String(contentWidth) + "x" + String(contentHeight));
+    logger->info("[GRID DEBUG]   Grid: " + String(Layout::GRID_COLS) + " cols x " + String(Layout::GRID_ROWS) + " rows");
+    logger->info("[GRID DEBUG]   Spacing: 10px");
+    logger->info("[GRID DEBUG]   Calculated cell size: " + String(cellSize.width) + "x" + String(cellSize.height));
     
     // VERIFICAÇÃO CRÍTICA: Se células são muito pequenas, usar valores mínimos
     if (cellSize.width < 50) cellSize.width = 80;
@@ -132,6 +184,9 @@ void GridContainer::updateLayout() {
         lv_obj_set_size(children[i], componentSize.width, componentSize.height);
         lv_obj_set_pos(children[i], position.x, position.y);
         
+        // ADIÇÃO DEBUG: Aplicar borda colorida para identificação visual
+        applyDebugBorder(children[i], i, "Container " + String(i + 1));
+        
         // Forçar visibilidade e desabilitar scroll
         lv_obj_clear_flag(children[i], LV_OBJ_FLAG_HIDDEN);
         lv_obj_clear_flag(children[i], LV_OBJ_FLAG_SCROLLABLE);
@@ -194,9 +249,9 @@ void GridContainer::layoutGridNew() {
     int containerWidth = lv_obj_get_content_width(obj);
     int containerHeight = lv_obj_get_content_height(obj);
     
-    // Se container é muito pequeno, usar valores padrão
-    if (containerWidth < 100) containerWidth = Layout::DISPLAY_WIDTH - 40;
-    if (containerHeight < 80) containerHeight = Layout::CONTENT_HEIGHT - 40;
+    // CORREÇÃO: Se container é muito pequeno, usar valores otimizados
+    if (containerWidth < 100) containerWidth = Layout::DISPLAY_WIDTH - 10;  // Reduzido de 40 para 10
+    if (containerHeight < 80) containerHeight = Layout::CONTENT_HEIGHT - 10; // Reduzido de 40 para 10
     
     Size containerSize = { containerWidth, containerHeight };
     Size cellSize = Layout::calculateGridCellSize(containerSize);
@@ -238,6 +293,9 @@ void GridContainer::layoutGridNew() {
         // Aplicar posição e tamanho
         lv_obj_set_size(children[i], componentSize.width, componentSize.height);
         lv_obj_set_pos(children[i], position.x, position.y);
+        
+        // ADIÇÃO DEBUG: Aplicar borda colorida para identificação visual no grid fixo
+        applyDebugBorder(children[i], i, "Grid Fixo Container " + String(i + 1));
         
         // Garantir visibilidade
         lv_obj_clear_flag(children[i], LV_OBJ_FLAG_HIDDEN);

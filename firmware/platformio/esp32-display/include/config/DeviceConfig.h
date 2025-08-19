@@ -15,7 +15,7 @@
 // UUID será gerado automaticamente baseado no MAC address
 // Formato: "esp32-display-AABBCCDDEEFF" onde AABBCCDDEEFF são os últimos 6 bytes do MAC
 #define DEVICE_UUID_PREFIX "esp32-display-"     // Prefixo do UUID
-#define DEVICE_TYPE "hmi_display"              // Tipo do dispositivo
+#define DEVICE_TYPE "esp32_display"            // Tipo do dispositivo
 #define DEVICE_VERSION "2.2.0"                 // Versão do firmware (atualizado para v2.2.0)
 #define PROTOCOL_VERSION "2.2.0"               // Versão do protocolo MQTT
 #define GENERATE_UUID_FROM_MAC true            // Gerar UUID a partir do MAC address

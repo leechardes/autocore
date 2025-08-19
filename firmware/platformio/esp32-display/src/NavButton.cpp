@@ -2,7 +2,47 @@
 #include "ui/Theme.h"
 #include "ui/Icons.h"
 #include "utils/StringUtils.h"
+#include "core/Logger.h"
 #include <Arduino.h>
+
+extern Logger* logger;
+
+// Cores de debug para NavButtons
+lv_color_t NAVBUTTON_DEBUG_COLORS[] = {
+    lv_color_make(255, 128, 0),    // LARANJA - NavButton
+    lv_color_make(128, 0, 255),    // ROXO - Ícone
+    lv_color_make(0, 255, 128),    // VERDE NEON - Label
+};
+
+const char* NAVBUTTON_COLOR_NAMES[] = {
+    "LARANJA", "ROXO", "VERDE_NEON"
+};
+
+enum NavButtonColorIndex {
+    NAVBUTTON_COLOR_IDX_BUTTON = 0,   // LARANJA
+    NAVBUTTON_COLOR_IDX_ICON = 1,     // ROXO
+    NAVBUTTON_COLOR_IDX_LABEL = 2     // VERDE NEON
+};
+
+/**
+ * Aplica borda colorida para debug em NavButtons
+ */
+void applyNavButtonDebugBorder(lv_obj_t* obj, NavButtonColorIndex colorIndex, const String& elementType) {
+    if (!obj) return;
+    
+    // Aplicar borda colorida para debug
+    lv_obj_set_style_border_width(obj, 2, 0);
+    lv_obj_set_style_border_color(obj, NAVBUTTON_DEBUG_COLORS[colorIndex], 0);
+    lv_obj_set_style_border_opa(obj, LV_OPA_100, 0);
+    
+    // Log informativo com tamanho do elemento
+    if (logger) {
+        lv_coord_t width = lv_obj_get_width(obj);
+        lv_coord_t height = lv_obj_get_height(obj);
+        logger->info("[NAVBUTTON DEBUG] " + elementType + ": Borda " + String(NAVBUTTON_COLOR_NAMES[colorIndex]) + 
+                    " (" + String(width) + "x" + String(height) + ")");
+    }
+}
 
 NavButton::NavButton(lv_obj_t* parent, const String& text, const String& iconId, const String& buttonId) 
     : id(buttonId) {
@@ -16,6 +56,9 @@ NavButton::NavButton(lv_obj_t* parent, const String& text, const String& iconId,
     
     createLayout(text, iconId);
     applyTheme();
+    
+    // ADIÇÃO DEBUG: Aplicar borda LARANJA no NavButton
+    applyNavButtonDebugBorder(button, NAVBUTTON_COLOR_IDX_BUTTON, "NavButton (" + text + ")");
     
     // Verificar posição e tamanho final - removido
     
@@ -76,6 +119,9 @@ void NavButton::createLayout(const String& text, const String& iconId) {
     lv_label_set_text(icon, iconSymbol);
     lv_obj_set_style_text_font(icon, &lv_font_montserrat_20, 0);  // Voltando para 20 (maior)
     
+    // ADIÇÃO DEBUG: Aplicar borda ROXA no ícone
+    applyNavButtonDebugBorder(icon, NAVBUTTON_COLOR_IDX_ICON, "NavButton Icon");
+    
     // Label - remover acentos
     label = lv_label_create(button);
     String cleanText = StringUtils::removeAccents(text);
@@ -84,6 +130,9 @@ void NavButton::createLayout(const String& text, const String& iconId) {
     lv_label_set_long_mode(label, LV_LABEL_LONG_WRAP);
     lv_obj_set_width(label, lv_pct(90));
     lv_obj_set_style_text_align(label, LV_TEXT_ALIGN_CENTER, 0);
+    
+    // ADIÇÃO DEBUG: Aplicar borda VERDE NEON no label
+    applyNavButtonDebugBorder(label, NAVBUTTON_COLOR_IDX_LABEL, "NavButton Label");
 }
 
 void NavButton::applyTheme() {

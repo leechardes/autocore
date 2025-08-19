@@ -22,6 +22,67 @@ extern Logger* logger;
 extern ScreenManager* screenManager;
 extern IconManager* iconManager;
 
+// Array de cores para bordas de debug - facilita identificação visual de componentes
+lv_color_t COMPONENT_DEBUG_COLORS[] = {
+    lv_color_make(255, 0, 0),    // Vermelho - Botões de relay
+    lv_color_make(0, 255, 0),    // Verde - Botões de navegação
+    lv_color_make(0, 0, 255),    // Azul - Botões de ação
+    lv_color_make(255, 255, 0),  // Amarelo - Switches
+    lv_color_make(255, 0, 255),  // Magenta - Gauges
+    lv_color_make(0, 255, 255),  // Ciano - Displays
+    lv_color_make(255, 165, 0),  // Laranja - Mode items
+    lv_color_make(128, 0, 128),  // Roxo - Display items
+    lv_color_make(255, 192, 203), // Rosa - Outros
+    lv_color_make(0, 128, 0)     // Verde Escuro - Fallback
+};
+
+const char* COMPONENT_COLOR_NAMES[] = {
+    "VERMELHO", "VERDE", "AZUL", "AMARELO", "MAGENTA", 
+    "CIANO", "LARANJA", "ROXO", "ROSA", "VERDE_ESCURO"
+};
+
+const int COMPONENT_COLORS_COUNT = sizeof(COMPONENT_DEBUG_COLORS) / sizeof(COMPONENT_DEBUG_COLORS[0]);
+
+// Índices específicos para cada tipo de componente
+enum ComponentColorIndex {
+    COLOR_IDX_RELAY_BUTTON = 0,     // Vermelho
+    COLOR_IDX_NAV_BUTTON = 1,       // Verde
+    COLOR_IDX_ACTION_BUTTON = 2,    // Azul
+    COLOR_IDX_SWITCH = 3,           // Amarelo
+    COLOR_IDX_GAUGE = 4,            // Magenta
+    COLOR_IDX_DISPLAY = 5,          // Ciano
+    COLOR_IDX_MODE = 6,             // Laranja
+    COLOR_IDX_DISPLAY_ITEM = 7,     // Roxo
+    COLOR_IDX_OTHER = 8,            // Rosa
+    COLOR_IDX_FALLBACK = 9          // Verde Escuro
+};
+
+/**
+ * Aplica borda colorida para debug/identificação visual de componentes
+ * @param obj Objeto LVGL para aplicar a borda
+ * @param colorIndex Índice da cor no array de cores
+ * @param componentType Tipo do componente para logs
+ */
+void applyComponentDebugBorder(lv_obj_t* obj, ComponentColorIndex colorIndex, const String& componentType) {
+    if (!obj) return;
+    
+    // Garantir que não estoure o array
+    int safeColorIndex = ((int)colorIndex) % COMPONENT_COLORS_COUNT;
+    
+    // Aplicar borda colorida para debug
+    lv_obj_set_style_border_width(obj, 2, 0);  // 2px de largura
+    lv_obj_set_style_border_color(obj, COMPONENT_DEBUG_COLORS[safeColorIndex], 0);
+    lv_obj_set_style_border_opa(obj, LV_OPA_100, 0);  // Opacidade total
+    
+    // Log informativo com tamanho do componente
+    if (logger) {
+        lv_coord_t width = lv_obj_get_width(obj);
+        lv_coord_t height = lv_obj_get_height(obj);
+        logger->info("[COMPONENT DEBUG] " + componentType + ": Borda " + String(COMPONENT_COLOR_NAMES[safeColorIndex]) + 
+                    " (" + String(width) + "x" + String(height) + ")");
+    }
+}
+
 // Instância global do DataBinder para widgets dinâmicos
 DataBinder* dataBinder = nullptr;
 
@@ -137,8 +198,13 @@ std::unique_ptr<ScreenBase> ScreenFactory::createScreen(JsonObject& config) {
                 String actionType = item["action_type"].as<String>();
                 
                 // CORREÇÃO: Converter para lowercase para compatibilidade
-                itemType.toLowerCase();
-                actionType.toLowerCase();
+                // Converter para lowercase
+                if (!itemType.isEmpty()) {
+                    itemType.toLowerCase();
+                }
+                if (!actionType.isEmpty()) {
+                    actionType.toLowerCase();
+                }
                 
                 // Debug log melhorado
                 logger->debug("=== Creating item ===");
@@ -155,17 +221,27 @@ std::unique_ptr<ScreenBase> ScreenFactory::createScreen(JsonObject& config) {
                 if (itemType == "button" && actionType == "relay_control") {
                     logger->debug("  -> Creating RelayItem (button for relay control)");
                     navBtn = ScreenFactory::createRelayItem(content->getObject(), item);
+                    if (navBtn && navBtn->getObject()) {
+                        applyComponentDebugBorder(navBtn->getObject(), COLOR_IDX_RELAY_BUTTON, "Item relay control");
+                    }
                 } else if (itemType == "button" && actionType == "navigation") {
                     logger->debug("  -> Creating NavigationItem (button for screen navigation)");
                     navBtn = ScreenFactory::createNavigationItem(content->getObject(), item);
+                    if (navBtn && navBtn->getObject()) {
+                        applyComponentDebugBorder(navBtn->getObject(), COLOR_IDX_NAV_BUTTON, "Item navigation");
+                    }
                 } else if (itemType == "button" && (actionType == "command" || actionType == "macro")) {
                     logger->debug("  -> Creating ActionItem (button for command/macro actions)");
                     navBtn = ScreenFactory::createActionItem(content->getObject(), item);
+                    if (navBtn && navBtn->getObject()) {
+                        applyComponentDebugBorder(navBtn->getObject(), COLOR_IDX_ACTION_BUTTON, "Item action command/macro");
+                    }
                 } else if (itemType == "switch" && actionType == "relay_control") {
                     logger->debug("  -> Creating SwitchItem (native LVGL switch widget for relay)");
                     // CORREÇÃO: Switches são tratados como objetos diretos, não NavButtons
                     lv_obj_t* switchObj = ScreenFactory::createSwitchDirectly(content->getObject(), item);
                     if (switchObj) {
+                        applyComponentDebugBorder(switchObj, COLOR_IDX_SWITCH, "Item switch relay");
                         content->addChild(switchObj);
                         currentPageSlots += slotsNeeded;
                     }
@@ -175,6 +251,7 @@ std::unique_ptr<ScreenBase> ScreenFactory::createScreen(JsonObject& config) {
                     // SOLUÇÃO: Criar gauge diretamente sem NavButton wrapper
                     lv_obj_t* gaugeObj = ScreenFactory::createGaugeDirectly(content->getObject(), item);
                     if (gaugeObj) {
+                        applyComponentDebugBorder(gaugeObj, COLOR_IDX_GAUGE, "Item gauge");
                         content->addChild(gaugeObj);
                         currentPageSlots += slotsNeeded;
                     }
@@ -189,6 +266,7 @@ std::unique_ptr<ScreenBase> ScreenFactory::createScreen(JsonObject& config) {
                         // SOLUÇÃO: Criar gauge diretamente sem NavButton wrapper
                         lv_obj_t* gaugeObj = ScreenFactory::createGaugeDirectly(content->getObject(), item);
                         if (gaugeObj) {
+                            applyComponentDebugBorder(gaugeObj, COLOR_IDX_DISPLAY, "Item display com dados");
                             content->addChild(gaugeObj);
                             currentPageSlots += slotsNeeded;
                         }
@@ -196,6 +274,9 @@ std::unique_ptr<ScreenBase> ScreenFactory::createScreen(JsonObject& config) {
                     } else {
                         logger->debug("  -> Creating DisplayItem (read-only data display, no gauge data)");
                         navBtn = ScreenFactory::createDisplayItem(content->getObject(), item);
+                        if (navBtn && navBtn->getObject()) {
+                            applyComponentDebugBorder(navBtn->getObject(), COLOR_IDX_DISPLAY_ITEM, "Item display sem dados");
+                        }
                     }
                 } else {
                     logger->warning("  -> UNKNOWN item combination: " + itemType + "/" + actionType);
@@ -207,6 +288,9 @@ std::unique_ptr<ScreenBase> ScreenFactory::createScreen(JsonObject& config) {
                     // Fallback: Tentar criar pelo menos um botão simples
                     logger->warning("  -> Creating fallback button");
                     navBtn = ScreenFactory::createActionItem(content->getObject(), item);
+                    if (navBtn && navBtn->getObject()) {
+                        applyComponentDebugBorder(navBtn->getObject(), COLOR_IDX_FALLBACK, "Item fallback button");
+                    }
                 }
                 
                 if (navBtn) {
@@ -919,6 +1003,12 @@ lv_obj_t* ScreenFactory::createGaugeDirectly(lv_obj_t* parent, JsonObject& confi
     lv_coord_t width = 86;
     lv_coord_t height = 72;
     
+    // LOG DETALHADO: Configuração recebida
+    if (logger) {
+        logger->info("[SIZE DEBUG] createGaugeDirectly - Item: " + label);
+        logger->info("[SIZE DEBUG]   Config size_display_small: '" + itemSize + "'");
+    }
+    
     if (itemSize == "small") {
         width = 70;
         height = 60;
@@ -928,6 +1018,7 @@ lv_obj_t* ScreenFactory::createGaugeDirectly(lv_obj_t* parent, JsonObject& confi
     }
     
     if (logger) {
+        logger->info("[SIZE DEBUG]   Calculated dimensions: " + String(width) + "x" + String(height));
         logger->debug("Creating digital display with size_display_small: " + itemSize + 
                      " -> " + String(width) + "x" + String(height));
     }
