@@ -34,6 +34,8 @@ void applyNavbarDebugBorder(lv_obj_t* obj, NavbarColorIndex colorIndex, const St
     lv_obj_set_style_border_opa(obj, LV_OPA_100, 0);
     
     // Log informativo com tamanho do botão
+    // CORREÇÃO: Forçar atualização de layout antes de obter tamanhos
+    lv_obj_update_layout(obj);
     lv_coord_t width = lv_obj_get_width(obj);
     lv_coord_t height = lv_obj_get_height(obj);
     logger->info("[NAVBAR DEBUG] " + buttonType + ": Borda " + String(NAVBAR_COLOR_NAMES[colorIndex]) + 

@@ -160,4 +160,15 @@ public:
     lv_obj_t* getValueLabel() { return valueLabel; }
 };
 
+// Forward declarations for debug functions
+enum NavButtonColorIndex {
+    NAVBUTTON_COLOR_IDX_BUTTON = 0,
+    NAVBUTTON_COLOR_IDX_ICON = 1,
+    NAVBUTTON_COLOR_IDX_LABEL = 2
+};
+
+// Debug function declaration
+void applyNavButtonDebugBorder(lv_obj_t* obj, NavButtonColorIndex colorIndex, const String& elementType,
+                               const String& name, const String& label, const String& icon, const String& sizeConfig);
+
 #endif

@@ -35,6 +35,8 @@ void applyHeaderDebugBorder(lv_obj_t* obj, HeaderColorIndex colorIndex, const St
     lv_obj_set_style_border_opa(obj, LV_OPA_100, 0);
     
     // Log informativo com tamanho do elemento
+    // CORREÇÃO: Forçar atualização de layout antes de obter tamanhos
+    lv_obj_update_layout(obj);
     lv_coord_t width = lv_obj_get_width(obj);
     lv_coord_t height = lv_obj_get_height(obj);
     logger->info("[HEADER DEBUG] " + elementType + ": Borda " + String(HEADER_COLOR_NAMES[colorIndex]) + 

@@ -76,6 +76,8 @@ void applyComponentDebugBorder(lv_obj_t* obj, ComponentColorIndex colorIndex, co
     
     // Log informativo com tamanho do componente
     if (logger) {
+        // CORREÇÃO: Forçar atualização de layout antes de obter tamanhos
+        lv_obj_update_layout(obj);
         lv_coord_t width = lv_obj_get_width(obj);
         lv_coord_t height = lv_obj_get_height(obj);
         logger->info("[COMPONENT DEBUG] " + componentType + ": Borda " + String(COMPONENT_COLOR_NAMES[safeColorIndex]) + 
@@ -156,7 +158,14 @@ std::unique_ptr<ScreenBase> ScreenFactory::createScreen(JsonObject& config) {
                 
                 for (int j = 0; j < (int)sortedItems.size(); j++) {
                     JsonObject item = sortedItems[j].item;
-                    String sizeStr = item["size_display_small"] | "normal";
+                    // CORREÇÃO: Usar campo "size" primeiro, depois "size_display_small"
+                    String sizeStr = item["size"].as<String>();
+                    if (sizeStr.isEmpty()) {
+                        sizeStr = item["size_display_small"] | "normal";
+                    }
+                    if (sizeStr.isEmpty()) {
+                        sizeStr = "normal"; // default
+                    }
                     ComponentSize size = Layout::parseComponentSize(sizeStr);
                     int slotsNeeded = Layout::getSlotsForSize(size);
                     
@@ -180,8 +189,14 @@ std::unique_ptr<ScreenBase> ScreenFactory::createScreen(JsonObject& config) {
             for (int i = startIdx; i < (int)sortedItems.size(); i++) {
                 JsonObject item = sortedItems[i].item;
                 
-                // Verificar quantos slots este componente precisa
-                String sizeStr = item["size_display_small"] | "normal";
+                // CORREÇÃO: Usar o campo "size" do JSON primeiro, depois "size_display_small"
+                String sizeStr = item["size"].as<String>();
+                if (sizeStr.isEmpty()) {
+                    sizeStr = item["size_display_small"] | "normal";
+                }
+                if (sizeStr.isEmpty()) {
+                    sizeStr = "normal"; // default
+                }
                 ComponentSize size = Layout::parseComponentSize(sizeStr);
                 int slotsNeeded = Layout::getSlotsForSize(size);
                 
@@ -206,10 +221,18 @@ std::unique_ptr<ScreenBase> ScreenFactory::createScreen(JsonObject& config) {
                     actionType.toLowerCase();
                 }
                 
-                // Debug log melhorado
-                logger->debug("=== Creating item ===");
-                logger->debug("  Type: " + itemType + " | Action: " + actionType + " (converted to lowercase)");
-                logger->debug("  Label: " + item["label"].as<String>());
+                // LOG COMPLETO COM INFORMAÇÕES DE DEBUG
+                String itemName = item["name"].as<String>();
+                String itemLabel = item["label"].as<String>();
+                String itemIcon = item["icon"].as<String>();
+                
+                logger->info("[COMPONENT CREATE] Type:" + itemType + "/" + actionType + " Name:'" + itemName + "' Label:'" + itemLabel + "' Icon:'" + itemIcon + "' Size:'" + sizeStr + "'");
+                
+                // LOG DE CONFIGURAÇÃO DE TAMANHO
+                Size componentSize = Layout::calculateComponentSize(size, {86, 72});
+                logger->info("[SIZE CONFIG] '" + itemName + "' (" + itemLabel + "): size_display_small='" + sizeStr + "' → " +
+                           String(componentSize.width) + "x" + String(componentSize.height) + " pixels");
+                
                 logger->debug("  Size: " + sizeStr + " (slots needed: " + String(slotsNeeded) + ")");
                 logger->debug("  Position: " + String(item["position"] | 0));
                 logger->debug("  Data Source: " + item["data_source"].as<String>());
@@ -219,39 +242,51 @@ std::unique_ptr<ScreenBase> ScreenFactory::createScreen(JsonObject& config) {
                 
                 // Mapear tipos da API para tipos internos (NOVOS ENUMS LOWERCASE)
                 if (itemType == "button" && actionType == "relay_control") {
-                    logger->debug("  -> Creating RelayItem (button for relay control)");
+                    logger->info("[CREATE] RelayItem - name:'" + itemName + "', label:'" + itemLabel + "', icon:'" + itemIcon + "', size:'" + sizeStr + "'");
                     navBtn = ScreenFactory::createRelayItem(content->getObject(), item);
                     if (navBtn && navBtn->getObject()) {
-                        applyComponentDebugBorder(navBtn->getObject(), COLOR_IDX_RELAY_BUTTON, "Item relay control");
+                        applyNavButtonDebugBorder(navBtn->getObject(), NAVBUTTON_COLOR_IDX_BUTTON, "RelayItem", itemName, itemLabel, itemIcon, sizeStr);
                     }
                 } else if (itemType == "button" && actionType == "navigation") {
-                    logger->debug("  -> Creating NavigationItem (button for screen navigation)");
+                    logger->info("[CREATE] NavigationItem - name:'" + itemName + "', label:'" + itemLabel + "', icon:'" + itemIcon + "', size:'" + sizeStr + "'");
                     navBtn = ScreenFactory::createNavigationItem(content->getObject(), item);
                     if (navBtn && navBtn->getObject()) {
-                        applyComponentDebugBorder(navBtn->getObject(), COLOR_IDX_NAV_BUTTON, "Item navigation");
+                        applyNavButtonDebugBorder(navBtn->getObject(), NAVBUTTON_COLOR_IDX_BUTTON, "NavigationItem", itemName, itemLabel, itemIcon, sizeStr);
                     }
                 } else if (itemType == "button" && (actionType == "command" || actionType == "macro")) {
-                    logger->debug("  -> Creating ActionItem (button for command/macro actions)");
+                    logger->info("[CREATE] ActionItem - name:'" + itemName + "', label:'" + itemLabel + "', icon:'" + itemIcon + "', size:'" + sizeStr + "'");
                     navBtn = ScreenFactory::createActionItem(content->getObject(), item);
                     if (navBtn && navBtn->getObject()) {
-                        applyComponentDebugBorder(navBtn->getObject(), COLOR_IDX_ACTION_BUTTON, "Item action command/macro");
+                        applyNavButtonDebugBorder(navBtn->getObject(), NAVBUTTON_COLOR_IDX_BUTTON, "ActionItem", itemName, itemLabel, itemIcon, sizeStr);
                     }
                 } else if (itemType == "switch" && actionType == "relay_control") {
-                    logger->debug("  -> Creating SwitchItem (native LVGL switch widget for relay)");
+                    logger->info("[CREATE] SwitchItem - name:'" + itemName + "', label:'" + itemLabel + "', icon:'" + itemIcon + "', size:'" + sizeStr + "'");
                     // CORREÇÃO: Switches são tratados como objetos diretos, não NavButtons
                     lv_obj_t* switchObj = ScreenFactory::createSwitchDirectly(content->getObject(), item);
                     if (switchObj) {
-                        applyComponentDebugBorder(switchObj, COLOR_IDX_SWITCH, "Item switch relay");
+                        // Armazenar ComponentSize no user_data
+                        ComponentSize compSize = Layout::parseComponentSize(sizeStr);
+                        lv_obj_set_user_data(switchObj, (void*)(intptr_t)compSize);
+                        logger->debug("[ScreenFactory] Switch user_data set to ComponentSize: " + String((int)compSize));
+                        
+                        // Removido: borda aplicada somente pelo GridContainer
+                        // applyComponentDebugBorder(switchObj, COLOR_IDX_SWITCH, "Item switch relay [size: " + sizeStr + "]");
                         content->addChild(switchObj);
                         currentPageSlots += slotsNeeded;
                     }
                     continue; // Pular o resto do loop, switch já foi adicionado
                 } else if (itemType == "gauge") {
-                    logger->debug("  -> Creating GaugeItem (gauge/meter widget for data display)");
+                    logger->info("[CREATE] GaugeItem - name:'" + itemName + "', label:'" + itemLabel + "', icon:'" + itemIcon + "', size:'" + sizeStr + "'");
                     // SOLUÇÃO: Criar gauge diretamente sem NavButton wrapper
                     lv_obj_t* gaugeObj = ScreenFactory::createGaugeDirectly(content->getObject(), item);
                     if (gaugeObj) {
-                        applyComponentDebugBorder(gaugeObj, COLOR_IDX_GAUGE, "Item gauge");
+                        // Armazenar ComponentSize no user_data
+                        ComponentSize compSize = Layout::parseComponentSize(sizeStr);
+                        lv_obj_set_user_data(gaugeObj, (void*)(intptr_t)compSize);
+                        logger->debug("[ScreenFactory] Gauge user_data set to ComponentSize: " + String((int)compSize));
+                        
+                        // Removido: borda aplicada somente pelo GridContainer
+                        // applyComponentDebugBorder(gaugeObj, COLOR_IDX_GAUGE, "Item gauge [size: " + sizeStr + "]");
                         content->addChild(gaugeObj);
                         currentPageSlots += slotsNeeded;
                     }
@@ -262,34 +297,39 @@ std::unique_ptr<ScreenBase> ScreenFactory::createScreen(JsonObject& config) {
                     String dataPath = item["data_path"].as<String>();
                     
                     if (!dataSource.isEmpty() && !dataPath.isEmpty()) {
-                        logger->debug("  -> Creating GaugeItem for display type (data visualization)");
+                        logger->info("[CREATE] GaugeItem (display) - name:'" + itemName + "', label:'" + itemLabel + "', icon:'" + itemIcon + "', size:'" + sizeStr + "'");
                         // SOLUÇÃO: Criar gauge diretamente sem NavButton wrapper
                         lv_obj_t* gaugeObj = ScreenFactory::createGaugeDirectly(content->getObject(), item);
                         if (gaugeObj) {
-                            applyComponentDebugBorder(gaugeObj, COLOR_IDX_DISPLAY, "Item display com dados");
+                            // Armazenar ComponentSize no user_data
+                            ComponentSize compSize = Layout::parseComponentSize(sizeStr);
+                            lv_obj_set_user_data(gaugeObj, (void*)(intptr_t)compSize);
+                            logger->debug("[ScreenFactory] Display(gauge) user_data set to ComponentSize: " + String((int)compSize));
+                            
+                            // Removido: borda aplicada somente pelo GridContainer
+                            // applyComponentDebugBorder(gaugeObj, COLOR_IDX_DISPLAY, "Item display com dados [size: " + sizeStr + "]");
                             content->addChild(gaugeObj);
                             currentPageSlots += slotsNeeded;
                         }
                         continue; // Pular o resto do loop, gauge já foi adicionado
                     } else {
-                        logger->debug("  -> Creating DisplayItem (read-only data display, no gauge data)");
+                        logger->info("[CREATE] DisplayItem - name:'" + itemName + "', label:'" + itemLabel + "', icon:'" + itemIcon + "', size:'" + sizeStr + "'");
                         navBtn = ScreenFactory::createDisplayItem(content->getObject(), item);
                         if (navBtn && navBtn->getObject()) {
-                            applyComponentDebugBorder(navBtn->getObject(), COLOR_IDX_DISPLAY_ITEM, "Item display sem dados");
+                            applyNavButtonDebugBorder(navBtn->getObject(), NAVBUTTON_COLOR_IDX_BUTTON, "DisplayItem", itemName, itemLabel, itemIcon, sizeStr);
                         }
                     }
                 } else {
-                    logger->warning("  -> UNKNOWN item combination: " + itemType + "/" + actionType);
+                    logger->warning("[CREATE] UNKNOWN item combination: " + itemType + "/" + actionType + " for name:'" + itemName + "', label:'" + itemLabel + "', icon:'" + itemIcon + "'");
                     logger->warning("     Valid combinations (BACKEND FORMAT - case insensitive):");
                     logger->warning("     - button/relay_control, button/navigation, button/command, button/macro");
                     logger->warning("     - switch/relay_control, gauge (null action), display (data visualization)");
-                    logger->warning("     Item details: name=" + item["name"].as<String>() + ", label=" + item["label"].as<String>());
                     
                     // Fallback: Tentar criar pelo menos um botão simples
-                    logger->warning("  -> Creating fallback button");
+                    logger->info("[CREATE] FallbackItem - name:'" + itemName + "', label:'" + itemLabel + "', icon:'" + itemIcon + "', size:'" + sizeStr + "'");
                     navBtn = ScreenFactory::createActionItem(content->getObject(), item);
                     if (navBtn && navBtn->getObject()) {
-                        applyComponentDebugBorder(navBtn->getObject(), COLOR_IDX_FALLBACK, "Item fallback button");
+                        applyNavButtonDebugBorder(navBtn->getObject(), NAVBUTTON_COLOR_IDX_BUTTON, "FallbackItem", itemName, itemLabel, itemIcon, sizeStr);
                     }
                 }
                 
@@ -303,6 +343,10 @@ std::unique_ptr<ScreenBase> ScreenFactory::createScreen(JsonObject& config) {
                     
                     // Aplicar tamanho ao botão
                     lv_obj_set_size(btnObj, componentSize.width, componentSize.height);
+                    
+                    // IMPORTANTE: Armazenar o ComponentSize no user_data para o GridContainer usar
+                    lv_obj_set_user_data(btnObj, (void*)(intptr_t)compSize);
+                    logger->debug("[ScreenFactory] Component user_data set to ComponentSize: " + String((int)compSize));
                     
                     // Debug: verificar o objeto antes de adicionar
                     logger->debug("Adding NavButton object to content container");
@@ -380,7 +424,14 @@ std::unique_ptr<ScreenBase> ScreenFactory::createScreen(JsonObject& config) {
         // Calcular totalPages baseado em slots ocupados
         int totalSlots = 0;
         for (JsonObject item : items) {
-            String sizeStr = item["size_display_small"] | "normal";
+            // CORREÇÃO: Usar campo "size" primeiro, depois "size_display_small"
+            String sizeStr = item["size"].as<String>();
+            if (sizeStr.isEmpty()) {
+                sizeStr = item["size_display_small"] | "normal";
+            }
+            if (sizeStr.isEmpty()) {
+                sizeStr = "normal"; // default
+            }
             ComponentSize size = Layout::parseComponentSize(sizeStr);
             totalSlots += Layout::getSlotsForSize(size);
         }
@@ -998,8 +1049,14 @@ lv_obj_t* ScreenFactory::createGaugeDirectly(lv_obj_t* parent, JsonObject& confi
     // Criar container principal com tamanho correto baseado em size_display_small
     lv_obj_t* container = lv_obj_create(parent);
     
-    // Determinar tamanho baseado no size_display_small
-    String itemSize = config["size_display_small"] | "normal";
+    // CORREÇÃO: Usar campo "size" primeiro, depois "size_display_small"
+    String itemSize = config["size"].as<String>();
+    if (itemSize.isEmpty()) {
+        itemSize = config["size_display_small"] | "normal";
+    }
+    if (itemSize.isEmpty()) {
+        itemSize = "normal"; // default
+    }
     lv_coord_t width = 86;
     lv_coord_t height = 72;
     
@@ -1010,11 +1067,17 @@ lv_obj_t* ScreenFactory::createGaugeDirectly(lv_obj_t* parent, JsonObject& confi
     }
     
     if (itemSize == "small") {
-        width = 70;
-        height = 60;
+        width = 86;  // Um slot apenas, sem texto
+        height = 72;
+    } else if (itemSize == "normal") {
+        width = 86;  // Um slot, texto embaixo
+        height = 72;
     } else if (itemSize == "large") {
-        width = 140;  // CORREÇÃO: Tamanho large deve ser bem maior para ocupar 2 slots
-        height = 90;
+        width = 202;  // CORREÇÃO: 2 slots (96*2 + 10 gap), texto à esquerda
+        height = 75;
+    } else if (itemSize == "full") {
+        width = 308;  // CORREÇÃO: 3 slots (96*3 + 20 gaps), texto à esquerda
+        height = 75;
     }
     
     if (logger) {
@@ -1028,46 +1091,109 @@ lv_obj_t* ScreenFactory::createGaugeDirectly(lv_obj_t* parent, JsonObject& confi
     theme_apply_card(container);
     lv_obj_clear_flag(container, LV_OBJ_FLAG_SCROLLABLE);
     
-    // Layout vertical para o container
-    lv_obj_set_flex_flow(container, LV_FLEX_FLOW_COLUMN);
-    lv_obj_set_flex_align(container, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER);
-    
-    // Ícone pequeno no topo (se houver)
-    if (iconManager && !icon.isEmpty()) {
-        lv_obj_t* iconLabel = lv_label_create(container);
-        String iconSymbol = iconManager->getIconSymbol(icon);
-        lv_label_set_text(iconLabel, iconSymbol.c_str());
-        lv_obj_set_style_text_font(iconLabel, &lv_font_montserrat_14, 0);
-        theme_apply_label_small(iconLabel);
+    // Configurar layout baseado no tamanho
+    if (itemSize == "small") {
+        // SMALL: Apenas valor, sem texto
+        lv_obj_set_flex_flow(container, LV_FLEX_FLOW_COLUMN);
+        lv_obj_set_flex_align(container, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER);
+        
+        // Valor grande centralizado
+        lv_obj_t* valueLabel = lv_label_create(container);
+        lv_label_set_text(valueLabel, "---");
+        lv_obj_set_style_text_font(valueLabel, &lv_font_montserrat_20, 0);
+        lv_obj_set_style_text_color(valueLabel, COLOR_GAUGE_NORMAL, 0);
+        
+        // Armazenar referência do valueLabel
+        lv_obj_set_user_data(container, valueLabel);
+        
+    } else if (itemSize == "normal") {
+        // NORMAL: Valor com texto embaixo
+        lv_obj_set_flex_flow(container, LV_FLEX_FLOW_COLUMN);
+        lv_obj_set_flex_align(container, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER);
+        
+        // Valor no centro
+        lv_obj_t* valueLabel = lv_label_create(container);
+        lv_label_set_text(valueLabel, "---");
+        lv_obj_set_style_text_font(valueLabel, &lv_font_montserrat_20, 0);
+        lv_obj_set_style_text_color(valueLabel, COLOR_GAUGE_NORMAL, 0);
+        
+        // Unidade pequena (se houver)
+        if (!dataUnit.isEmpty()) {
+            lv_obj_t* unitLabel = lv_label_create(container);
+            lv_label_set_text(unitLabel, dataUnit.c_str());
+            lv_obj_set_style_text_font(unitLabel, &lv_font_montserrat_10, 0);
+            theme_apply_label_small(unitLabel);
+        }
+        
+        // Label embaixo
+        lv_obj_t* titleLabel = lv_label_create(container);
+        lv_label_set_text(titleLabel, label.c_str());
+        lv_obj_set_style_text_font(titleLabel, &lv_font_montserrat_10, 0);
+        theme_apply_label_small(titleLabel);
+        
+        // Armazenar referência do valueLabel
+        lv_obj_set_user_data(container, valueLabel);
+        
+    } else if (itemSize == "large" || itemSize == "full") {
+        // LARGE/FULL: Texto à esquerda, valor à direita
+        lv_obj_set_flex_flow(container, LV_FLEX_FLOW_ROW);
+        lv_obj_set_flex_align(container, LV_FLEX_ALIGN_SPACE_BETWEEN, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER);
+        lv_obj_set_style_pad_left(container, 10, 0);
+        lv_obj_set_style_pad_right(container, 10, 0);
+        
+        // Container esquerdo para label e ícone
+        lv_obj_t* leftContainer = lv_obj_create(container);
+        lv_obj_set_size(leftContainer, LV_SIZE_CONTENT, LV_SIZE_CONTENT);
+        lv_obj_set_style_bg_opa(leftContainer, LV_OPA_TRANSP, 0);
+        lv_obj_set_style_border_width(leftContainer, 0, 0);
+        lv_obj_set_style_pad_all(leftContainer, 0, 0);
+        lv_obj_set_flex_flow(leftContainer, LV_FLEX_FLOW_ROW);
+        lv_obj_set_flex_align(leftContainer, LV_FLEX_ALIGN_START, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER);
+        
+        // Ícone (se houver)
+        if (iconManager && !icon.isEmpty()) {
+            lv_obj_t* iconLabel = lv_label_create(leftContainer);
+            String iconSymbol = iconManager->getIconSymbol(icon);
+            lv_label_set_text(iconLabel, iconSymbol.c_str());
+            lv_obj_set_style_text_font(iconLabel, &lv_font_montserrat_16, 0);
+            theme_apply_label_small(iconLabel);
+            lv_obj_set_style_pad_right(iconLabel, 5, 0);
+        }
+        
+        // Label/título
+        lv_obj_t* titleLabel = lv_label_create(leftContainer);
+        lv_label_set_text(titleLabel, label.c_str());
+        lv_obj_set_style_text_font(titleLabel, &lv_font_montserrat_14, 0);
+        theme_apply_label_small(titleLabel);
+        
+        // Container direito para valor e unidade
+        lv_obj_t* rightContainer = lv_obj_create(container);
+        lv_obj_set_size(rightContainer, LV_SIZE_CONTENT, LV_SIZE_CONTENT);
+        lv_obj_set_style_bg_opa(rightContainer, LV_OPA_TRANSP, 0);
+        lv_obj_set_style_border_width(rightContainer, 0, 0);
+        lv_obj_set_style_pad_all(rightContainer, 0, 0);
+        lv_obj_set_flex_flow(rightContainer, LV_FLEX_FLOW_ROW);
+        lv_obj_set_flex_align(rightContainer, LV_FLEX_ALIGN_END, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER);
+        
+        // Valor grande
+        lv_obj_t* valueLabel = lv_label_create(rightContainer);
+        lv_label_set_text(valueLabel, "---");
+        lv_obj_set_style_text_font(valueLabel, &lv_font_montserrat_20, 0);
+        lv_obj_set_style_text_color(valueLabel, COLOR_GAUGE_NORMAL, 0);
+        
+        // Unidade (se houver)
+        if (!dataUnit.isEmpty()) {
+            lv_obj_t* unitLabel = lv_label_create(rightContainer);
+            lv_label_set_text(unitLabel, (" " + dataUnit).c_str());
+            lv_obj_set_style_text_font(unitLabel, &lv_font_montserrat_12, 0);
+            theme_apply_label_small(unitLabel);
+        }
+        
+        // Armazenar referência do valueLabel
+        lv_obj_set_user_data(container, valueLabel);
     }
     
-    // Valor grande no centro (display digital)
-    lv_obj_t* valueLabel = lv_label_create(container);
-    lv_label_set_text(valueLabel, "---");
-    lv_obj_set_style_text_font(valueLabel, &lv_font_montserrat_20, 0);
-    lv_obj_set_style_text_color(valueLabel, COLOR_GAUGE_NORMAL, 0);
-    lv_obj_set_width(valueLabel, lv_pct(90));
-    lv_obj_set_style_text_align(valueLabel, LV_TEXT_ALIGN_CENTER, 0);
-    
-    // Unidade pequena (se houver)
-    if (!dataUnit.isEmpty()) {
-        lv_obj_t* unitLabel = lv_label_create(container);
-        lv_label_set_text(unitLabel, dataUnit.c_str());
-        lv_obj_set_style_text_font(unitLabel, &lv_font_montserrat_10, 0);
-        theme_apply_label_small(unitLabel);
-    }
-    
-    // Label/título pequeno embaixo
-    lv_obj_t* titleLabel = lv_label_create(container);
-    lv_label_set_text(titleLabel, label.c_str());
-    lv_obj_set_style_text_font(titleLabel, &lv_font_montserrat_10, 0);
-    lv_obj_set_width(titleLabel, lv_pct(90));
-    lv_obj_set_style_text_align(titleLabel, LV_TEXT_ALIGN_CENTER, 0);
-    lv_label_set_long_mode(titleLabel, LV_LABEL_LONG_WRAP);
-    theme_apply_label_small(titleLabel);
-    
-    // Armazenar referência do valueLabel para atualizações
-    lv_obj_set_user_data(container, valueLabel);
+    // Não precisa armazenar valueLabel aqui, já foi feito nos blocos acima
     
     // Registrar no DataBinder para atualizações automáticas se necessário
     if (!dataSource.isEmpty() && !dataPath.isEmpty()) {
@@ -1396,8 +1522,14 @@ lv_obj_t* ScreenFactory::createSwitchDirectly(lv_obj_t* parent, JsonObject& conf
     lv_obj_t* container = lv_obj_create(parent);
     theme_apply_card(container);
     
-    // CORREÇÃO: Aplicar tamanho correto baseado em config
-    String itemSize = config["size_display_small"] | "normal";
+    // CORREÇÃO: Usar campo "size" primeiro, depois "size_display_small" 
+    String itemSize = config["size"].as<String>();
+    if (itemSize.isEmpty()) {
+        itemSize = config["size_display_small"] | "normal";
+    }
+    if (itemSize.isEmpty()) {
+        itemSize = "normal"; // default
+    }
     lv_coord_t width = 86;
     lv_coord_t height = 72;
     

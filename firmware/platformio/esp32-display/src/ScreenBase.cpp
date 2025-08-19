@@ -47,6 +47,8 @@ void applyMainContainerDebugBorder(lv_obj_t* obj, MainContainerColorIndex colorI
     
     // Log informativo com tamanho do container
     if (logger) {
+        // CORREÇÃO: Forçar atualização de layout antes de obter tamanhos
+        lv_obj_update_layout(obj);
         lv_coord_t width = lv_obj_get_width(obj);
         lv_coord_t height = lv_obj_get_height(obj);
         logger->info("[MAIN CONTAINER DEBUG] " + containerType + ": Borda " + String(MAIN_CONTAINER_COLOR_NAMES[colorIndex]) + 

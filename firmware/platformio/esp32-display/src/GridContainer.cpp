@@ -29,8 +29,9 @@ const int DEBUG_COLORS_COUNT = sizeof(DEBUG_BORDER_COLORS) / sizeof(DEBUG_BORDER
  * @param obj Objeto LVGL para aplicar a borda
  * @param colorIndex Índice da cor no array de cores
  * @param label Label/nome do componente para logs
+ * @param componentInfo Informações adicionais do componente (name, label, icon)
  */
-void applyDebugBorder(lv_obj_t* obj, int colorIndex, const String& label) {
+void applyDebugBorder(lv_obj_t* obj, int colorIndex, const String& label, const String& componentInfo = "") {
     if (!obj) return;
     
     // Usar modulo para não estourar o array
@@ -43,10 +44,17 @@ void applyDebugBorder(lv_obj_t* obj, int colorIndex, const String& label) {
     
     // Log informativo com tamanho do container
     if (logger) {
+        // CORREÇÃO: Forçar atualização de layout antes de obter tamanhos
+        lv_obj_update_layout(obj);
         lv_coord_t width = lv_obj_get_width(obj);
         lv_coord_t height = lv_obj_get_height(obj);
-        logger->info("[DEBUG BORDER] " + label + ": Borda " + String(DEBUG_COLOR_NAMES[safeColorIndex]) + 
-                    " (" + String(width) + "x" + String(height) + ")");
+        String logMsg = "[DEBUG BORDER] " + label;
+        if (!componentInfo.isEmpty()) {
+            logMsg += " (" + componentInfo + ")";
+        }
+        logMsg += ": Borda " + String(DEBUG_COLOR_NAMES[safeColorIndex]) + 
+                  " (" + String(width) + "x" + String(height) + ")";
+        logger->info(logMsg);
     }
 }
 
@@ -127,30 +135,44 @@ void GridContainer::updateLayout() {
             continue;
         }
         
-        // CORREÇÃO: Obter tamanho real do componente usando user_data
-        ComponentSize size = SIZE_NORMAL;
+        // SOLUÇÃO: Ler o ComponentSize diretamente do user_data do objeto
+        // O ScreenFactory já armazenou o tamanho correto no user_data
+        ComponentSize size = (ComponentSize)(intptr_t)lv_obj_get_user_data(children[i]);
+        String sizeType = "normal";
         
-        // Tentar obter o tamanho do user_data (definido pelo ScreenFactory)
-        void* userData = lv_obj_get_user_data(children[i]);
-        if (userData) {
-            // Se for um NavButton, obter o tamanho dele
-            // Se for um container de gauge/display, verificar tamanho visual
-            lv_coord_t objWidth = lv_obj_get_width(children[i]);
-            lv_coord_t objHeight = lv_obj_get_height(children[i]);
-            
-            // Determinar tamanho baseado nas dimensões do objeto
-            if (objWidth >= 110 || objHeight >= 90) {
-                size = SIZE_LARGE;
-            } else if (objWidth <= 70 || objHeight <= 60) {
-                size = SIZE_SMALL;
-            } else {
-                size = SIZE_NORMAL;
-            }
-            
-            logger->debug("[GridContainer] Component " + String(i) + " detected size: " + 
-                         String(objWidth) + "x" + String(objHeight) + " -> " + 
-                         (size == SIZE_SMALL ? "SMALL" : (size == SIZE_LARGE ? "LARGE" : "NORMAL")));
+        // Validar e aplicar defaults se necessário
+        if (size < SIZE_SMALL || size > SIZE_FULL) {
+            logger->warning("[GridContainer] Invalid ComponentSize in user_data: " + String((int)size) + ", using NORMAL");
+            size = SIZE_NORMAL;
         }
+        
+        // Converter ComponentSize para string para logs
+        switch(size) {
+            case SIZE_SMALL:
+                sizeType = "small";
+                break;
+            case SIZE_NORMAL:
+                sizeType = "normal";
+                break;
+            case SIZE_LARGE:
+                sizeType = "large";
+                break;
+            case SIZE_FULL:
+                sizeType = "full";
+                break;
+            default:
+                sizeType = "normal";
+                break;
+        }
+        
+        // CORREÇÃO: Forçar atualização antes de obter dimensões para logs
+        lv_obj_update_layout(children[i]);
+        lv_coord_t objWidth = lv_obj_get_width(children[i]);
+        lv_coord_t objHeight = lv_obj_get_height(children[i]);
+        
+        logger->debug("[GridContainer] Component " + String(i) + " size from user_data: " + sizeType + 
+                     " (ComponentSize=" + String((int)size) + "), current dimensions: " + 
+                     String(objWidth) + "x" + String(objHeight));
         
         int slotsNeeded = Layout::getSlotsForSize(size);
         
@@ -185,17 +207,16 @@ void GridContainer::updateLayout() {
         lv_obj_set_pos(children[i], position.x, position.y);
         
         // ADIÇÃO DEBUG: Aplicar borda colorida para identificação visual
-        applyDebugBorder(children[i], i, "Container " + String(i + 1));
+        applyDebugBorder(children[i], i, "Container " + String(i + 1), "Component " + String(i));
         
         // Forçar visibilidade e desabilitar scroll
         lv_obj_clear_flag(children[i], LV_OBJ_FLAG_HIDDEN);
         lv_obj_clear_flag(children[i], LV_OBJ_FLAG_SCROLLABLE);
         
-        // Log detalhado para debug
-        logger->info("[GridContainer] Component " + String(i) + " at grid (" + 
-                    String(currentCol) + "," + String(currentRow) + ") position: " +
-                    String(position.x) + "," + String(position.y) + " size: " +
-                    String(componentSize.width) + "x" + String(componentSize.height));
+        // Log detalhado para debug com informação de slots
+        logger->info("[GridContainer] Component " + String(i) + ": size " + sizeType + " (" + String(slotsNeeded) + 
+                    " slots), position: " + String(position.x) + "," + String(position.y) + 
+                    " dimensions: " + String(componentSize.width) + "x" + String(componentSize.height));
         
         // Avançar posição no grid
         currentCol += slotsNeeded;
@@ -295,16 +316,15 @@ void GridContainer::layoutGridNew() {
         lv_obj_set_pos(children[i], position.x, position.y);
         
         // ADIÇÃO DEBUG: Aplicar borda colorida para identificação visual no grid fixo
-        applyDebugBorder(children[i], i, "Grid Fixo Container " + String(i + 1));
+        applyDebugBorder(children[i], i, "Grid Fixo Container " + String(i + 1), "FixedGrid Component " + String(i));
         
         // Garantir visibilidade
         lv_obj_clear_flag(children[i], LV_OBJ_FLAG_HIDDEN);
         lv_obj_clear_flag(children[i], LV_OBJ_FLAG_SCROLLABLE);
         
-        logger->info("[GridContainer] Fixed grid - Component " + String(i) + " at (" + 
-                    String(currentCol) + "," + String(currentRow) + ") pos: " +
-                    String(position.x) + "," + String(position.y) + " size: " + 
-                    String(componentSize.width) + "x" + String(componentSize.height));
+        logger->info("[GridContainer] Fixed grid - Component " + String(i) + ": size normal (" + String(slotsNeeded) + 
+                    " slot), position: " + String(position.x) + "," + String(position.y) + 
+                    " dimensions: " + String(componentSize.width) + "x" + String(componentSize.height));
         
         currentCol += slotsNeeded;
     }
