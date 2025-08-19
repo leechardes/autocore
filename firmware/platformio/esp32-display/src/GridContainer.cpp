@@ -211,7 +211,7 @@ void GridContainer::updateLayout() {
         lv_obj_set_pos(children[i], position.x, position.y);
         
         // ADIÇÃO DEBUG: Aplicar borda colorida para identificação visual
-        applyDebugBorder(children[i], i, "Container " + String(i + 1), "Component " + String(i));
+        // applyDebugBorder(children[i], i, "Container " + String(i + 1), "Component " + String(i));
         
         // Forçar visibilidade e desabilitar scroll
         lv_obj_clear_flag(children[i], LV_OBJ_FLAG_HIDDEN);
@@ -320,7 +320,7 @@ void GridContainer::layoutGridNew() {
         lv_obj_set_pos(children[i], position.x, position.y);
         
         // ADIÇÃO DEBUG: Aplicar borda colorida para identificação visual no grid fixo
-        applyDebugBorder(children[i], i, "Grid Fixo Container " + String(i + 1), "FixedGrid Component " + String(i));
+        // applyDebugBorder(children[i], i, "Grid Fixo Container " + String(i + 1), "FixedGrid Component " + String(i));
         
         // Garantir visibilidade
         lv_obj_clear_flag(children[i], LV_OBJ_FLAG_HIDDEN);

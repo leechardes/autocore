@@ -45,8 +45,8 @@
 // ============================================================================
 
 // Offsets para ajustar posição dos componentes dentro do grid
-#define COMPONENT_LEFT_OFFSET   -3  // Move componentes para esquerda (pixels)
-#define COMPONENT_TOP_OFFSET    -2  // Move componentes para cima (pixels)
+#define COMPONENT_LEFT_OFFSET   4   // Move componentes para direita (pixels) - ajustado após remover bordas
+#define COMPONENT_TOP_OFFSET    2  // Move componentes para cima (pixels)
 
 // Gap entre componentes do grid
 #define GRID_COMPONENT_GAP      10  // Espaçamento entre componentes
