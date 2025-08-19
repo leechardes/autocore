@@ -1,83 +1,95 @@
 /**
- * Funções de normalização para garantir compatibilidade com enums UPPERCASE do database.
- * Mantém compatibilidade com valores antigos em lowercase/hífen.
+ * Funções de normalização para garantir compatibilidade com tipos em lowercase.
+ * Padronização: TODOS os tipos em minúsculo com underscores.
  */
 
 /**
- * Normaliza device_type para uppercase padrão.
+ * Normaliza device_type para lowercase padrão.
  * @param {string} deviceType - Tipo do dispositivo (pode estar em qualquer formato)
- * @returns {string} Tipo normalizado em UPPERCASE com underscores
+ * @returns {string} Tipo normalizado em lowercase com underscores
  */
 export const normalizeDeviceType = (deviceType) => {
   if (!deviceType) return '';
   
-  // Converte para uppercase e substitui hífen por underscore
-  const normalized = deviceType.toUpperCase().replace(/-/g, '_');
+  // Converte para lowercase e substitui hífen por underscore
+  const normalized = deviceType.toLowerCase().replace(/-/g, '_');
   
-  // Mapeamento de valores antigos para novos (se necessário)
+  // Mapeamento de valores antigos para novos
   const mapping = {
-    'ESP32_RELAY_BOARD': 'ESP32_RELAY',
-    'ESP32_DISPLAY_BOARD': 'ESP32_DISPLAY',
-    'HMI_DISPLAY': 'ESP32_DISPLAY',
+    'esp32_relay_board': 'esp32_relay',
+    'esp32_display_board': 'esp32_display',
+    'hmi_display': 'esp32_display',
+    'esp32_display_small': 'sensor_board',
+    'esp32_display_large': 'gateway',
+    'relay': 'esp32_relay',
+    'display': 'esp32_display',
   };
   
   return mapping[normalized] || normalized;
 };
 
 /**
- * Normaliza item_type para uppercase padrão.
+ * Normaliza item_type para lowercase padrão.
  * @param {string} itemType - Tipo do item (pode estar em qualquer formato)
- * @returns {string} Tipo normalizado em UPPERCASE
+ * @returns {string} Tipo normalizado em lowercase
  */
 export const normalizeItemType = (itemType) => {
   if (!itemType) return '';
   
-  const normalized = itemType.toUpperCase();
+  const normalized = itemType.toLowerCase();
   
-  // Mapeamento de valores antigos para novos (se necessário)
+  // Mapeamento de valores antigos para novos
   const mapping = {
-    'TEXT': 'DISPLAY',
-    'LABEL': 'DISPLAY',
+    'text': 'display',
+    'label': 'display',
   };
   
   return mapping[normalized] || normalized;
 };
 
 /**
- * Normaliza action_type para uppercase padrão.
+ * Normaliza action_type para lowercase padrão.
  * @param {string} actionType - Tipo da ação (pode estar em qualquer formato)
- * @returns {string|null} Tipo normalizado em UPPERCASE ou null se vazio
+ * @returns {string|null} Tipo normalizado em lowercase ou null se vazio
  */
 export const normalizeActionType = (actionType) => {
   if (!actionType) return null;
   
   // Mapeamento de valores antigos para novos
   const mapping = {
-    'relay_toggle': 'RELAY_CONTROL',
-    'relay_pulse': 'RELAY_CONTROL',
-    'relay_control': 'RELAY_CONTROL',
-    'toggle': 'RELAY_CONTROL',
-    'pulse': 'RELAY_CONTROL',
-    'command': 'COMMAND',
-    'macro': 'MACRO',
-    'navigation': 'NAVIGATION',
-    'navigate': 'NAVIGATION',
+    'relay_toggle': 'relay_control',
+    'relay_pulse': 'relay_control',
+    'toggle': 'relay_control',
+    'pulse': 'relay_control',
+    'navigate': 'navigation',
   };
   
   const normalized = actionType.toLowerCase();
-  const result = mapping[normalized] || actionType.toUpperCase();
+  const result = mapping[normalized] || normalized;
   
   return result;
 };
 
 /**
- * Normaliza status para uppercase padrão.
+ * Normaliza status para lowercase padrão.
  * @param {string} status - Status (pode estar em qualquer formato)
- * @returns {string} Status normalizado em UPPERCASE
+ * @returns {string} Status normalizado em lowercase
  */
 export const normalizeStatus = (status) => {
   if (!status) return '';
-  return status.toUpperCase();
+  
+  // Mapeamento de valores antigos para novos
+  const mapping = {
+    'active': 'online',
+    'connected': 'online',
+    'inactive': 'offline',
+    'disconnected': 'offline',
+    'fault': 'error',
+    'maint': 'maintenance',
+  };
+  
+  const normalized = status.toLowerCase();
+  return mapping[normalized] || normalized;
 };
 
 /**
@@ -110,26 +122,27 @@ export const compareActionTypes = (type1, type2) => {
   return normalizeActionType(type1) === normalizeActionType(type2);
 };
 
-// Constantes para dropdowns e selects (todos em UPPERCASE)
+// Constantes para dropdowns e selects (todos em lowercase)
 export const ITEM_TYPES = [
-  { value: 'BUTTON', label: 'Botão' },
-  { value: 'SWITCH', label: 'Switch' },
-  { value: 'GAUGE', label: 'Medidor' },
-  { value: 'DISPLAY', label: 'Display' }
+  { value: 'button', label: 'Botão' },
+  { value: 'switch', label: 'Switch' },
+  { value: 'gauge', label: 'Medidor' },
+  { value: 'display', label: 'Display' }
 ];
 
 export const ACTION_TYPES = [
-  { value: 'RELAY_CONTROL', label: 'Controle de Relé' },
-  { value: 'COMMAND', label: 'Comando' },
-  { value: 'MACRO', label: 'Macro' },
-  { value: 'NAVIGATION', label: 'Navegação' }
+  { value: 'relay_control', label: 'Controle de Relé' },
+  { value: 'command', label: 'Comando' },
+  { value: 'macro', label: 'Macro' },
+  { value: 'navigation', label: 'Navegação' },
+  { value: 'preset', label: 'Preset' }
 ];
 
 export const DEVICE_TYPES = [
-  { value: 'ESP32_RELAY', label: 'ESP32 Relay' },
-  { value: 'ESP32_DISPLAY', label: 'ESP32 Display' },
-  { value: 'ESP32_DISPLAY_SMALL', label: 'ESP32 Display P' },
-  { value: 'ESP32_DISPLAY_LARGE', label: 'ESP32 Display G' }
+  { value: 'esp32_relay', label: 'ESP32 Relay' },
+  { value: 'esp32_display', label: 'ESP32 Display' },
+  { value: 'sensor_board', label: 'Sensor Board' },
+  { value: 'gateway', label: 'Gateway' }
 ];
 
 // Helper para validar se um tipo é válido

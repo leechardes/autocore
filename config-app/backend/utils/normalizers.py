@@ -1,22 +1,22 @@
 """
-Funções de normalização para garantir compatibilidade com enums UPPERCASE do database.
-Mantém compatibilidade com valores antigos em lowercase/hífen.
+Funções de normalização para garantir compatibilidade com tipos em lowercase.
+Padronização: TODOS os tipos em minúsculo com underscores.
 """
 
 def normalize_device_type(device_type) -> str:
     """
-    Normaliza device_type para uppercase padrão.
+    Normaliza device_type para lowercase padrão.
     
     Args:
         device_type: Tipo do dispositivo (pode estar em qualquer formato ou ser um Enum)
         
     Returns:
-        str: Tipo normalizado em UPPERCASE com underscores
+        str: Tipo normalizado em lowercase com underscores
         
     Examples:
-        normalize_device_type("esp32-relay") -> "ESP32_RELAY"
-        normalize_device_type("esp32_display") -> "ESP32_DISPLAY"
-        normalize_device_type("ESP32_RELAY") -> "ESP32_RELAY"
+        normalize_device_type("ESP32-RELAY") -> "esp32_relay"
+        normalize_device_type("ESP32_DISPLAY") -> "esp32_display"
+        normalize_device_type("sensor_board") -> "sensor_board"
     """
     if not device_type:
         return ""
@@ -25,13 +25,17 @@ def normalize_device_type(device_type) -> str:
     if hasattr(device_type, 'value'):
         device_type = device_type.value
     
-    # Converte para uppercase e substitui hífen por underscore
-    normalized = str(device_type).upper().replace("-", "_")
+    # Converte para lowercase e substitui hífen por underscore
+    normalized = str(device_type).lower().replace("-", "_")
     
-    # Mapeamento de valores antigos para novos (se necessário)
+    # Mapeamento de valores antigos para novos
     mapping = {
-        "ESP32_RELAY_BOARD": "ESP32_RELAY",
-        "ESP32_DISPLAY_BOARD": "ESP32_DISPLAY",
+        "esp32_relay_board": "esp32_relay",
+        "esp32_display_board": "esp32_display",
+        "esp32_display_small": "sensor_board",
+        "esp32_display_large": "gateway",
+        "relay": "esp32_relay",
+        "display": "esp32_display",
     }
     
     return mapping.get(normalized, normalized)
@@ -39,18 +43,18 @@ def normalize_device_type(device_type) -> str:
 
 def normalize_item_type(item_type) -> str:
     """
-    Normaliza item_type para uppercase padrão.
+    Normaliza item_type para lowercase padrão.
     
     Args:
         item_type: Tipo do item (pode estar em qualquer formato ou ser um Enum)
         
     Returns:
-        str: Tipo normalizado em UPPERCASE
+        str: Tipo normalizado em lowercase
         
     Examples:
-        normalize_item_type("button") -> "BUTTON"
-        normalize_item_type("switch") -> "SWITCH"
-        normalize_item_type("GAUGE") -> "GAUGE"
+        normalize_item_type("BUTTON") -> "button"
+        normalize_item_type("Switch") -> "switch"
+        normalize_item_type("GAUGE") -> "gauge"
     """
     if not item_type:
         return ""
@@ -59,12 +63,12 @@ def normalize_item_type(item_type) -> str:
     if hasattr(item_type, 'value'):
         item_type = item_type.value
     
-    normalized = str(item_type).upper()
+    normalized = str(item_type).lower()
     
-    # Mapeamento de valores antigos para novos (se necessário)
+    # Mapeamento de valores antigos para novos
     mapping = {
-        "TEXT": "DISPLAY",
-        "LABEL": "DISPLAY",
+        "text": "display",
+        "label": "display",
     }
     
     return mapping.get(normalized, normalized)
@@ -72,18 +76,18 @@ def normalize_item_type(item_type) -> str:
 
 def normalize_action_type(action_type) -> str:
     """
-    Normaliza action_type para uppercase padrão.
+    Normaliza action_type para lowercase padrão.
     
     Args:
         action_type: Tipo da ação (pode estar em qualquer formato ou ser um Enum)
         
     Returns:
-        str: Tipo normalizado em UPPERCASE ou None se vazio
+        str: Tipo normalizado em lowercase ou None se vazio
         
     Examples:
-        normalize_action_type("relay_toggle") -> "RELAY_CONTROL"
-        normalize_action_type("relay_pulse") -> "RELAY_CONTROL"
-        normalize_action_type("command") -> "COMMAND"
+        normalize_action_type("RELAY_TOGGLE") -> "relay_control"
+        normalize_action_type("relay_pulse") -> "relay_control"
+        normalize_action_type("COMMAND") -> "command"
     """
     if not action_type:
         return None
@@ -94,41 +98,48 @@ def normalize_action_type(action_type) -> str:
     
     # Mapeamento de valores antigos para novos
     mapping = {
-        "relay_toggle": "RELAY_CONTROL",
-        "relay_pulse": "RELAY_CONTROL", 
-        "relay_control": "RELAY_CONTROL",
-        "toggle": "RELAY_CONTROL",
-        "pulse": "RELAY_CONTROL",
-        "command": "COMMAND",
-        "macro": "MACRO",
-        "navigation": "NAVIGATION",
-        "navigate": "NAVIGATION",
+        "relay_toggle": "relay_control",
+        "relay_pulse": "relay_control", 
+        "toggle": "relay_control",
+        "pulse": "relay_control",
+        "navigate": "navigation",
     }
     
     normalized = str(action_type).lower()
-    result = mapping.get(normalized, str(action_type).upper())
+    result = mapping.get(normalized, normalized)
     
     return result
 
 
 def normalize_status(status: str) -> str:
     """
-    Normaliza status para uppercase padrão.
+    Normaliza status para lowercase padrão.
     
     Args:
         status: Status (pode estar em qualquer formato)
         
     Returns:
-        str: Status normalizado em UPPERCASE
+        str: Status normalizado em lowercase
         
     Examples:
-        normalize_status("active") -> "ACTIVE"
-        normalize_status("inactive") -> "INACTIVE"
+        normalize_status("ACTIVE") -> "online"
+        normalize_status("OFFLINE") -> "offline"
     """
     if not status:
         return ""
     
-    return status.upper()
+    # Mapeamento de valores antigos para novos
+    mapping = {
+        "active": "online",
+        "connected": "online",
+        "inactive": "offline",
+        "disconnected": "offline",
+        "fault": "error",
+        "maint": "maintenance",
+    }
+    
+    normalized = str(status).lower()
+    return mapping.get(normalized, normalized)
 
 
 def compare_device_types(type1, type2) -> bool:
@@ -175,18 +186,18 @@ def compare_action_types(type1, type2) -> bool:
 
 def enum_to_str(value):
     """
-    Converte enum value para string, se necessário.
-    Função essencial para serializar os Enums do SQLAlchemy.
+    Converte valor para string lowercase, se necessário.
+    Função para garantir consistência nos valores de retorno.
     
     Args:
         value: Valor que pode ser um Enum ou string
         
     Returns:
-        str ou None: Valor como string
+        str ou None: Valor como string em lowercase
         
     Examples:
-        enum_to_str(ItemType.BUTTON) -> "BUTTON"
-        enum_to_str("DISPLAY") -> "DISPLAY"
+        enum_to_str("BUTTON") -> "button"
+        enum_to_str("Display") -> "display"
         enum_to_str(None) -> None
     """
     if value is None:
@@ -194,7 +205,7 @@ def enum_to_str(value):
     
     # Verifica se é um Enum (tem atributo 'value')
     if hasattr(value, 'value'):
-        return value.value
+        return str(value.value).lower()
     
     # Já é string ou outro tipo
-    return str(value) if value else None
+    return str(value).lower() if value else None

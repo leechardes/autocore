@@ -16,8 +16,7 @@ from sqlalchemy import create_engine, func, and_, or_
 from src.models.models import (
     Base, Device, RelayBoard, RelayChannel, 
     TelemetryData, EventLog, Screen, ScreenItem,
-    Theme, CANSignal, Macro, User, Icon,
-    DeviceType, DeviceStatus, FunctionType, ProtectionMode, ItemType, ActionType
+    Theme, CANSignal, Macro, User, Icon
 )
 
 # Configuração da sessão
@@ -87,10 +86,8 @@ class DeviceRepository(BaseRepository):
     def create(self, device_data: Dict) -> Device:
         """Cria novo dispositivo"""
         with SessionLocal() as session:
-            # Converter strings para enums se necessário
-            device_type = device_data['type']
-            if isinstance(device_type, str):
-                device_type = DeviceType(device_type)
+            # Normalizar device_type para lowercase
+            device_type = str(device_data['type']).lower()
             
             device = Device(
                 uuid=device_data['uuid'],
@@ -100,7 +97,7 @@ class DeviceRepository(BaseRepository):
                 ip_address=device_data.get('ip_address'),
                 firmware_version=device_data.get('firmware_version'),
                 hardware_version=device_data.get('hardware_version'),
-                status=DeviceStatus.OFFLINE,
+                status='offline',
                 configuration_json=json.dumps(device_data.get('configuration', {})),
                 capabilities_json=json.dumps(device_data.get('capabilities', {}))
             )
@@ -114,10 +111,8 @@ class DeviceRepository(BaseRepository):
         with SessionLocal() as session:
             device = session.query(Device).filter(Device.id == device_id).first()
             if device:
-                # Converter string para enum se necessário
-                if isinstance(status, str):
-                    status = DeviceStatus(status)
-                device.status = status
+                # Normalizar status para lowercase
+                device.status = str(status).lower()
                 device.last_seen = datetime.now()
                 if ip_address:
                     device.ip_address = ip_address
@@ -143,7 +138,7 @@ class DeviceRepository(BaseRepository):
         """Lista dispositivos online"""
         with SessionLocal() as session:
             return session.query(Device).filter(
-                Device.status == DeviceStatus.ONLINE,
+                Device.status == 'online',
                 Device.is_active == True
             ).order_by(Device.last_seen.desc()).all()
     
@@ -214,19 +209,13 @@ class RelayRepository(BaseRepository):
                 if 'description' in config_data:
                     channel.description = config_data['description']
                 if 'function_type' in config_data:
-                    function_type = config_data['function_type']
-                    if isinstance(function_type, str):
-                        function_type = FunctionType(function_type)
-                    channel.function_type = function_type
+                    channel.function_type = str(config_data['function_type']).lower()
                 if 'icon' in config_data:
                     channel.icon = config_data['icon']
                 if 'color' in config_data:
                     channel.color = config_data['color']
                 if 'protection_mode' in config_data:
-                    protection_mode = config_data['protection_mode']
-                    if isinstance(protection_mode, str):
-                        protection_mode = ProtectionMode(protection_mode)
-                    channel.protection_mode = protection_mode
+                    channel.protection_mode = str(config_data['protection_mode']).lower()
                 if 'allow_in_macro' in config_data:
                     channel.allow_in_macro = config_data['allow_in_macro']
                 
@@ -691,41 +680,43 @@ class ConfigRepository(BaseRepository):
         if 'item_type' not in item_data:
             errors.append("item_type é obrigatório")
         else:
-            try:
-                item_type = ItemType(item_data['item_type']) if isinstance(item_data['item_type'], str) else item_data['item_type']
-            except ValueError:
-                errors.append(f"item_type inválido: {item_data['item_type']}")
+            item_type = str(item_data['item_type']).lower()
+            
+            # Validar valores válidos
+            valid_item_types = ['display', 'button', 'switch', 'gauge']
+            if item_type not in valid_item_types:
+                errors.append(f"item_type inválido: {item_data['item_type']}. Valores válidos: {valid_item_types}")
                 return {'valid': False, 'errors': errors}
             
             # Validações específicas por tipo
-            if item_type in [ItemType.DISPLAY, ItemType.GAUGE]:
+            if item_type in ['display', 'gauge']:
                 # Displays e gauges não devem ter action_type
                 if item_data.get('action_type'):
-                    errors.append(f"{item_type.value} não deve ter action_type")
+                    errors.append(f"{item_type} não deve ter action_type")
                 
                 # Displays e gauges devem ter data_source e data_path
                 if not item_data.get('data_source'):
-                    errors.append(f"{item_type.value} deve ter data_source")
+                    errors.append(f"{item_type} deve ter data_source")
                 if not item_data.get('data_path'):
-                    errors.append(f"{item_type.value} deve ter data_path")
+                    errors.append(f"{item_type} deve ter data_path")
                     
-            elif item_type in [ItemType.BUTTON, ItemType.SWITCH]:
+            elif item_type in ['button', 'switch']:
                 # Buttons e switches devem ter action_type
                 if not item_data.get('action_type'):
-                    errors.append(f"{item_type.value} deve ter action_type")
+                    errors.append(f"{item_type} deve ter action_type")
                 else:
-                    try:
-                        action_type = ActionType(item_data['action_type']) if isinstance(item_data['action_type'], str) else item_data['action_type']
-                        
-                        # Se action_type for relay_control, deve ter relay info
-                        if action_type == ActionType.RELAY_CONTROL:
-                            if not item_data.get('relay_board_id'):
-                                errors.append("relay_control deve ter relay_board_id")
-                            if not item_data.get('relay_channel_id'):
-                                errors.append("relay_control deve ter relay_channel_id")
-                                
-                    except ValueError:
-                        errors.append(f"action_type inválido: {item_data['action_type']}")
+                    action_type = str(item_data['action_type']).lower()
+                    valid_action_types = ['relay_control', 'command', 'macro', 'navigation', 'preset']
+                    
+                    if action_type not in valid_action_types:
+                        errors.append(f"action_type inválido: {item_data['action_type']}. Valores válidos: {valid_action_types}")
+                    
+                    # Se action_type for relay_control, deve ter relay info
+                    elif action_type == 'relay_control':
+                        if not item_data.get('relay_board_id'):
+                            errors.append("relay_control deve ter relay_board_id")
+                        if not item_data.get('relay_channel_id'):
+                            errors.append("relay_control deve ter relay_channel_id")
         
         return {'valid': len(errors) == 0, 'errors': errors}
     
@@ -737,11 +728,11 @@ class ConfigRepository(BaseRepository):
             raise ValueError(f"Dados inválidos: {', '.join(validation['errors'])}")
         
         with SessionLocal() as session:
-            # Converter strings para enums se necessário
-            if isinstance(item_data.get('item_type'), str):
-                item_data['item_type'] = ItemType(item_data['item_type'])
-            if isinstance(item_data.get('action_type'), str):
-                item_data['action_type'] = ActionType(item_data['action_type'])
+            # Normalizar tipos para lowercase
+            if 'item_type' in item_data:
+                item_data['item_type'] = str(item_data['item_type']).lower()
+            if 'action_type' in item_data and item_data['action_type']:
+                item_data['action_type'] = str(item_data['action_type']).lower()
             
             item = ScreenItem(
                 screen_id=item_data['screen_id'],
