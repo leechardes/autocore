@@ -130,7 +130,7 @@ const RelaysPage = () => {
   const filteredChannels = channels.filter(channel =>
     channel.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
     channel.description?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    channel.function_type.toLowerCase().includes(searchTerm.toLowerCase())
+    channel.function_type?.toLowerCase().includes(searchTerm.toLowerCase())
   )
 
 

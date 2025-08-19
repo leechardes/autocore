@@ -191,7 +191,7 @@ bool DeviceRegistration::registerDevice(const String& deviceId) {
     String deviceName = "ESP32-Display-" + macHex.substring(macHex.length() - 6);
     doc["name"] = deviceName;
     
-    doc["type"] = "hmi_display";
+    doc["type"] = "esp32_display";
     doc["mac_address"] = DeviceUtils::getMACAddress();
     doc["ip_address"] = WiFi.localIP().toString();
     doc["firmware_version"] = DEVICE_VERSION;

@@ -3,12 +3,12 @@ Funções de normalização para garantir compatibilidade com enums UPPERCASE do
 Mantém compatibilidade com valores antigos em lowercase/hífen.
 """
 
-def normalize_device_type(device_type: str) -> str:
+def normalize_device_type(device_type) -> str:
     """
     Normaliza device_type para uppercase padrão.
     
     Args:
-        device_type: Tipo do dispositivo (pode estar em qualquer formato)
+        device_type: Tipo do dispositivo (pode estar em qualquer formato ou ser um Enum)
         
     Returns:
         str: Tipo normalizado em UPPERCASE com underscores
@@ -21,8 +21,12 @@ def normalize_device_type(device_type: str) -> str:
     if not device_type:
         return ""
     
+    # Se for um Enum, pega o valor
+    if hasattr(device_type, 'value'):
+        device_type = device_type.value
+    
     # Converte para uppercase e substitui hífen por underscore
-    normalized = device_type.upper().replace("-", "_")
+    normalized = str(device_type).upper().replace("-", "_")
     
     # Mapeamento de valores antigos para novos (se necessário)
     mapping = {
@@ -33,12 +37,12 @@ def normalize_device_type(device_type: str) -> str:
     return mapping.get(normalized, normalized)
 
 
-def normalize_item_type(item_type: str) -> str:
+def normalize_item_type(item_type) -> str:
     """
     Normaliza item_type para uppercase padrão.
     
     Args:
-        item_type: Tipo do item (pode estar em qualquer formato)
+        item_type: Tipo do item (pode estar em qualquer formato ou ser um Enum)
         
     Returns:
         str: Tipo normalizado em UPPERCASE
@@ -51,7 +55,11 @@ def normalize_item_type(item_type: str) -> str:
     if not item_type:
         return ""
     
-    normalized = item_type.upper()
+    # Se for um Enum, pega o valor
+    if hasattr(item_type, 'value'):
+        item_type = item_type.value
+    
+    normalized = str(item_type).upper()
     
     # Mapeamento de valores antigos para novos (se necessário)
     mapping = {
@@ -62,12 +70,12 @@ def normalize_item_type(item_type: str) -> str:
     return mapping.get(normalized, normalized)
 
 
-def normalize_action_type(action_type: str) -> str:
+def normalize_action_type(action_type) -> str:
     """
     Normaliza action_type para uppercase padrão.
     
     Args:
-        action_type: Tipo da ação (pode estar em qualquer formato)
+        action_type: Tipo da ação (pode estar em qualquer formato ou ser um Enum)
         
     Returns:
         str: Tipo normalizado em UPPERCASE ou None se vazio
@@ -79,6 +87,10 @@ def normalize_action_type(action_type: str) -> str:
     """
     if not action_type:
         return None
+    
+    # Se for um Enum, pega o valor
+    if hasattr(action_type, 'value'):
+        action_type = action_type.value
     
     # Mapeamento de valores antigos para novos
     mapping = {
@@ -93,8 +105,8 @@ def normalize_action_type(action_type: str) -> str:
         "navigate": "NAVIGATION",
     }
     
-    normalized = action_type.lower()
-    result = mapping.get(normalized, action_type.upper())
+    normalized = str(action_type).lower()
+    result = mapping.get(normalized, str(action_type).upper())
     
     return result
 
@@ -119,7 +131,7 @@ def normalize_status(status: str) -> str:
     return status.upper()
 
 
-def compare_device_types(type1: str, type2: str) -> bool:
+def compare_device_types(type1, type2) -> bool:
     """
     Compara dois device types após normalização.
     
@@ -133,7 +145,7 @@ def compare_device_types(type1: str, type2: str) -> bool:
     return normalize_device_type(type1) == normalize_device_type(type2)
 
 
-def compare_item_types(type1: str, type2: str) -> bool:
+def compare_item_types(type1, type2) -> bool:
     """
     Compara dois item types após normalização.
     
@@ -147,7 +159,7 @@ def compare_item_types(type1: str, type2: str) -> bool:
     return normalize_item_type(type1) == normalize_item_type(type2)
 
 
-def compare_action_types(type1: str, type2: str) -> bool:
+def compare_action_types(type1, type2) -> bool:
     """
     Compara dois action types após normalização.
     
@@ -159,3 +171,30 @@ def compare_action_types(type1: str, type2: str) -> bool:
         bool: True se os tipos são equivalentes
     """
     return normalize_action_type(type1) == normalize_action_type(type2)
+
+
+def enum_to_str(value):
+    """
+    Converte enum value para string, se necessário.
+    Função essencial para serializar os Enums do SQLAlchemy.
+    
+    Args:
+        value: Valor que pode ser um Enum ou string
+        
+    Returns:
+        str ou None: Valor como string
+        
+    Examples:
+        enum_to_str(ItemType.BUTTON) -> "BUTTON"
+        enum_to_str("DISPLAY") -> "DISPLAY"
+        enum_to_str(None) -> None
+    """
+    if value is None:
+        return None
+    
+    # Verifica se é um Enum (tem atributo 'value')
+    if hasattr(value, 'value'):
+        return value.value
+    
+    # Já é string ou outro tipo
+    return str(value) if value else None

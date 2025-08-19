@@ -43,7 +43,8 @@ from utils.normalizers import (
     normalize_item_type, 
     normalize_action_type,
     compare_device_types,
-    compare_item_types
+    compare_item_types,
+    enum_to_str
 )
 
 # ====================================
@@ -237,7 +238,7 @@ async def get_devices():
                 id=d.id,
                 uuid=d.uuid,
                 name=d.name,
-                type=d.type,
+                type=enum_to_str(d.type),
                 mac_address=d.mac_address,
                 ip_address=d.ip_address,
                 firmware_version=d.firmware_version,
@@ -977,7 +978,7 @@ async def get_screen_items(screen_id: int):
             {
                 "id": i.id,
                 "screen_id": i.screen_id,
-                "item_type": i.item_type,
+                "item_type": enum_to_str(i.item_type),
                 "name": i.name,
                 "label": i.label,
                 "icon": i.icon,
@@ -986,7 +987,7 @@ async def get_screen_items(screen_id: int):
                 "size_display_small": i.size_display_small,
                 "size_display_large": i.size_display_large,
                 "size_web": i.size_web,
-                "action_type": i.action_type,
+                "action_type": enum_to_str(i.action_type),
                 "action_target": i.action_target,
                 "action_payload": i.action_payload,
                 "relay_board_id": i.relay_board_id,
@@ -1015,7 +1016,7 @@ async def create_screen_item(screen_id: int, item_data: dict):
         return {
             "id": new_item.id,
             "screen_id": new_item.screen_id,
-            "item_type": new_item.item_type,
+            "item_type": enum_to_str(new_item.item_type),
             "name": new_item.name,
             "label": new_item.label,
             "position": new_item.position,
@@ -1037,7 +1038,7 @@ async def update_screen_item(screen_id: int, item_id: int, item_data: dict):
         return {
             "id": updated_item.id,
             "screen_id": updated_item.screen_id,
-            "item_type": updated_item.item_type,
+            "item_type": enum_to_str(updated_item.item_type),
             "name": updated_item.name,
             "label": updated_item.label,
             "position": updated_item.position,
@@ -1235,12 +1236,12 @@ def get_preview_configuration():
                 if item.is_active:
                     item_data = {
                         "id": item.id,
-                        "item_type": item.item_type,
+                        "item_type": enum_to_str(item.item_type),
                         "name": item.name,
                         "label": item.label,
                         "icon": item.icon,
                         "position": item.position,
-                        "action_type": item.action_type,
+                        "action_type": enum_to_str(item.action_type),
                         "action_target": item.action_target,
                         "action_payload": item.action_payload,
                         "relay_board_id": item.relay_board_id,
@@ -1297,10 +1298,10 @@ def get_preview_configuration():
                                     "channel_number": channel.channel_number,
                                     "name": channel.name,
                                     "description": channel.description,
-                                    "function_type": channel.function_type,
+                                    "function_type": enum_to_str(channel.function_type),
                                     "icon": channel.icon,
                                     "color": channel.color,
-                                    "protection_mode": channel.protection_mode,
+                                    "protection_mode": enum_to_str(channel.protection_mode),
                                     "max_activation_time": channel.max_activation_time,
                                     "allow_in_macro": channel.allow_in_macro,
                                     "is_active": channel.is_active
@@ -1321,8 +1322,8 @@ def get_preview_configuration():
                 "id": d.id,
                 "uuid": d.uuid,
                 "name": d.name,
-                "type": d.type,
-                "status": d.status,
+                "type": enum_to_str(d.type),
+                "status": enum_to_str(d.status),
                 "ip_address": d.ip_address,
                 "is_active": d.is_active
             }
@@ -1434,7 +1435,7 @@ async def get_full_configuration(
             "device": {
                 "id": device.id,
                 "uuid": device.uuid,
-                "type": device.type,
+                "type": enum_to_str(device.type),
                 "name": device.name,
                 "status": device.status,
                 "ip_address": device.ip_address,
@@ -1482,12 +1483,12 @@ async def get_full_configuration(
                         if item.is_active:  # Apenas itens ativos
                             item_data = {
                                 "id": item.id,
-                                "item_type": item.item_type,
+                                "item_type": enum_to_str(item.item_type),
                                 "name": item.name,
                                 "label": item.label,
                                 "icon": item.icon,
                                 "position": item.position,
-                                "action_type": item.action_type,
+                                "action_type": enum_to_str(item.action_type),
                                 "action_target": item.action_target,
                                 "action_payload": item.action_payload,
                                 # Manter IDs para compatibilidade
@@ -1546,10 +1547,10 @@ async def get_full_configuration(
                                             "channel_number": channel.channel_number,
                                             "name": channel.name,
                                             "description": channel.description,
-                                            "function_type": channel.function_type,
+                                            "function_type": enum_to_str(channel.function_type),
                                             "icon": channel.icon,
                                             "color": channel.color,
-                                            "protection_mode": channel.protection_mode,
+                                            "protection_mode": enum_to_str(channel.protection_mode),
                                             "max_activation_time": channel.max_activation_time,
                                             "allow_in_macro": channel.allow_in_macro,
                                             "is_active": channel.is_active
@@ -1853,12 +1854,12 @@ async def get_screen_by_id(screen_id: int, include_items: bool = False):
             result["items"] = [
                 {
                     "id": i.id,
-                    "item_type": i.item_type,
+                    "item_type": enum_to_str(i.item_type),
                     "name": i.name,
                     "label": i.label,
                     "icon": i.icon,
                     "position": i.position,
-                    "action_type": i.action_type,
+                    "action_type": enum_to_str(i.action_type),
                     "action_target": i.action_target,
                     "relay_board_id": i.relay_board_id,
                     "relay_channel_id": i.relay_channel_id,
