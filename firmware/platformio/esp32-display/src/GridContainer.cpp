@@ -1,4 +1,5 @@
 #include "GridContainer.h"
+#include "LayoutConfig.h"
 #include "core/Logger.h"
 
 extern Logger* logger;
@@ -83,9 +84,9 @@ void GridContainer::updateLayout() {
     
     // CORREÇÃO: Se o container não tem tamanho definido, forçar tamanho otimizado
     if (containerWidth <= 10 || containerHeight <= 10) {
-        // Usar quase todo o espaço disponível (margem mínima)
-        containerWidth = Layout::DISPLAY_WIDTH - 10;  // 5px margem cada lado
-        containerHeight = Layout::CONTENT_HEIGHT - 5;  // 5px margem total
+        // Usar configurações centralizadas do LayoutConfig.h
+        containerWidth = GRID_CONTAINER_FALLBACK_WIDTH;
+        containerHeight = GRID_CONTAINER_FALLBACK_HEIGHT;
         
         // Definir tamanho explicitamente
         lv_obj_set_size(obj, containerWidth, containerHeight);
@@ -101,8 +102,8 @@ void GridContainer::updateLayout() {
     int contentHeight = lv_obj_get_content_height(obj);
     
     // CORREÇÃO: Se content area for muito pequena, usar valores otimizados
-    if (contentWidth < 100) contentWidth = Layout::DISPLAY_WIDTH - 10;  // Reduzido de 40 para 10
-    if (contentHeight < 80) contentHeight = Layout::CONTENT_HEIGHT - 10; // Reduzido de 40 para 10
+    if (NEEDS_WIDTH_FALLBACK(contentWidth)) contentWidth = GRID_CONTENT_MIN_WIDTH;
+    if (NEEDS_HEIGHT_FALLBACK(contentHeight)) contentHeight = GRID_CONTENT_MIN_HEIGHT;
     
     logger->info("[GridContainer] Content area: " + String(contentWidth) + "x" + String(contentHeight));
     

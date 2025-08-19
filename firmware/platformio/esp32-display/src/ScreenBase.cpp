@@ -1,5 +1,6 @@
 #include "ScreenBase.h"
 #include "Layout.h"
+#include "LayoutConfig.h"
 #include "ui/Theme.h"
 #include "core/Logger.h"
 #include "ui/ScreenManager.h"
@@ -88,11 +89,11 @@ void ScreenBase::createLayout() {
     
     // Criar área de conteúdo com GridContainer configurado para 3x2
     content = new GridContainer(screen);
-    // CORREÇÃO: Content area deve ocupar TODA a largura e altura disponível
-    content->setSize(Layout::DISPLAY_WIDTH, Layout::CONTENT_HEIGHT);
-    content->setPosition(0, Layout::HEADER_HEIGHT);
+    // Usar configurações centralizadas do LayoutConfig.h
+    content->setSize(MAIN_CONTAINER_WIDTH, Layout::CONTENT_HEIGHT);
+    content->setPosition(MAIN_CONTAINER_X_POS, Layout::HEADER_HEIGHT);
     // Reduzir margins internas do content container
-    content->setMargins(2); // Margem mínima de 2px
+    content->setMargins(GRID_CONTAINER_PADDING);
     
     // ADIÇÃO DEBUG: Aplicar borda VERDE CLARO no content area
     if (content && content->getObject()) {

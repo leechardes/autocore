@@ -1,4 +1,5 @@
 #include "Layout.h"
+#include "LayoutConfig.h"
 #include <algorithm>
 #include <Arduino.h>
 
@@ -132,18 +133,21 @@ Size Layout::calculateGridCellSize(Size containerSize) {
 Point Layout::calculateGridPosition(int col, int row, Size cellSize) {
     Point position;
     
-    // Calcular posição baseada na coluna e linha
+    // Usar offsets centralizados do LayoutConfig.h
+    const int LEFT_OFFSET = COMPONENT_LEFT_OFFSET;
+    const int TOP_OFFSET = COMPONENT_TOP_OFFSET;
+    
     // Importante: GAP deve ser aplicado apenas ENTRE células, não antes da primeira
     if (col == 0) {
-        position.x = 0;
+        position.x = LEFT_OFFSET;  // Aplicar offset esquerdo
     } else {
-        position.x = col * cellSize.width + (col * GAP);
+        position.x = col * cellSize.width + (col * GAP) + LEFT_OFFSET;
     }
     
     if (row == 0) {
-        position.y = 0;
+        position.y = TOP_OFFSET;  // Aplicar offset superior
     } else {
-        position.y = row * cellSize.height + (row * GAP);
+        position.y = row * cellSize.height + (row * GAP) + TOP_OFFSET;
     }
     
     return position;
