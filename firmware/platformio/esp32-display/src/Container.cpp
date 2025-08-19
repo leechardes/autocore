@@ -49,8 +49,8 @@ Container::Container(lv_obj_t* parent) : margin(5), gap(10) {
     obj = lv_obj_create(parent);
     applyTheme();
     
-    // ADIÇÃO DEBUG: Aplicar borda AMARELO BRILHANTE no container base
-    applyBaseContainerDebugBorder(obj, BASE_COLOR_IDX_MAIN, "Container Base");
+    // DEBUG REMOVIDO: Bordas coloridas desabilitadas
+    // applyBaseContainerDebugBorder(obj, BASE_COLOR_IDX_MAIN, "Container Base");
 }
 
 Container::~Container() {
@@ -65,14 +65,14 @@ void Container::addChild(lv_obj_t* child) {
         // Verificar se parent está correto antes de adicionar
         lv_obj_t* childParent = lv_obj_get_parent(child);
         if (childParent != obj) {
-            Serial.printf("[Container] INFO: Correcting child parent. Expected %p, got %p\n", obj, childParent);
+            // Serial.printf("[Container] INFO: Correcting child parent. Expected %p, got %p\n", obj, childParent);
             // CORREÇÃO: Sempre corrigir o parent para evitar problemas de layout
             lv_obj_set_parent(child, obj);
         }
         
         children.push_back(child);
-        Serial.printf("[Container] Added child %p to container %p, total children: %d\n", 
-                      child, obj, (int)children.size());
+        // Serial.printf("[Container] Added child %p to container %p, total children: %d\n", 
+        //               child, obj, (int)children.size());
         
         // Forçar visibilidade e garantir que o child não tem scroll
         lv_obj_clear_flag(child, LV_OBJ_FLAG_HIDDEN);
@@ -87,9 +87,9 @@ void Container::addChild(lv_obj_t* child) {
         // Forçar atualização do layout
         updateLayout();
         
-        Serial.printf("[Container] Child added successfully. Final children count: %d\n", (int)children.size());
+        // Serial.printf("[Container] Child added successfully. Final children count: %d\n", (int)children.size());
     } else {
-        Serial.println("[Container] ERROR: Tried to add null child!");
+        // Serial.println("[Container] ERROR: Tried to add null child!");
     }
 }
 

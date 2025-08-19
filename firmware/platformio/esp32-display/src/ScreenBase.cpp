@@ -76,16 +76,16 @@ void ScreenBase::createLayout() {
     // Configurar tela base
     lv_obj_set_style_bg_color(screen, COLOR_BACKGROUND, 0);
     
-    // ADIÇÃO DEBUG: Aplicar borda BRANCA no container principal/root (4px)
-    applyMainContainerDebugBorder(screen, COLOR_IDX_ROOT, 4, "Container Principal/Root");
+    // DEBUG REMOVIDO: Bordas coloridas desabilitadas
+    // applyMainContainerDebugBorder(screen, COLOR_IDX_ROOT, 4, "Container Principal/Root");
     
     // Criar header
     header = new Header(screen);
     
-    // ADIÇÃO DEBUG: Aplicar borda AMARELA no header
-    if (header && header->getObject()) {
-        applyMainContainerDebugBorder(header->getObject(), COLOR_IDX_HEADER, 3, "Header Container");
-    }
+    // DEBUG REMOVIDO: Bordas coloridas desabilitadas
+    // if (header && header->getObject()) {
+    //     applyMainContainerDebugBorder(header->getObject(), COLOR_IDX_HEADER, 3, "Header Container");
+    // }
     
     // Criar área de conteúdo com GridContainer configurado para 3x2
     content = new GridContainer(screen);
@@ -95,20 +95,21 @@ void ScreenBase::createLayout() {
     // Reduzir margins internas do content container
     content->setMargins(GRID_CONTAINER_PADDING);
     
-    // ADIÇÃO DEBUG: Aplicar borda VERDE CLARO no content area
-    if (content && content->getObject()) {
-        applyMainContainerDebugBorder(content->getObject(), COLOR_IDX_CONTENT, 3, "Content Area Container");
-    }
+    // DEBUG REMOVIDO: Bordas coloridas desabilitadas
+    // if (content && content->getObject()) {
+    //     applyMainContainerDebugBorder(content->getObject(), COLOR_IDX_CONTENT, 3, "Content Area Container");
+    // }
     
     // Configurar grid para 3x2 explicitamente
     content->setGridSize(3, 2);
     content->setAdaptive(true); // Usar modo adaptativo por padrão
     
-    if (logger) {
-        logger->info("[ScreenBase] Created GridContainer with size " + 
-                    String(Layout::DISPLAY_WIDTH) + "x" + String(Layout::CONTENT_HEIGHT) + 
-                    " at position (0," + String(Layout::HEADER_HEIGHT) + ")");
-    }
+    // Log reduzido para produção
+    // if (logger) {
+    //     logger->info("[ScreenBase] Created GridContainer with size " + 
+    //                 String(Layout::DISPLAY_WIDTH) + "x" + String(Layout::CONTENT_HEIGHT) + 
+    //                 " at position (0," + String(Layout::HEADER_HEIGHT) + ")");
+    // }
     
     // Criar barra de navegação
     navBar = new NavigationBar(screen);
@@ -116,10 +117,10 @@ void ScreenBase::createLayout() {
         onNavigate(dir);
     });
     
-    // ADIÇÃO DEBUG: Aplicar borda AZUL CLARO no navigation bar
-    if (navBar && navBar->getObject()) {
-        applyMainContainerDebugBorder(navBar->getObject(), COLOR_IDX_NAVBAR, 3, "Navigation Bar Container");
-    }
+    // DEBUG REMOVIDO: Bordas coloridas desabilitadas
+    // if (navBar && navBar->getObject()) {
+    //     applyMainContainerDebugBorder(navBar->getObject(), COLOR_IDX_NAVBAR, 3, "Navigation Bar Container");
+    // }
 }
 
 void ScreenBase::build() {

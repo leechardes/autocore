@@ -171,9 +171,10 @@ void GridContainer::updateLayout() {
         lv_coord_t objWidth = lv_obj_get_width(children[i]);
         lv_coord_t objHeight = lv_obj_get_height(children[i]);
         
-        logger->debug("[GridContainer] Component " + String(i) + " size from user_data: " + sizeType + 
-                     " (ComponentSize=" + String((int)size) + "), current dimensions: " + 
-                     String(objWidth) + "x" + String(objHeight));
+        // DEBUG REMOVIDO: Log de tamanho dos componentes
+        // logger->debug("[GridContainer] Component " + String(i) + " size from user_data: " + sizeType + 
+        //              " (ComponentSize=" + String((int)size) + "), current dimensions: " + 
+        //              String(objWidth) + "x" + String(objHeight));
         
         int slotsNeeded = Layout::getSlotsForSize(size);
         
