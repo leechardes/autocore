@@ -592,6 +592,13 @@ NavButton* ScreenFactory::createRelayItem(lv_obj_t* parent, JsonObject& config) 
     String icon = config["icon"].as<String>();
     String id = config["name"].as<String>(); // API usa 'name' não 'id'
     
+    // Se name estiver vazio, tentar id
+    if (id.isEmpty() && config["id"].is<JsonVariant>()) {
+        id = config["id"].as<String>();
+    }
+    
+    logger->info("[createRelayItem] Creating relay button: id='" + id + "' label='" + label + "'");
+    
     // IMPORTANTE: Ler o tamanho configurado
     String sizeStr = "";
     if (config["size"].is<JsonVariant>()) {
@@ -609,11 +616,16 @@ NavButton* ScreenFactory::createRelayItem(lv_obj_t* parent, JsonObject& config) 
     uint8_t relay_channel_id = config["relay_channel_id"] | 0;
     JsonObject action_payload = config["action_payload"];
     
+    logger->info("[createRelayItem] relay_board_id=" + String(relay_board_id) + 
+                " relay_channel_id=" + String(relay_channel_id));
+    
     // Determinar function_type
     String function_type = "toggle"; // default
     if (action_payload["momentary"].is<bool>() && action_payload["momentary"]) {
         function_type = "momentary";
     }
+    
+    logger->info("[createRelayItem] function_type=" + function_type);
     
     auto btn = new NavButton(parent, label, icon, id);
     btn->setButtonType(NavButton::TYPE_RELAY);
@@ -636,22 +648,27 @@ NavButton* ScreenFactory::createRelayItem(lv_obj_t* parent, JsonObject& config) 
     
     // Verificar se tem relay_board_id válido
     if (relay_board_id == 0 || relay_channel_id == 0) {
-        logger->warning("Button without valid relay config: " + String(config["name"].as<const char*>()));
+        logger->error("[createRelayItem] ERROR: Invalid relay config for button '" + id + "'");
+        logger->error("  relay_board_id=" + String(relay_board_id) + " relay_channel_id=" + String(relay_channel_id));
+        logger->error("  Button will have NO CALLBACK!");
         // Visual de desabilitado - usar estado OFF 
         btn->setState(false);
         return btn;
     }
     
     // Verificar se relay board existe no registry
+    logger->info("[createRelayItem] Checking DeviceRegistry for relay_board_id=" + String(relay_board_id));
+    logger->info("  Registry has " + String(DeviceRegistry::getInstance()->getRelayBoardCount()) + " relay boards");
+    
     if (!DeviceRegistry::getInstance()->hasRelayBoard(relay_board_id)) {
-        logger->warning("Relay board not found in registry: " + String(relay_board_id) + 
-                       " for button: " + config["name"].as<String>() + " (" + label + ")");
-        logger->info("Available relay boards in registry:");
-        // TODO: Adicionar método para listar boards disponíveis
+        logger->error("[createRelayItem] ERROR: Relay board " + String(relay_board_id) + " NOT FOUND in registry!");
+        logger->error("  Button '" + id + "' will have NO CALLBACK!");
         // Visual de desabilitado - usar estado OFF 
         btn->setState(false);
         return btn;
     }
+    
+    logger->info("[createRelayItem] Relay board found! Setting up callback...");
     
     // Configurar callback para envio de comando com novo formato
     btn->setClickCallback([relay_board_id, relay_channel_id, function_type, label](NavButton* b) {
@@ -721,6 +738,8 @@ NavButton* ScreenFactory::createRelayItem(lv_obj_t* parent, JsonObject& config) 
             buttonStateManager->registerButton(b);
         }
     });
+    
+    logger->info("[createRelayItem] Callback configured successfully for button '" + id + "'!");
     
     return btn;
 }
