@@ -198,6 +198,69 @@ std::unique_ptr<ScreenBase> ScreenFactory::createScreen(JsonObject& config) {
             for (int i = startIdx; i < (int)sortedItems.size(); i++) {
                 JsonObject item = sortedItems[i].item;
                 
+                // ADAPTADOR: Converter formato antigo para novo formato da API
+                // Detectar formato antigo (type="relay" com device/channel)
+                if (item["type"].is<JsonVariant>()) {
+                    String oldType = item["type"].as<String>();
+                    
+                    if (oldType == "relay") {
+                        // Converter formato antigo para novo
+                        item["item_type"] = "button";
+                        item["action_type"] = "relay_control";
+                        
+                        // Converter device para relay_board_id
+                        if (item["device"].is<JsonVariant>()) {
+                            String device = item["device"].as<String>();
+                            // Extrair número do device (relay_board_1 → 1)
+                            if (device.startsWith("relay_board_")) {
+                                int boardId = device.substring(12).toInt();
+                                item["relay_board_id"] = boardId;
+                            }
+                        }
+                        
+                        // Converter channel para relay_channel_id
+                        if (item["channel"].is<JsonVariant>()) {
+                            item["relay_channel_id"] = item["channel"].as<int>();
+                        }
+                        
+                        // Converter mode para action_payload
+                        if (item["mode"].is<JsonVariant>()) {
+                            String mode = item["mode"].as<String>();
+                            JsonObject payload = item.createNestedObject("action_payload");
+                            payload["momentary"] = (mode == "momentary");
+                        }
+                        
+                        // Converter id para name se necessário
+                        if (item["id"].is<JsonVariant>() && !item["name"].is<JsonVariant>()) {
+                            item["name"] = item["id"].as<String>();
+                        }
+                        
+                        logger->info("[ADAPTER] Converted old relay format to new API format for: " + item["label"].as<String>());
+                    } else if (oldType == "navigation") {
+                        // Converter navegação
+                        item["item_type"] = "button";
+                        item["action_type"] = "navigation";
+                        
+                        // Converter id para name
+                        if (item["id"].is<JsonVariant>() && !item["name"].is<JsonVariant>()) {
+                            item["name"] = item["id"].as<String>();
+                        }
+                        
+                        logger->info("[ADAPTER] Converted old navigation format to new API format for: " + item["label"].as<String>());
+                    } else if (oldType == "action" || oldType == "preset") {
+                        // Converter action/preset
+                        item["item_type"] = "button";
+                        item["action_type"] = (oldType == "preset") ? "macro" : "command";
+                        
+                        // Converter id para name
+                        if (item["id"].is<JsonVariant>() && !item["name"].is<JsonVariant>()) {
+                            item["name"] = item["id"].as<String>();
+                        }
+                        
+                        logger->info("[ADAPTER] Converted old " + oldType + " format to new API format for: " + item["label"].as<String>());
+                    }
+                }
+                
                 // CORREÇÃO: Verificar múltiplos campos de size em ordem de prioridade  
                 String sizeStr = "";
                 
@@ -587,30 +650,71 @@ NavButton* ScreenFactory::createRelayItem(lv_obj_t* parent, JsonObject& config) 
     }
     
     // Configurar callback para envio de comando com novo formato
-    btn->setClickCallback([relay_board_id, relay_channel_id, function_type](NavButton* b) {
+    btn->setClickCallback([relay_board_id, relay_channel_id, function_type, label](NavButton* b) {
         extern CommandSender* commandSender;
         extern ButtonStateManager* buttonStateManager;
         
-        if (commandSender) {
-            // Determinar estado baseado no tipo
-            bool newState = true;
-            if (function_type == "toggle") {
-                // Para toggle, usar estado atual do botão e inverter
-                newState = !b->getState();
-            }
-            
-            // Enviar comando com novo formato
-            commandSender->sendRelayCommand(String(relay_board_id), relay_channel_id, newState ? "on" : "off", function_type);
-            
-            // Para toggle, atualizar estado visual imediatamente
-            if (function_type == "toggle") {
-                b->setState(newState);
-            }
-            
-            // Registrar botão para receber atualizações MQTT se ainda não estiver
-            if (buttonStateManager) {
-                buttonStateManager->registerButton(b);
-            }
+        logger->info("=== BUTTON CLICK DEBUG ===");
+        logger->info("Button: " + label);
+        logger->info("Type: " + function_type);
+        logger->info("Relay Board ID: " + String(relay_board_id));
+        logger->info("Channel ID: " + String(relay_channel_id));
+        
+        if (!commandSender) {
+            logger->error("CommandSender is NULL!");
+            return;
+        }
+        
+        // Verificar DeviceRegistry
+        logger->info("DeviceRegistry has " + String(DeviceRegistry::getInstance()->getRelayBoardCount()) + " relay boards");
+        
+        // Resolver relay_board_id para UUID
+        String targetUuid = DeviceRegistry::getInstance()->resolveRelayBoardToUuid(relay_board_id);
+        
+        if (targetUuid.isEmpty()) {
+            logger->error("Failed to resolve UUID for relay_board_id: " + String(relay_board_id));
+            logger->error("Check if DeviceRegistry was populated from config");
+            return;
+        }
+        
+        logger->info("Resolved UUID: " + targetUuid);
+        
+        // Determinar estado baseado no tipo
+        bool newState = true;
+        if (function_type == "toggle") {
+            // Para toggle, usar estado atual do botão e inverter
+            bool currentState = b->getState();
+            newState = !currentState;
+            logger->info("Toggle: current=" + String(currentState) + " new=" + String(newState));
+        } else if (function_type == "momentary") {
+            // Para momentary, usar o estado pressed do botão
+            newState = b->getIsPressed();
+            logger->info(String("Momentary button ") + (newState ? "PRESSED" : "RELEASED") + 
+                       " - channel " + String(relay_channel_id));
+        }
+        
+        String stateStr = newState ? "on" : "off";
+        logger->info("Sending command: UUID=" + targetUuid + " ch=" + String(relay_channel_id) + 
+                    " state=" + stateStr + " type=" + function_type);
+        
+        // Enviar comando com UUID correto
+        bool sent = commandSender->sendRelayCommand(targetUuid, relay_channel_id, stateStr, function_type);
+        
+        if (sent) {
+            logger->info("Command sent successfully!");
+        } else {
+            logger->error("Failed to send command!");
+        }
+        logger->info("========================");
+        
+        // Para toggle, atualizar estado visual imediatamente
+        if (function_type == "toggle") {
+            b->setState(newState);
+        }
+        
+        // Registrar botão para receber atualizações MQTT se ainda não estiver
+        if (buttonStateManager) {
+            buttonStateManager->registerButton(b);
         }
     });
     

@@ -79,7 +79,7 @@ bool ConfigReceiver::loadFromApi() {
         logger->info("ConfigReceiver: Loading configuration from API...");
     }
     
-    DynamicJsonDocument config(JSON_DOCUMENT_SIZE);
+    JsonDocument config;
     
     // Tentar carregar da API com retries automáticos
     for (int attempt = 1; attempt <= API_RETRY_COUNT; attempt++) {

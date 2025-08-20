@@ -78,7 +78,7 @@ public:
     }
     
     static bool validateProtocolVersion(const JsonDocument& doc) {
-        if (!doc.containsKey("protocol_version")) {
+        if (!doc["protocol_version"].is<String>()) {
             return false;
         }
         

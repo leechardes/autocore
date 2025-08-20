@@ -502,6 +502,11 @@ void loop() {
     if (mqttClient && mqttClient->isConnected()) {
         mqttClient->loop();
         
+        // Process heartbeats for momentary buttons
+        if (commandSender) {
+            commandSender->processHeartbeats();
+        }
+        
         // Check if we received configuration
         if (!configReceived && configManager->hasConfig()) {
             logger->info("Configuration received! Building UI...");

@@ -82,34 +82,59 @@ bool CommandSender::sendCommand(NavButton* button) {
 
 bool CommandSender::sendRelayCommand(const String& targetUuid, int channel, 
                                    const String& state, const String& functionType) {
-    if (!mqttClient || !mqttClient->isConnected()) {
+    logger->info("=== MQTT COMMAND DEBUG ===");
+    logger->info("Target UUID: " + targetUuid);
+    logger->info("Channel: " + String(channel));
+    logger->info("State: " + state);
+    logger->info("Function Type: " + functionType);
+    
+    if (!mqttClient) {
+        logger->error("MQTT Client is NULL!");
+        return false;
+    }
+    
+    if (!mqttClient->isConnected()) {
         logger->warning("MQTT not connected, command not sent");
         return false;
     }
     
     // V2.2.0: Comando para dispositivo usando UUID completo
     String topic = "autocore/devices/" + targetUuid + "/command";
+    logger->info("MQTT Topic: " + topic);
     
     StaticJsonDocument<512> doc;
     MQTTProtocol::addProtocolFields(doc); // Adiciona protocol_version, uuid, timestamp
     
     doc["channel"] = channel;
-    doc["state"] = (state == "ON" || state == "true" || state == "1");
+    bool boolState = (state == "ON" || state == "on" || state == "true" || state == "1");
+    doc["state"] = boolState;
     doc["function_type"] = functionType;
     doc["user"] = "display_touch";
     doc["source_uuid"] = MQTTProtocol::getDeviceUUID();
     
+    logger->info("State boolean: " + String(boolState ? "true" : "false"));
+    logger->info("Source UUID: " + String(MQTTProtocol::getDeviceUUID()));
+    
     String payload;
     serializeJson(doc, payload);
+    logger->info("MQTT Payload: " + payload);
+    
     bool result = mqttClient->publish(topic, payload);
+    logger->info("Publish result: " + String(result ? "SUCCESS" : "FAILED"));
     
     if (result) {
         logger->info("CMD: Sent " + functionType + " command to " + 
                     targetUuid + " ch:" + String(channel) + " state:" + state);
         
-        // Se for momentâneo e ON, iniciar heartbeat
-        if (functionType == "momentary" && (state == "ON" || state == "true" || state == "1")) {
-            startHeartbeat(targetUuid, channel);
+        // Gerenciar heartbeat para botões momentâneos
+        if (functionType == "momentary") {
+            if (state == "ON" || state == "on" || state == "true" || state == "1") {
+                // Iniciar heartbeat quando pressionado
+                startHeartbeat(targetUuid, channel);
+            } else {
+                // Parar heartbeat quando solto
+                stopHeartbeat(channel);
+            }
         }
     } else {
         logger->error("CMD: Failed to send command to " + targetUuid);

@@ -497,17 +497,20 @@ bool ScreenApiClient::loadLegacyConfiguration(JsonDocument& config) {
     JsonArray devicesArray = devicesDoc.to<JsonArray>();
     if (getDevices(devicesArray)) {
         // Populate device registry
+        logger->info("=== DEVICE REGISTRY POPULATION ===");
         for (JsonObject device : devicesArray) {
-            DeviceInfo info(
-                device["id"].as<uint8_t>(),
-                device["uuid"].as<String>(),
-                device["type"].as<String>(),
-                device["name"].as<String>()
-            );
+            uint8_t id = device["id"].as<uint8_t>();
+            String uuid = device["uuid"].as<String>();
+            String type = device["type"].as<String>();
+            String name = device["name"].as<String>();
+            
+            logger->info("Device: id=" + String(id) + " uuid=" + uuid + " type=" + type + " name=" + name);
+            
+            DeviceInfo info(id, uuid, type, name);
             DeviceRegistry::getInstance()->addDevice(info);
         }
         if (logger) {
-            logger->debug("ScreenApiClient: Legacy - Registered " + String(DeviceRegistry::getInstance()->getDeviceCount()) + " devices");
+            logger->info("ScreenApiClient: Registered " + String(DeviceRegistry::getInstance()->getDeviceCount()) + " devices");
         }
     }
     
@@ -516,17 +519,22 @@ bool ScreenApiClient::loadLegacyConfiguration(JsonDocument& config) {
     JsonArray boardsArray = boardsDoc.to<JsonArray>();
     if (getRelayBoards(boardsArray)) {
         // Populate relay board registry
+        logger->info("=== RELAY BOARDS REGISTRY ===");
         for (JsonObject board : boardsArray) {
-            RelayBoardInfo info(
-                board["id"].as<uint8_t>(),
-                board["device_id"].as<uint8_t>(),
-                board["name"].as<String>(),
-                board["total_channels"].as<uint8_t>()
-            );
+            uint8_t id = board["id"].as<uint8_t>();
+            uint8_t device_id = board["device_id"].as<uint8_t>();
+            String name = board["name"].as<String>();
+            uint8_t channels = board["total_channels"].as<uint8_t>();
+            
+            logger->info("RelayBoard: id=" + String(id) + " device_id=" + String(device_id) + 
+                        " name=" + name + " channels=" + String(channels));
+            
+            RelayBoardInfo info(id, device_id, name, channels);
             DeviceRegistry::getInstance()->addRelayBoard(info);
         }
         if (logger) {
-            logger->debug("ScreenApiClient: Legacy - Registered " + String(DeviceRegistry::getInstance()->getRelayBoardCount()) + " relay boards");
+            logger->info("ScreenApiClient: Registered " + String(DeviceRegistry::getInstance()->getRelayBoardCount()) + " relay boards");
+            logger->info("===========================");
         }
     }
     

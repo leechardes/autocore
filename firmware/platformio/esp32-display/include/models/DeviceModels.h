@@ -59,16 +59,36 @@ public:
     
     // Resolve relay_board_id -> device uuid
     String resolveRelayBoardToUuid(uint8_t relay_board_id) {
+        Serial.printf("[DeviceRegistry] Resolving relay_board_id: %d\n", relay_board_id);
+        Serial.printf("[DeviceRegistry] Total relay boards: %d\n", relayBoards.size());
+        
         auto boardIt = relayBoards.find(relay_board_id);
         if (boardIt == relayBoards.end()) {
+            Serial.println("[DeviceRegistry] Relay board not found!");
+            // Listar boards disponíveis
+            Serial.println("[DeviceRegistry] Available relay boards:");
+            for (auto& pair : relayBoards) {
+                Serial.printf("  - Board ID: %d, Device ID: %d, Name: %s\n", 
+                    pair.second.id, pair.second.device_id, pair.second.name.c_str());
+            }
             return ""; // Relay board não encontrado
         }
         
+        Serial.printf("[DeviceRegistry] Found relay board, device_id: %d\n", boardIt->second.device_id);
+        
         auto deviceIt = devices.find(boardIt->second.device_id);
         if (deviceIt == devices.end()) {
+            Serial.println("[DeviceRegistry] Device not found!");
+            // Listar devices disponíveis
+            Serial.println("[DeviceRegistry] Available devices:");
+            for (auto& pair : devices) {
+                Serial.printf("  - Device ID: %d, UUID: %s, Type: %s\n", 
+                    pair.second.id, pair.second.uuid.c_str(), pair.second.type.c_str());
+            }
             return ""; // Device não encontrado
         }
         
+        Serial.printf("[DeviceRegistry] Resolved UUID: %s\n", deviceIt->second.uuid.c_str());
         return deviceIt->second.uuid;
     }
     
