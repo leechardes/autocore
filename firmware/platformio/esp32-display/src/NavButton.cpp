@@ -76,6 +76,25 @@ NavButton::NavButton(lv_obj_t* parent, const String& text, const String& iconId,
         NavButton* navBtn = (NavButton*)lv_event_get_user_data(e);
         lv_event_code_t event = lv_event_get_code(e);
         
+        // Log para debug
+        if (event == LV_EVENT_CLICKED || event == LV_EVENT_PRESSED || event == LV_EVENT_RELEASED) {
+            Serial.printf("[NavButton] Event received: %s for button: %s\n", 
+                event == LV_EVENT_CLICKED ? "CLICKED" :
+                event == LV_EVENT_PRESSED ? "PRESSED" : "RELEASED",
+                navBtn ? navBtn->id.c_str() : "NULL");
+                
+            if (navBtn) {
+                Serial.printf("[NavButton] Function type: %s, Has callback: %s\n", 
+                    navBtn->functionType.c_str(),
+                    navBtn->clickCallback ? "YES" : "NO");
+            }
+        }
+        
+        if (!navBtn) {
+            Serial.println("[NavButton] ERROR: navBtn is NULL in event handler!");
+            return;
+        }
+        
         if (navBtn->functionType == "momentary") {
             // Para botões momentâneos: press/release
             if (event == LV_EVENT_PRESSED) {

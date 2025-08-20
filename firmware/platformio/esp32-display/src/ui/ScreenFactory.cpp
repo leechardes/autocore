@@ -202,6 +202,7 @@ std::unique_ptr<ScreenBase> ScreenFactory::createScreen(JsonObject& config) {
                 // Detectar formato antigo (type="relay" com device/channel)
                 if (item["type"].is<JsonVariant>()) {
                     String oldType = item["type"].as<String>();
+                    logger->info("[ADAPTER] Detected old format with type: " + oldType);
                     
                     if (oldType == "relay") {
                         // Converter formato antigo para novo
@@ -320,6 +321,9 @@ std::unique_ptr<ScreenBase> ScreenFactory::createScreen(JsonObject& config) {
                 logger->debug("  Data Path: " + item["data_path"].as<String>());
                 
                 NavButton* navBtn = nullptr;
+                
+                // Log final antes de criar o componente
+                logger->info("[FINAL TYPE] itemType='" + itemType + "' actionType='" + actionType + "'");
                 
                 // Mapear tipos da API para tipos internos (NOVOS ENUMS LOWERCASE)
                 if (itemType == "button" && actionType == "relay_control") {
