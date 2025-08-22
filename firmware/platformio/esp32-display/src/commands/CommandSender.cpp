@@ -54,11 +54,11 @@ bool CommandSender::sendCommand(NavButton* button) {
                     "toggle"  // Function type
                 );
             } else {
-                // Para botões momentary, permitir comandos repetidos mas com debounce menor
+                // Para botões momentary, enviar ON quando pressionado, OFF quando liberado
                 return sendRelayCommand(
                     button->getDeviceId(),
                     button->getChannel(),
-                    "ON",  // Momentary sempre ON
+                    button->getIsPressed() ? "ON" : "OFF",  // ON quando pressionado, OFF quando liberado
                     "momentary"   // Function type
                 );
             }
@@ -99,10 +99,11 @@ bool CommandSender::sendRelayCommand(const String& targetUuid, int channel,
     }
     
     // V2.2.0: Comando para dispositivo usando UUID completo
-    String topic = "autocore/devices/" + targetUuid + "/command";
+    // Para placas de relé, usar tópico específico /relays/set
+    String topic = "autocore/devices/" + targetUuid + "/relays/set";
     logger->info("MQTT Topic: " + topic);
     
-    StaticJsonDocument<512> doc;
+    JsonDocument doc;
     MQTTProtocol::addProtocolFields(doc); // Adiciona protocol_version, uuid, timestamp
     
     doc["channel"] = channel;
@@ -175,9 +176,10 @@ void CommandSender::sendHeartbeat(const String& targetUuid, int channel) {
     if (!heartbeatActive[idx]) return;
     
     // V2.2.0: Heartbeat usando UUID completo
-    String topic = "autocore/devices/" + targetUuid + "/heartbeat";
+    // Para placas de relé, usar tópico específico /relays/heartbeat
+    String topic = "autocore/devices/" + targetUuid + "/relays/heartbeat";
     
-    StaticJsonDocument<512> doc;
+    JsonDocument doc;
     MQTTProtocol::addProtocolFields(doc);
     
     doc["channel"] = channel;
@@ -198,7 +200,10 @@ void CommandSender::processHeartbeats() {
     
     for (int i = 0; i < MAX_CHANNELS; i++) {
         if (heartbeatActive[i]) {
-            if (now - lastHeartbeat[i] >= HEARTBEAT_INTERVAL_MS) {
+            unsigned long elapsed = now - lastHeartbeat[i];
+            if (elapsed >= HEARTBEAT_INTERVAL_MS) {
+                logger->debug("CMD: Sending heartbeat for channel " + String(i+1) + 
+                           " (elapsed: " + String(elapsed) + "ms)");
                 sendHeartbeat(heartbeatTargetDevice[i], i + 1);
             }
         }
@@ -209,7 +214,7 @@ void CommandSender::sendDisplayEvent(const String& eventType, const JsonObject& 
     // V2.2.0: Eventos do display usando UUID
     String topic = "autocore/devices/" + MQTTProtocol::getDeviceUUID() + "/telemetry/touch";
     
-    StaticJsonDocument<512> doc;
+    JsonDocument doc;
     MQTTProtocol::addProtocolFields(doc);
     
     doc["event"] = eventType;
@@ -224,7 +229,7 @@ bool CommandSender::sendPresetCommand(const String& preset) {
     // V2.2.0: Preset execution topic
     String topic = "autocore/preset/execute";
     
-    StaticJsonDocument<512> doc;
+    JsonDocument doc;
     MQTTProtocol::addProtocolFields(doc);
     
     doc["preset_id"] = preset;
@@ -242,7 +247,7 @@ bool CommandSender::sendModeCommand(const String& mode) {
     // V2.2.0: System control topic
     String topic = "autocore/system/control";
     
-    StaticJsonDocument<512> doc;
+    JsonDocument doc;
     MQTTProtocol::addProtocolFields(doc);
     
     doc["command_type"] = "set_mode";
@@ -261,7 +266,7 @@ bool CommandSender::sendActionCommand(const String& action, JsonObject& params) 
     // V2.2.0: System control topic
     String topic = "autocore/system/control";
     
-    StaticJsonDocument<512> doc;
+    JsonDocument doc;
     MQTTProtocol::addProtocolFields(doc);
     
     doc["command_type"] = "action";

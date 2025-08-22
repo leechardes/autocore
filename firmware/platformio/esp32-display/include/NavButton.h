@@ -68,7 +68,10 @@ public:
     String getId() const { return id; }
     
     void setClickCallback(std::function<void(NavButton*)> callback) {
+        Serial.printf("[NavButton] setClickCallback called for button: %s\n", id.c_str());
         clickCallback = callback;
+        Serial.printf("[NavButton] Callback set successfully! Has callback: %s\n", 
+                     clickCallback ? "YES" : "NO");
     }
     
     void setState(bool on);
@@ -87,6 +90,7 @@ public:
         deviceId = device;
         channel = ch;
         mode = m;
+        functionType = m;  // Garantir que functionType também é setado
     }
     
     // Configuração para ações/presets

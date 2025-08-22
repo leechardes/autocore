@@ -18,6 +18,7 @@ TouchHandler::TouchHandler() {
     touchscreen = nullptr;
     indev = nullptr;
     debugEnabled = true;  // Habilitar debug
+    logger = ::logger;  // Usar logger global
 }
 
 TouchHandler::~TouchHandler() {
@@ -76,36 +77,51 @@ void TouchHandler::read(lv_indev_drv_t* indev_driver, lv_indev_data_t* data) {
     }
     
     TouchHandler* handler = (TouchHandler*)indev_driver->user_data;
+    uint32_t now = millis();
+    
+    // Ler estado raw do touch
+    bool rawPressed = false;
+    TS_Point p;
     
     if (handler->touchscreen->touched()) {
-        TS_Point p = handler->touchscreen->getPoint();
+        p = handler->touchscreen->getPoint();
         
-        // Filter by pressure
-        if (p.z < MIN_PRESSURE) {
-            data->state = LV_INDEV_STATE_REL;
-            return;
+        // Filtrar por pressão - threshold mais alto
+        if (p.z >= MIN_PRESSURE) {
+            rawPressed = true;
         }
+    }
+    
+    // Filtro de estado para estabilização
+    if (rawPressed != handler->lastRawState) {
+        // Estado mudou, iniciar timer de confirmação
+        handler->lastRawState = rawPressed;
+        handler->stateChangeTime = now;
         
-        // Debounce
-        uint32_t now = millis();
-        if (now - handler->lastTouchTime < DEBOUNCE_TIME) {
-            return;
+        // Debug raw values apenas na mudança
+        if (handler->debugEnabled && handler->logger) {
+            handler->logger->info("[TOUCH] State change detected: " + 
+                        String(rawPressed ? "PRESSED" : "RELEASED") + 
+                        " (pressure: " + String(p.z) + ")");
         }
-        handler->lastTouchTime = now;
-        
-        // Debug raw values
-        if (handler->debugEnabled && (now - handler->lastDebugTime > DEBUG_INTERVAL)) {
-            logger->info("[TOUCH] RAW: X=" + String(p.x) + ", Y=" + String(p.y) + ", Z=" + String(p.z));
-            handler->lastDebugTime = now;
+    }
+    
+    // Confirmar mudança de estado após tempo de estabilização
+    if (handler->lastRawState != handler->touchState) {
+        if (now - handler->stateChangeTime >= STATE_CONFIRM_TIME) {
+            // Estado confirmado, aplicar mudança
+            handler->touchState = handler->lastRawState;
+            
+            if (handler->debugEnabled && handler->logger) {
+                handler->logger->info("[TOUCH] State confirmed: " + 
+                            String(handler->touchState ? "PRESSED" : "RELEASED"));
+            }
         }
-        
-        // Auto-calibration (optional)
-        if (p.x < handler->touchMinX) handler->touchMinX = p.x;
-        if (p.x > handler->touchMaxX) handler->touchMaxX = p.x;
-        if (p.y < handler->touchMinY) handler->touchMinY = p.y;
-        if (p.y > handler->touchMaxY) handler->touchMaxY = p.y;
-        
-        // Map to screen coordinates
+    }
+    
+    // Retornar estado estável
+    if (handler->touchState && rawPressed) {
+        // Mapear coordenadas apenas se realmente pressionado
         data->point.x = map(p.x, handler->touchMinX, handler->touchMaxX, 0, SCREEN_WIDTH - 1);
         data->point.y = map(p.y, handler->touchMinY, handler->touchMaxY, 0, SCREEN_HEIGHT - 1);
         
@@ -113,12 +129,16 @@ void TouchHandler::read(lv_indev_drv_t* indev_driver, lv_indev_data_t* data) {
         data->point.x = constrain(data->point.x, 0, SCREEN_WIDTH - 1);
         data->point.y = constrain(data->point.y, 0, SCREEN_HEIGHT - 1);
         
-        // Debug mapped values
-        if (handler->debugEnabled && (handler->lastDebugTime == now)) {
-            logger->info("[TOUCH] MAPPED: X=" + String(data->point.x) + ", Y=" + String(data->point.y));
-        }
-        
         data->state = LV_INDEV_STATE_PR;
+        
+        // Log apenas se debugEnabled
+        if (handler->debugEnabled && (now - handler->lastDebugTime > 1000)) {
+            handler->lastDebugTime = now;
+            if (handler->logger) {
+                handler->logger->info("[TOUCH] STABLE - X=" + String(data->point.x) + 
+                                    ", Y=" + String(data->point.y));
+            }
+        }
     } else {
         data->state = LV_INDEV_STATE_REL;
     }

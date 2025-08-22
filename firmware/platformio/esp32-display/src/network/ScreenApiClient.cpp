@@ -453,12 +453,49 @@ bool ScreenApiClient::processUnifiedResponse(const JsonDocument& response, JsonD
     config["version"] = response["version"];
     config["protocol_version"] = response["protocol_version"];
     
+    // Process devices and populate DeviceRegistry
     if (response["devices"]) {
         config["devices"] = response["devices"];
+        
+        // Populate device registry
+        logger->info("=== DEVICE REGISTRY POPULATION (Unified) ===");
+        JsonArrayConst devices = response["devices"].as<JsonArrayConst>();
+        for (JsonVariantConst device : devices) {
+            uint8_t id = device["id"] | 0;
+            String uuid = device["uuid"] | "";
+            String type = device["type"] | "";
+            String name = device["name"] | "";
+            
+            if (id > 0 && !uuid.isEmpty()) {
+                logger->info("Device: id=" + String(id) + " uuid=" + uuid + " type=" + type + " name=" + name);
+                DeviceInfo info(id, uuid, type, name);
+                DeviceRegistry::getInstance()->addDevice(info);
+            }
+        }
+        logger->info("Registered " + String(DeviceRegistry::getInstance()->getDeviceCount()) + " devices");
     }
     
     if (response["relay_boards"]) {
         config["relay_boards"] = response["relay_boards"];
+        
+        // Populate relay board registry
+        logger->info("=== RELAY BOARDS REGISTRY (Unified) ===");
+        JsonArrayConst boards = response["relay_boards"].as<JsonArrayConst>();
+        for (JsonVariantConst board : boards) {
+            uint8_t id = board["id"] | 0;
+            uint8_t device_id = board["device_id"] | 0;
+            String name = board["name"] | "";
+            uint8_t channels = board["total_channels"] | 16;
+            
+            if (id > 0) {
+                logger->info("RelayBoard: id=" + String(id) + " device_id=" + String(device_id) + 
+                            " name=" + name + " channels=" + String(channels));
+                RelayBoardInfo info(id, device_id, name, channels);
+                DeviceRegistry::getInstance()->addRelayBoard(info);
+            }
+        }
+        logger->info("Registered " + String(DeviceRegistry::getInstance()->getRelayBoardCount()) + " relay boards");
+        logger->info("===========================");
     }
     
     if (response["screens"]) {

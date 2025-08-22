@@ -96,6 +96,11 @@
 #define BUTTON_DEBOUNCE_DELAY 50               // Debounce dos botões (ms)
 #define BUTTON_LONG_PRESS_TIME 1000            // Tempo para long press (ms)
 
+// Touch Screen - Configurações melhoradas
+#define TOUCH_MIN_PRESSURE 400          // Threshold maior para evitar ruído
+#define TOUCH_DEBOUNCE_TIME 100         // Debounce maior
+#define TOUCH_STATE_CONFIRM_TIME 150    // Tempo para confirmar mudança de estado
+
 // Recursos
 #define ENABLE_OTA true                        // Habilitar atualização OTA
 #define ENABLE_WEB_CONFIG false                // Habilitar configuração via web

@@ -6,6 +6,7 @@ analyzer:
     - "**/*.freezed.dart"
     - "build/**"
     - "lib/generated/**"
+    - "docs/**"
   
   language:
     strict-casts: true

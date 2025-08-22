@@ -76,8 +76,13 @@ NavButton::NavButton(lv_obj_t* parent, const String& text, const String& iconId,
         NavButton* navBtn = (NavButton*)lv_event_get_user_data(e);
         lv_event_code_t event = lv_event_get_code(e);
         
-        // Log para debug
+        // Log para debug - mas não logar CLICKED para momentâneos
         if (event == LV_EVENT_CLICKED || event == LV_EVENT_PRESSED || event == LV_EVENT_RELEASED) {
+            // Pular log de CLICKED para botões momentâneos
+            if (navBtn && navBtn->functionType == "momentary" && event == LV_EVENT_CLICKED) {
+                return;  // Ignorar completamente CLICKED para momentâneos
+            }
+            
             Serial.printf("[NavButton] Event received: %s for button: %s\n", 
                 event == LV_EVENT_CLICKED ? "CLICKED" :
                 event == LV_EVENT_PRESSED ? "PRESSED" : "RELEASED",
@@ -96,18 +101,23 @@ NavButton::NavButton(lv_obj_t* parent, const String& text, const String& iconId,
         }
         
         if (navBtn->functionType == "momentary") {
-            // Para botões momentâneos: press/release
+            // Para botões momentâneos: confiar no estado filtrado do TouchHandler
             if (event == LV_EVENT_PRESSED) {
-                navBtn->setPressed(true);
-                if (navBtn->clickCallback) {
-                    navBtn->clickCallback(navBtn);
+                if (!navBtn->getIsPressed()) {  // Só processar se não estava pressionado
+                    navBtn->setPressed(true);
+                    if (navBtn->clickCallback) {
+                        navBtn->clickCallback(navBtn);
+                    }
                 }
             } else if (event == LV_EVENT_RELEASED) {
-                navBtn->setPressed(false);
-                if (navBtn->clickCallback) {
-                    navBtn->clickCallback(navBtn);
+                if (navBtn->getIsPressed()) {   // Só processar se estava pressionado
+                    navBtn->setPressed(false);
+                    if (navBtn->clickCallback) {
+                        navBtn->clickCallback(navBtn);
+                    }
                 }
             }
+            // Ignorar LV_EVENT_CLICKED para momentâneos
         } else {
             // Para botões toggle: apenas clicked com debounce
             if (event == LV_EVENT_CLICKED) {

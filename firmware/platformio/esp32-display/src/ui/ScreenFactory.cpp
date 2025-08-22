@@ -227,7 +227,7 @@ std::unique_ptr<ScreenBase> ScreenFactory::createScreen(JsonObject& config) {
                         // Converter mode para action_payload
                         if (item["mode"].is<JsonVariant>()) {
                             String mode = item["mode"].as<String>();
-                            JsonObject payload = item.createNestedObject("action_payload");
+                            JsonObject payload = item["action_payload"].to<JsonObject>();
                             payload["momentary"] = (mode == "momentary");
                         }
                         
@@ -621,7 +621,17 @@ NavButton* ScreenFactory::createRelayItem(lv_obj_t* parent, JsonObject& config) 
     
     // Determinar function_type
     String function_type = "toggle"; // default
-    if (action_payload["momentary"].is<bool>() && action_payload["momentary"]) {
+    
+    // Primeiro verificar se tem relay_channel.function_type (novo formato)
+    if (config["relay_channel"].is<JsonObject>()) {
+        JsonObject relay_channel = config["relay_channel"];
+        if (relay_channel["function_type"].is<const char*>()) {
+            function_type = relay_channel["function_type"].as<String>();
+            logger->info("[createRelayItem] Found function_type in relay_channel: " + function_type);
+        }
+    }
+    // Fallback para action_payload["momentary"] (formato antigo)
+    else if (action_payload["momentary"].is<bool>() && action_payload["momentary"]) {
         function_type = "momentary";
     }
     
@@ -708,10 +718,12 @@ NavButton* ScreenFactory::createRelayItem(lv_obj_t* parent, JsonObject& config) 
             newState = !currentState;
             logger->info("Toggle: current=" + String(currentState) + " new=" + String(newState));
         } else if (function_type == "momentary") {
-            // Para momentary, usar o estado pressed do botão
+            // Para momentary: true quando pressionado, false quando liberado
+            // Não usar estado do botão, apenas se está pressionado
             newState = b->getIsPressed();
             logger->info(String("Momentary button ") + (newState ? "PRESSED" : "RELEASED") + 
-                       " - channel " + String(relay_channel_id));
+                       " - channel " + String(relay_channel_id) + 
+                       " - sending state: " + String(newState ? "true" : "false"));
         }
         
         String stateStr = newState ? "on" : "off";

@@ -1,0 +1,858 @@
+openapi: 3.0.0
+info:
+  title: AutoCore Config API
+  description: API para configuração e gerenciamento do sistema AutoCore
+  version: 2.0.0
+  contact:
+    name: Equipe AutoCore
+    email: dev@autocore.com
+  license:
+    name: MIT
+    url: https://opensource.org/licenses/MIT
+
+servers:
+  - url: http://localhost:8081
+    description: Servidor de desenvolvimento
+  - url: https://api.autocore.local
+    description: Servidor de produção local
+
+paths:
+  /:
+    get:
+      summary: Informações da API
+      description: Endpoint raiz que retorna informações básicas da API
+      tags:
+        - Root
+      responses:
+        '200':
+          description: Informações da API
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                    example: "AutoCore Config API"
+                  version:
+                    type: string
+                    example: "2.0.0"
+                  status:
+                    type: string
+                    example: "online"
+                  docs:
+                    type: string
+                    example: "/docs"
+                  timestamp:
+                    type: string
+                    format: date-time
+
+  /api/health:
+    get:
+      summary: Health Check
+      description: Verifica se a API está funcionando
+      tags:
+        - Sistema
+      responses:
+        '200':
+          description: API funcionando
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HealthResponse'
+
+  /api/status:
+    get:
+      summary: Status do Sistema
+      description: Retorna status completo do sistema
+      tags:
+        - Sistema
+      responses:
+        '200':
+          description: Status do sistema
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/StatusResponse'
+
+  /api/devices:
+    get:
+      summary: Listar Dispositivos
+      description: Lista todos os dispositivos cadastrados
+      tags:
+        - Dispositivos
+      responses:
+        '200':
+          description: Lista de dispositivos
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/DeviceResponse'
+        '500':
+          $ref: '#/components/responses/InternalError'
+
+    post:
+      summary: Criar Dispositivo
+      description: Registra um novo dispositivo no sistema
+      tags:
+        - Dispositivos
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/DeviceBase'
+      responses:
+        '201':
+          description: Dispositivo criado com sucesso
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DeviceResponse'
+        '409':
+          description: UUID já existe
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '422':
+          $ref: '#/components/responses/ValidationError'
+
+  /api/devices/{device_id}:
+    get:
+      summary: Buscar Dispositivo
+      description: Busca dispositivo por ID numérico ou UUID
+      tags:
+        - Dispositivos
+      parameters:
+        - name: device_id
+          in: path
+          required: true
+          schema:
+            type: string
+          description: ID numérico ou UUID do dispositivo
+      responses:
+        '200':
+          description: Dispositivo encontrado
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DeviceResponse'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+    patch:
+      summary: Atualizar Dispositivo
+      description: Atualiza um dispositivo existente
+      tags:
+        - Dispositivos
+      parameters:
+        - name: device_id
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/DeviceUpdate'
+      responses:
+        '200':
+          description: Dispositivo atualizado
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DeviceResponse'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+    delete:
+      summary: Remover Dispositivo
+      description: Remove dispositivo (soft delete)
+      tags:
+        - Dispositivos
+      parameters:
+        - name: device_id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: Dispositivo removido
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SuccessMessage'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /api/screens:
+    get:
+      summary: Listar Telas
+      description: Lista todas as telas configuradas
+      tags:
+        - Interface
+      responses:
+        '200':
+          description: Lista de telas
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/ScreenResponse'
+
+    post:
+      summary: Criar Tela
+      description: Cria uma nova tela
+      tags:
+        - Interface
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ScreenCreate'
+      responses:
+        '201':
+          description: Tela criada
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ScreenResponse'
+
+  /api/screens/{screen_id}:
+    get:
+      summary: Buscar Tela
+      description: Busca uma tela específica
+      tags:
+        - Interface
+      parameters:
+        - name: screen_id
+          in: path
+          required: true
+          schema:
+            type: integer
+        - name: include_items
+          in: query
+          schema:
+            type: boolean
+            default: false
+          description: Incluir itens da tela
+      responses:
+        '200':
+          description: Tela encontrada
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ScreenDetailResponse'
+
+  /api/relays/boards:
+    get:
+      summary: Listar Placas de Relé
+      description: Lista placas de relé ativas
+      tags:
+        - Relés
+      responses:
+        '200':
+          description: Lista de placas
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/RelayBoardResponse'
+
+    post:
+      summary: Criar Placa de Relé
+      description: Cria nova placa associada a um dispositivo
+      tags:
+        - Relés
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RelayBoardCreate'
+      responses:
+        '201':
+          description: Placa criada
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SuccessMessage'
+
+  /api/relays/channels:
+    get:
+      summary: Listar Canais de Relé
+      description: Lista canais de relé ativos
+      tags:
+        - Relés
+      parameters:
+        - name: board_id
+          in: query
+          schema:
+            type: integer
+          description: Filtrar por placa específica
+      responses:
+        '200':
+          description: Lista de canais
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/RelayChannelResponse'
+
+  /api/relays/channels/{channel_id}:
+    patch:
+      summary: Atualizar Canal
+      description: Atualiza configurações de um canal
+      tags:
+        - Relés
+      parameters:
+        - name: channel_id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RelayChannelUpdate'
+      responses:
+        '200':
+          description: Canal atualizado
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RelayChannelResponse'
+
+  /api/mqtt/publish:
+    post:
+      summary: Publicar MQTT
+      description: Publica mensagem MQTT
+      tags:
+        - MQTT
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/MQTTPublishRequest'
+      responses:
+        '200':
+          description: Mensagem publicada
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MQTTPublishResponse'
+
+  /api/config/full/{device_uuid}:
+    get:
+      summary: Configuração Completa
+      description: Retorna configuração completa para dispositivo
+      tags:
+        - Configuração
+      parameters:
+        - name: device_uuid
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: preview
+          in: query
+          schema:
+            type: boolean
+            default: false
+          description: Modo preview
+      responses:
+        '200':
+          description: Configuração completa
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/FullConfigResponse'
+
+components:
+  schemas:
+    # Dispositivos
+    DeviceBase:
+      type: object
+      required:
+        - uuid
+        - name
+        - type
+      properties:
+        uuid:
+          type: string
+          pattern: '^[a-zA-Z0-9_-]+$'
+          minLength: 3
+          maxLength: 50
+          example: esp32-display-001
+        name:
+          type: string
+          minLength: 1
+          maxLength: 100
+          example: Display Principal
+        type:
+          type: string
+          enum: [esp32_display, esp32_relay, hmi_display, gateway]
+          example: esp32_display
+        mac_address:
+          type: string
+          pattern: '^([0-9A-Fa-f]{2}[:-]){5}([0-9A-Fa-f]{2})$'
+          example: 'AA:BB:CC:DD:EE:FF'
+        ip_address:
+          type: string
+          format: ipv4
+          example: 192.168.1.100
+        firmware_version:
+          type: string
+          pattern: '^\d+\.\d+\.\d+$'
+          example: 1.2.3
+        hardware_version:
+          type: string
+          example: v2.1
+
+    DeviceUpdate:
+      type: object
+      properties:
+        name:
+          type: string
+          minLength: 1
+          maxLength: 100
+        type:
+          type: string
+          enum: [esp32_display, esp32_relay, hmi_display, gateway]
+        ip_address:
+          type: string
+          format: ipv4
+        location:
+          type: string
+          maxLength: 200
+        is_active:
+          type: boolean
+        configuration:
+          type: object
+        capabilities:
+          type: object
+
+    DeviceResponse:
+      type: object
+      required:
+        - id
+        - uuid
+        - name
+        - type
+        - status
+        - is_active
+        - created_at
+        - updated_at
+      properties:
+        id:
+          type: integer
+          example: 1
+        uuid:
+          type: string
+          example: esp32-display-001
+        name:
+          type: string
+          example: Display Principal
+        type:
+          type: string
+          example: esp32_display
+        mac_address:
+          type: string
+          nullable: true
+          example: 'AA:BB:CC:DD:EE:FF'
+        ip_address:
+          type: string
+          nullable: true
+          example: 192.168.1.100
+        firmware_version:
+          type: string
+          nullable: true
+          example: 1.2.3
+        hardware_version:
+          type: string
+          nullable: true
+          example: v2.1
+        status:
+          type: string
+          enum: [online, offline, error, updating]
+          example: online
+        last_seen:
+          type: string
+          format: date-time
+          nullable: true
+        location:
+          type: string
+          nullable: true
+          example: Sala de Controle
+        configuration_json:
+          type: string
+          nullable: true
+        capabilities_json:
+          type: string
+          nullable: true
+        is_active:
+          type: boolean
+          example: true
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+
+    # Telas
+    ScreenCreate:
+      type: object
+      required:
+        - name
+        - title
+        - screen_type
+      properties:
+        name:
+          type: string
+          pattern: '^[a-zA-Z0-9_-]+$'
+          example: main_dashboard
+        title:
+          type: string
+          example: Dashboard Principal
+        icon:
+          type: string
+          example: home
+        screen_type:
+          type: string
+          enum: [dashboard, control, monitoring, settings, navigation]
+        position:
+          type: integer
+          minimum: 1
+        is_visible:
+          type: boolean
+          default: true
+
+    ScreenResponse:
+      type: object
+      properties:
+        id:
+          type: integer
+          example: 1
+        name:
+          type: string
+          example: main_dashboard
+        title:
+          type: string
+          example: Dashboard Principal
+        icon:
+          type: string
+          nullable: true
+        screen_type:
+          type: string
+        position:
+          type: integer
+        is_visible:
+          type: boolean
+        items_count:
+          type: integer
+          description: Número de itens na tela
+        created_at:
+          type: string
+          format: date-time
+
+    ScreenDetailResponse:
+      allOf:
+        - $ref: '#/components/schemas/ScreenResponse'
+        - type: object
+          properties:
+            items:
+              type: array
+              items:
+                $ref: '#/components/schemas/ScreenItemResponse'
+
+    ScreenItemResponse:
+      type: object
+      properties:
+        id:
+          type: integer
+        screen_id:
+          type: integer
+        item_type:
+          type: string
+          enum: [button, gauge, display, navigation, separator]
+        name:
+          type: string
+        label:
+          type: string
+        icon:
+          type: string
+          nullable: true
+        position:
+          type: integer
+        action_type:
+          type: string
+          enum: [none, relay_toggle, relay_on, relay_off, navigate, macro]
+        is_active:
+          type: boolean
+
+    # Relés
+    RelayBoardCreate:
+      type: object
+      required:
+        - device_id
+      properties:
+        device_id:
+          type: integer
+          minimum: 1
+        total_channels:
+          type: integer
+          minimum: 1
+          maximum: 32
+          default: 16
+        board_model:
+          type: string
+          example: 16CH_5V
+
+    RelayBoardResponse:
+      type: object
+      properties:
+        id:
+          type: integer
+        device_id:
+          type: integer
+        name:
+          type: string
+        total_channels:
+          type: integer
+        board_model:
+          type: string
+        is_active:
+          type: boolean
+
+    RelayChannelUpdate:
+      type: object
+      properties:
+        name:
+          type: string
+          maxLength: 50
+        description:
+          type: string
+          maxLength: 200
+        function_type:
+          type: string
+          enum: [toggle, on, off, momentary, pulse]
+        icon:
+          type: string
+        color:
+          type: string
+          pattern: '^#[0-9A-Fa-f]{6}$'
+        protection_mode:
+          type: string
+          enum: [none, timeout, cooldown, schedule]
+
+    RelayChannelResponse:
+      type: object
+      properties:
+        id:
+          type: integer
+        board_id:
+          type: integer
+        channel_number:
+          type: integer
+        name:
+          type: string
+        description:
+          type: string
+          nullable: true
+        function_type:
+          type: string
+        icon:
+          type: string
+          nullable: true
+        color:
+          type: string
+          nullable: true
+        protection_mode:
+          type: string
+
+    # MQTT
+    MQTTPublishRequest:
+      type: object
+      required:
+        - topic
+        - payload
+      properties:
+        topic:
+          type: string
+          example: autocore/devices/esp32-001/command
+        payload:
+          type: object
+        qos:
+          type: integer
+          enum: [0, 1, 2]
+          default: 1
+        retain:
+          type: boolean
+          default: false
+
+    MQTTPublishResponse:
+      type: object
+      properties:
+        success:
+          type: boolean
+        message:
+          type: string
+        topic:
+          type: string
+        message_id:
+          type: string
+        timestamp:
+          type: string
+          format: date-time
+
+    # Sistema
+    StatusResponse:
+      type: object
+      properties:
+        status:
+          type: string
+          enum: [online, degraded, offline]
+        version:
+          type: string
+        database:
+          type: string
+          enum: [connected, disconnected, error]
+        devices_online:
+          type: integer
+        timestamp:
+          type: string
+          format: date-time
+
+    HealthResponse:
+      type: object
+      properties:
+        status:
+          type: string
+          enum: [healthy, unhealthy]
+        service:
+          type: string
+        timestamp:
+          type: string
+          format: date-time
+
+    # Configuração
+    FullConfigResponse:
+      type: object
+      properties:
+        version:
+          type: string
+        protocol_version:
+          type: string
+        timestamp:
+          type: string
+          format: date-time
+        device:
+          type: object
+        system:
+          type: object
+        screens:
+          type: array
+          items:
+            type: object
+        devices:
+          type: array
+          items:
+            type: object
+        relay_boards:
+          type: array
+          items:
+            type: object
+        theme:
+          type: object
+        telemetry:
+          type: object
+
+    # Utilitários
+    SuccessMessage:
+      type: object
+      properties:
+        message:
+          type: string
+          example: Operação realizada com sucesso
+
+    ErrorResponse:
+      type: object
+      properties:
+        detail:
+          type: string
+        error_code:
+          type: string
+        timestamp:
+          type: string
+          format: date-time
+        path:
+          type: string
+
+  responses:
+    NotFound:
+      description: Recurso não encontrado
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+          example:
+            detail: Recurso não encontrado
+            error_code: NOT_FOUND
+
+    ValidationError:
+      description: Erro de validação
+      content:
+        application/json:
+          schema:
+            type: object
+            properties:
+              detail:
+                type: array
+                items:
+                  type: object
+                  properties:
+                    loc:
+                      type: array
+                      items:
+                        type: string
+                    msg:
+                      type: string
+                    type:
+                      type: string
+
+    InternalError:
+      description: Erro interno do servidor
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+
+tags:
+  - name: Root
+    description: Endpoints básicos da API
+  - name: Sistema
+    description: Status e saúde do sistema
+  - name: Dispositivos
+    description: Gerenciamento de dispositivos ESP32
+  - name: Interface
+    description: Configuração de telas e UI
+  - name: Relés
+    description: Controle de placas e canais de relé
+  - name: MQTT
+    description: Comunicação e messaging
+  - name: Configuração
+    description: Configurações para dispositivos

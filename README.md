@@ -2,6 +2,17 @@
 
 Sistema completo de automação veicular com ESP32, MQTT e controle via app.
 
+## 📚 Documentação Completa
+
+### [📖 Central de Documentação](docs/README.md)
+Acesso completo a toda documentação organizada do projeto.
+
+### [🚀 Hub de Projetos](docs/projects/README.md)
+Links diretos para documentação de cada componente do sistema.
+
+### [🤖 Sistema de Agentes](docs/agents/README.md)
+Agentes automatizados para documentação e desenvolvimento.
+
 ## 📋 Visão Geral
 
 O AutoCore é um sistema modular de automação veicular que permite controlar e monitorar diversos aspectos do veículo através de dispositivos ESP32 conectados via MQTT. O sistema oferece controle local (display touch), remoto (app mobile) e configuração via web.
@@ -71,20 +82,40 @@ npm run dev
 
 ```
 autocore/
-├── config-app/          # Aplicação de configuração
-│   ├── backend/        # API FastAPI
-│   └── frontend/       # Interface React
-├── database/           # Schema e migrations
-├── gateway/           # Gateway central (desenvolvimento)
-├── firmware/          # Código ESP32 (desenvolvimento)
-├── mobile/           # App Flutter (desenvolvimento)
-└── docs/             # Documentação
+├── config-app/              # Aplicação de configuração
+│   ├── backend/            # API FastAPI [100% documentado]
+│   └── frontend/           # Interface React [100% documentado]
+├── database/               # Schema e migrations [100% documentado]
+├── app-flutter/            # App mobile Flutter [100% documentado]
+├── firmware/               # Firmware ESP32 [100% documentado]
+│   └── platformio/
+│       └── esp32-display/
+├── gateway/                # Gateway MQTT/HTTP [em desenvolvimento]
+├── raspberry-pi/           # Sistema embarcado [em desenvolvimento]
+└── docs/                   # Documentação central [reorganizada]
+    ├── agents/             # Sistema de agentes
+    ├── projects/           # Hub de navegação
+    ├── architecture/       # Arquitetura do sistema
+    ├── hardware/           # Documentação ESP32
+    ├── deployment/         # Guias de deploy
+    ├── standards/          # Padrões e convenções
+    └── guides/             # Guias gerais
 ```
 
-## 📖 Documentação
+## 📖 Documentação Rápida
 
-- [Arquitetura MQTT](docs/MQTT_ARCHITECTURE.md)
-- [Setup Completo](docs/guides/SETUP.md)
+### Por Componente
+- [Backend API](config-app/backend/docs/README.md)
+- [Frontend React](config-app/frontend/docs/README.md)
+- [Database](database/docs/README.md)
+- [App Flutter](app-flutter/docs/README.md)
+- [Firmware ESP32](firmware/platformio/esp32-display/docs/README.md)
+
+### Por Categoria
+- [Arquitetura MQTT](docs/architecture/mqtt-architecture.md)
+- [Estrutura do Projeto](docs/architecture/project-structure.md)
+- [Guias de Deploy](docs/deployment/deployment-guide.md)
+- [Segurança](docs/standards/security.md)
 
 ## 🔒 Segurança
 

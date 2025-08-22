@@ -11,6 +11,9 @@
 #include <SPI.h>
 #include <lvgl.h>
 
+// Forward declaration
+class Logger;
+
 class TouchHandler {
 public:
     TouchHandler();
@@ -50,9 +53,17 @@ private:
     uint32_t lastTouchTime = 0;
     uint32_t lastDebugTime = 0;
     bool debugEnabled = false;
+    Logger* logger;
     
     // Minimum pressure threshold
-    static const uint16_t MIN_PRESSURE = 200;
+    static const uint16_t MIN_PRESSURE = 400;
+    
+    // Filtro de estado para estabilização
+    bool touchState = false;           // Estado atual do touch
+    bool lastRawState = false;         // Último estado raw lido
+    uint32_t stateChangeTime = 0;      // Quando o estado mudou
+    static const uint32_t STATE_CONFIRM_TIME = 150;  // 150ms para confirmar
+    static const uint32_t IMPROVED_DEBOUNCE_TIME = 100;  // Debounce melhorado
     
     // Debounce time in ms
     static const uint32_t DEBOUNCE_TIME = 50;
