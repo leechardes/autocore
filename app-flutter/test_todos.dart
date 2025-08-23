@@ -2,7 +2,6 @@
 
 // TODO: Este é um TODO de teste
 // FIXME: Este é um FIXME de teste
-// HACK: Este é um HACK de teste
 // NOTE: Esta é uma NOTE de teste
 // BUG: Este é um BUG de teste
 
@@ -10,10 +9,10 @@ class TestTodos {
   void testMethod() {
     // TODO(teste): TODO com autor
     // TODO: TODO simples sem autor
-    print('test'); // TODO: TODO inline
-    
+    // print('test'); // TODO: TODO inline - Removido print para produção
+
     /* TODO: TODO em comentário de bloco */
-    
+
     /// TODO: TODO em doc comment
   }
 }

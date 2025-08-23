@@ -646,9 +646,121 @@ echo "✅ Flutter analyze passed!"
 ---
 
 **Última atualização**: 2025-08-23
-**Versão**: 1.1.0
+**Versão**: 1.2.0
 **Conformidade**: Flutter 3.x / Dart 3.x
 
+## 🆕 16. Padrões Específicos do Projeto AutoCore
+
+### 16.1 Material Colors Nullable
+
+⚠️ **PROBLEMA ENCONTRADO**:
+```dart
+// Colors.grey[600] retorna Color? mas componentes esperam Color
+_buildStatusRow('Status:', text, Colors.grey[600]); // ERROR
+```
+
+✅ **SOLUÇÃO**:
+```dart
+// Use null assertion quando garantido que a cor existe
+_buildStatusRow('Status:', text, Colors.grey[600]!); // OK
+
+// Ou prefira cores com fallback
+_buildStatusRow('Status:', text, Colors.grey[600] ?? Colors.grey); // MELHOR
+```
+
+### 16.2 Widget Lists com Nullable
+
+⚠️ **PROBLEMA ENCONTRADO**:
+```dart
+children: [
+  if (widget.leading != null) ...[
+    widget.leading,  // ERROR: Widget? em List<Widget>
+  ],
+],
+```
+
+✅ **SOLUÇÃO**:
+```dart
+children: [
+  if (widget.leading != null) ...[
+    widget.leading!,  // OK: garantido não-null pelo if
+  ],
+],
+```
+
+### 16.3 Switch Statements Exaustivos
+
+⚠️ **PROBLEMA ENCONTRADO**:
+```dart
+switch (type) {
+  case TypeA:
+    return valueA;
+  case TypeB:
+    return valueB;
+}
+return null; // Dead code - switch já é exaustivo
+```
+
+✅ **SOLUÇÃO**:
+```dart
+switch (type) {
+  case TypeA:
+    return valueA;
+  case TypeB:
+    return valueB;
+}
+// Sem return adicional - Dart infere que é exaustivo
+```
+
+### 16.4 Null Assertion Após Verificação
+
+⚠️ **USO INCONSISTENTE** encontrado no projeto:
+```dart
+if (action.condition != null) {
+  await _evaluateCondition(action.condition); // ERROR: ainda é nullable
+}
+
+// Mas em outros lugares:
+if (widget.telemetryKey != null) {
+  use(widget.telemetryKey!); // Uso correto após verificação
+}
+```
+
+✅ **PADRÃO CONSISTENTE**:
+```dart
+// Sempre use ! após verificação if != null
+if (action.condition != null) {
+  await _evaluateCondition(action.condition!); // OK
+}
+
+if (widget.telemetryKey != null) {
+  use(widget.telemetryKey!); // OK
+}
+```
+
+### 16.5 Smart Cast vs Explicit Null Checks
+
+O projeto teve 2 casos de null checks desnecessários que foram corrigidos:
+
+❌ **ANTES (com warning)**:
+```dart
+if (widget.item.telemetryKey != null) {
+  if (widget.relayStates.containsKey(widget.item.telemetryKey!)) {
+    // Warning: unnecessary null check após verificação
+  }
+}
+```
+
+✅ **DEPOIS (sem warning)**:
+```dart
+if (widget.item.telemetryKey != null) {
+  if (widget.relayStates.containsKey(widget.item.telemetryKey)) {
+    // Smart cast automático - sem ! necessário
+  }
+}
+```
+
 ### 📝 Changelog
-- **v1.1.0** (2025-08-23): Adicionada seção 8.3-8.5 sobre null checks desnecessários
+- **v1.2.0** (2025-08-23): Adicionada seção 16 com padrões específicos do AutoCore
+- **v1.1.0** (2025-08-23): Adicionada seção 8.3-8.5 sobre null checks desnecessários  
 - **v1.0.0** (2025-08-22): Versão inicial com 15 seções de padrões
