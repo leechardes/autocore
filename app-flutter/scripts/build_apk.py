@@ -411,7 +411,7 @@ def verify_apk_signature(apk_path):
             # APK pode estar assinado apenas com v2/v3
             print_warning("⚠️  APK não tem assinatura v1 (JAR signature)")
             print_info("   ℹ️  O APK pode estar assinado com v2/v3")
-            print_info("   ℹ️  A Cielo geralmente aceita APKs com assinatura v2/v3")
+            print_info("   ℹ️  Android geralmente aceita APKs com assinatura v2/v3")
 
             # Como não conseguimos verificar v2/v3 sem apksigner,
             # assumimos que está assinado se foi buildado pelo Flutter
@@ -446,7 +446,7 @@ def open_explorer(apk_path):
 
 # Programa principal
 def main():
-    print_header("I9 Smart PDV - Build APK")
+    print_header("AutoCore Flutter - Build APK")
 
     user = getpass.getuser()
     print_info(f"Usuário: {user}")
