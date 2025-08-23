@@ -1,0 +1,188 @@
+{
+  // Flutter Snippets para AutoCore
+  
+  "Stateless Widget AutoCore": {
+    "prefix": "acstateless",
+    "body": [
+      "import 'package:flutter/material.dart';",
+      "",
+      "class ${1:WidgetName} extends StatelessWidget {",
+      "  const ${1:WidgetName}({super.key});",
+      "",
+      "  @override",
+      "  Widget build(BuildContext context) {",
+      "    return ${2:Container}(",
+      "      ${3:// TODO: Implement widget}",
+      "    );",
+      "  }",
+      "}"
+    ],
+    "description": "Cria um Stateless Widget AutoCore"
+  },
+  
+  "Stateful Widget AutoCore": {
+    "prefix": "acstateful",
+    "body": [
+      "import 'package:flutter/material.dart';",
+      "",
+      "class ${1:WidgetName} extends StatefulWidget {",
+      "  const ${1:WidgetName}({super.key});",
+      "",
+      "  @override",
+      "  State<${1:WidgetName}> createState() => _${1:WidgetName}State();",
+      "}",
+      "",
+      "class _${1:WidgetName}State extends State<${1:WidgetName}> {",
+      "  @override",
+      "  Widget build(BuildContext context) {",
+      "    return ${2:Container}(",
+      "      ${3:// TODO: Implement widget}",
+      "    );",
+      "  }",
+      "",
+      "  @override",
+      "  void dispose() {",
+      "    ${4:// TODO: Clean up resources}",
+      "    super.dispose();",
+      "  }",
+      "}"
+    ],
+    "description": "Cria um Stateful Widget AutoCore com dispose"
+  },
+  
+  "MQTT Service Method": {
+    "prefix": "acmqtt",
+    "body": [
+      "Future<void> ${1:methodName}(${2:String deviceUuid, int channel}) async {",
+      "  final topic = 'autocore/devices/\\$deviceUuid/${3:command}';",
+      "  ",
+      "  if (topic == null) {",
+      "    throw Exception('Topic MQTT não disponível');",
+      "  }",
+      "  ",
+      "  final payload = {",
+      "    'channel': channel,",
+      "    'state': ${4:true},",
+      "    'timestamp': DateTime.now().toIso8601String(),",
+      "  };",
+      "  ",
+      "  AppLogger.info('Enviando comando MQTT: \\$topic -> \\$payload');",
+      "  MqttService.instance.publishJson(topic, payload);",
+      "}"
+    ],
+    "description": "Cria método MQTT com validação null-safety"
+  },
+  
+  "Momentary Button with Heartbeat": {
+    "prefix": "acmomentary",
+    "body": [
+      "class ${1:ButtonName}Button extends StatelessWidget {",
+      "  final int channel;",
+      "  final String deviceUuid;",
+      "  ",
+      "  const ${1:ButtonName}Button({",
+      "    super.key,",
+      "    required this.channel,",
+      "    required this.deviceUuid,",
+      "  });",
+      "  ",
+      "  @override",
+      "  Widget build(BuildContext context) {",
+      "    return MomentaryButton(",
+      "      channel: channel,",
+      "      deviceUuid: deviceUuid,",
+      "      label: '${2:Label}',",
+      "      icon: Icons.${3:icon_name},",
+      "      onPressed: () => _handlePress(context),",
+      "      onReleased: () => _handleRelease(context),",
+      "    );",
+      "  }",
+      "  ",
+      "  void _handlePress(BuildContext context) {",
+      "    HeartbeatService.instance.startMomentary(deviceUuid, channel);",
+      "  }",
+      "  ",
+      "  void _handleRelease(BuildContext context) {",
+      "    HeartbeatService.instance.stopMomentary(deviceUuid, channel);",
+      "  }",
+      "}"
+    ],
+    "description": "Cria botão momentâneo com heartbeat (segurança)"
+  },
+  
+  "AppLogger Usage": {
+    "prefix": "aclog",
+    "body": [
+      "AppLogger.${1|debug,info,warning,error,network,config|}('${2:message}'${3:, error: e, stackTrace: stack});"
+    ],
+    "description": "Usa AppLogger ao invés de print"
+  },
+  
+  "TODO AutoCore": {
+    "prefix": "actodo",
+    "body": [
+      "// TODO(${1:seu_nome}): ${2:Descrição da tarefa} - https://github.com/autocore/issue/${3:123}"
+    ],
+    "description": "Adiciona TODO no formato Flutter"
+  },
+  
+  "Null Safety Check": {
+    "prefix": "acnull",
+    "body": [
+      "final ${1:variable} = ${2:source};",
+      "if (${1:variable} == null) {",
+      "  throw Exception('${3:Erro: variável não pode ser nula}');",
+      "}",
+      "${4:// Continue com variable não-nula}"
+    ],
+    "description": "Adiciona validação null-safety"
+  },
+  
+  "Freezed Model": {
+    "prefix": "acfreezed",
+    "body": [
+      "import 'package:freezed_annotation/freezed_annotation.dart';",
+      "",
+      "part '${TM_FILENAME_BASE}.freezed.dart';",
+      "part '${TM_FILENAME_BASE}.g.dart';",
+      "",
+      "@freezed",
+      "class ${1:ModelName} with _\\$${1:ModelName} {",
+      "  const factory ${1:ModelName}({",
+      "    required ${2:String id},",
+      "    ${3:// Adicione outros campos}",
+      "  }) = _${1:ModelName};",
+      "",
+      "  factory ${1:ModelName}.fromJson(Map<String, dynamic> json) =>",
+      "      _\\$${1:ModelName}FromJson(json);",
+      "}"
+    ],
+    "description": "Cria modelo Freezed com fromJson"
+  },
+  
+  "Try Catch AutoCore": {
+    "prefix": "actry",
+    "body": [
+      "try {",
+      "  ${1:// Código que pode gerar exceção}",
+      "} catch (e, stack) {",
+      "  AppLogger.error('${2:Erro ao executar operação}', error: e, stackTrace: stack);",
+      "  ${3:rethrow;}",
+      "}"
+    ],
+    "description": "Try-catch com AppLogger"
+  },
+  
+  "Dispose Pattern": {
+    "prefix": "acdispose",
+    "body": [
+      "@override",
+      "void dispose() {",
+      "  ${1:_controller}.close();",
+      "  ${2:// Limpar outros recursos}",
+      "  super.dispose();",
+      "}"
+    ],
+    "description": "Override dispose com limpeza de recursos"
+  }
+}

@@ -47,7 +47,7 @@ config-app/frontend/build/
 *.local
 
 # IDE
-.vscode/
+# .vscode/ # Mantendo configurações do VS Code no repositório
 .idea/
 *.swp
 *.swo

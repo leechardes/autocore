@@ -1,0 +1,124 @@
+{
+  // Configurações de Debug para AutoCore
+  "version": "0.2.0",
+  "configurations": [
+    {
+      "name": "Flutter: Debug",
+      "type": "dart",
+      "request": "launch",
+      "program": "lib/main.dart",
+      "cwd": "${workspaceFolder}/app-flutter",
+      "args": []
+    },
+    {
+      "name": "Flutter: Debug (Verbose)",
+      "type": "dart",
+      "request": "launch",
+      "program": "lib/main.dart",
+      "cwd": "${workspaceFolder}/app-flutter",
+      "args": [
+        "--verbose"
+      ]
+    },
+    {
+      "name": "Flutter: Profile Mode",
+      "type": "dart",
+      "request": "launch",
+      "program": "lib/main.dart",
+      "cwd": "${workspaceFolder}/app-flutter",
+      "flutterMode": "profile",
+      "args": []
+    },
+    {
+      "name": "Flutter: Release Mode",
+      "type": "dart",
+      "request": "launch",
+      "program": "lib/main.dart",
+      "cwd": "${workspaceFolder}/app-flutter",
+      "flutterMode": "release",
+      "args": []
+    },
+    {
+      "name": "Flutter: Test Current File",
+      "type": "dart",
+      "request": "launch",
+      "program": "${file}",
+      "cwd": "${workspaceFolder}/app-flutter",
+      "args": []
+    },
+    {
+      "name": "Flutter: Run All Tests",
+      "type": "dart",
+      "request": "launch",
+      "program": "test/",
+      "cwd": "${workspaceFolder}/app-flutter",
+      "args": []
+    },
+    {
+      "name": "Flutter: Attach to Process",
+      "type": "dart",
+      "request": "attach"
+    },
+    {
+      "name": "Python: Current File",
+      "type": "debugpy",
+      "request": "launch",
+      "program": "${file}",
+      "console": "integratedTerminal",
+      "justMyCode": true,
+      "cwd": "${fileDirname}",
+      "env": {
+        "PYTHONPATH": "${workspaceFolder}"
+      }
+    },
+    {
+      "name": "Python: ADB Manager",
+      "type": "debugpy",
+      "request": "launch",
+      "program": "${workspaceFolder}/app-flutter/scripts/adb_device_manager.py",
+      "console": "integratedTerminal",
+      "justMyCode": true,
+      "cwd": "${workspaceFolder}/app-flutter/scripts"
+    },
+    {
+      "name": "Python: Build APK",
+      "type": "debugpy",
+      "request": "launch",
+      "program": "${workspaceFolder}/app-flutter/scripts/build_apk.py",
+      "console": "integratedTerminal",
+      "justMyCode": true,
+      "cwd": "${workspaceFolder}/app-flutter"
+    },
+    {
+      "name": "FastAPI: Backend",
+      "type": "debugpy",
+      "request": "launch",
+      "module": "uvicorn",
+      "args": [
+        "main:app",
+        "--reload",
+        "--host",
+        "0.0.0.0",
+        "--port",
+        "8000"
+      ],
+      "jinja": true,
+      "justMyCode": true,
+      "console": "integratedTerminal",
+      "cwd": "${workspaceFolder}/config-app/backend",
+      "env": {
+        "PYTHONPATH": "${workspaceFolder}/config-app/backend"
+      }
+    }
+  ],
+  "compounds": [
+    {
+      "name": "Full Stack: Backend + Flutter",
+      "configurations": [
+        "FastAPI: Backend",
+        "Flutter: Debug"
+      ],
+      "stopAll": true
+    }
+  ]
+}

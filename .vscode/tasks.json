@@ -1,0 +1,292 @@
+{
+  // Tarefas automatizadas para AutoCore
+  "version": "2.0.0",
+  "tasks": [
+    // Flutter Tasks
+    {
+      "label": "Flutter: Clean",
+      "type": "shell",
+      "command": "flutter",
+      "args": ["clean"],
+      "options": {
+        "cwd": "${workspaceFolder}/app-flutter"
+      },
+      "group": "build",
+      "problemMatcher": [],
+      "presentation": {
+        "reveal": "always",
+        "panel": "shared"
+      }
+    },
+    {
+      "label": "Flutter: Pub Get",
+      "type": "shell",
+      "command": "flutter",
+      "args": ["pub", "get"],
+      "options": {
+        "cwd": "${workspaceFolder}/app-flutter"
+      },
+      "group": "build",
+      "problemMatcher": [],
+      "presentation": {
+        "reveal": "always",
+        "panel": "shared"
+      }
+    },
+    {
+      "label": "Flutter: Analyze",
+      "type": "shell",
+      "command": "flutter",
+      "args": ["analyze"],
+      "options": {
+        "cwd": "${workspaceFolder}/app-flutter"
+      },
+      "group": "test",
+      "problemMatcher": [
+        {
+          "owner": "dart",
+          "fileLocation": ["relative", "${workspaceFolder}/app-flutter"],
+          "pattern": {
+            "regexp": "^\\s+(info|warning|error)\\s+•\\s+(.*)\\s+•\\s+(.*):(\\d+):(\\d+)\\s+•\\s+(.*)$",
+            "severity": 1,
+            "message": 2,
+            "file": 3,
+            "line": 4,
+            "column": 5,
+            "code": 6
+          }
+        }
+      ],
+      "presentation": {
+        "reveal": "always",
+        "panel": "shared"
+      }
+    },
+    {
+      "label": "Flutter: Test",
+      "type": "shell",
+      "command": "flutter",
+      "args": ["test"],
+      "options": {
+        "cwd": "${workspaceFolder}/app-flutter"
+      },
+      "group": {
+        "kind": "test",
+        "isDefault": true
+      },
+      "problemMatcher": [],
+      "presentation": {
+        "reveal": "always",
+        "panel": "shared"
+      }
+    },
+    {
+      "label": "Flutter: Build APK Debug",
+      "type": "shell",
+      "command": "flutter",
+      "args": ["build", "apk", "--debug"],
+      "options": {
+        "cwd": "${workspaceFolder}/app-flutter"
+      },
+      "group": "build",
+      "problemMatcher": [],
+      "presentation": {
+        "reveal": "always",
+        "panel": "shared"
+      }
+    },
+    {
+      "label": "Flutter: Build APK Release",
+      "type": "shell",
+      "command": "flutter",
+      "args": ["build", "apk", "--release"],
+      "options": {
+        "cwd": "${workspaceFolder}/app-flutter"
+      },
+      "group": "build",
+      "problemMatcher": [],
+      "presentation": {
+        "reveal": "always",
+        "panel": "shared"
+      }
+    },
+    {
+      "label": "Flutter: Format Code",
+      "type": "shell",
+      "command": "dart",
+      "args": ["format", "lib", "test"],
+      "options": {
+        "cwd": "${workspaceFolder}/app-flutter"
+      },
+      "group": "build",
+      "problemMatcher": [],
+      "presentation": {
+        "reveal": "always",
+        "panel": "shared"
+      }
+    },
+    {
+      "label": "Flutter: Fix Issues",
+      "type": "shell",
+      "command": "dart",
+      "args": ["fix", "--apply"],
+      "options": {
+        "cwd": "${workspaceFolder}/app-flutter"
+      },
+      "group": "build",
+      "problemMatcher": [],
+      "presentation": {
+        "reveal": "always",
+        "panel": "shared"
+      }
+    },
+    {
+      "label": "Flutter: Hot Reload",
+      "type": "shell",
+      "command": "echo",
+      "args": ["'r' in terminal to hot reload"],
+      "problemMatcher": []
+    },
+    {
+      "label": "Flutter: Hot Restart",
+      "type": "shell",
+      "command": "echo",
+      "args": ["'R' in terminal to hot restart"],
+      "problemMatcher": []
+    },
+    
+    // Makefile Tasks
+    {
+      "label": "Make: QA",
+      "type": "shell",
+      "command": "make",
+      "args": ["qa"],
+      "options": {
+        "cwd": "${workspaceFolder}/app-flutter"
+      },
+      "group": "test",
+      "problemMatcher": [],
+      "presentation": {
+        "reveal": "always",
+        "panel": "shared"
+      }
+    },
+    {
+      "label": "Make: Release",
+      "type": "shell",
+      "command": "make",
+      "args": ["release"],
+      "options": {
+        "cwd": "${workspaceFolder}/app-flutter"
+      },
+      "group": "build",
+      "problemMatcher": [],
+      "presentation": {
+        "reveal": "always",
+        "panel": "shared"
+      }
+    },
+    {
+      "label": "Make: Doctor",
+      "type": "shell",
+      "command": "make",
+      "args": ["doctor"],
+      "options": {
+        "cwd": "${workspaceFolder}/app-flutter"
+      },
+      "group": "none",
+      "problemMatcher": [],
+      "presentation": {
+        "reveal": "always",
+        "panel": "shared"
+      }
+    },
+    {
+      "label": "Make: Clean Gradle",
+      "type": "shell",
+      "command": "make",
+      "args": ["gradle-clean"],
+      "options": {
+        "cwd": "${workspaceFolder}/app-flutter"
+      },
+      "group": "build",
+      "problemMatcher": [],
+      "presentation": {
+        "reveal": "always",
+        "panel": "shared"
+      }
+    },
+    
+    // Python Tasks
+    {
+      "label": "Python: Setup Environment",
+      "type": "shell",
+      "command": "./scripts/setup_env.sh",
+      "options": {
+        "cwd": "${workspaceFolder}/app-flutter"
+      },
+      "group": "build",
+      "problemMatcher": [],
+      "presentation": {
+        "reveal": "always",
+        "panel": "shared"
+      }
+    },
+    {
+      "label": "Python: Install Requirements",
+      "type": "shell",
+      "command": "${workspaceFolder}/.venv/bin/pip",
+      "args": ["install", "-r", "scripts/requirements.txt"],
+      "options": {
+        "cwd": "${workspaceFolder}/app-flutter"
+      },
+      "group": "build",
+      "problemMatcher": [],
+      "presentation": {
+        "reveal": "always",
+        "panel": "shared"
+      }
+    },
+    
+    // Backend Tasks
+    {
+      "label": "Backend: Start FastAPI",
+      "type": "shell",
+      "command": "${workspaceFolder}/.venv/bin/python",
+      "args": ["-m", "uvicorn", "main:app", "--reload", "--host", "0.0.0.0", "--port", "8000"],
+      "options": {
+        "cwd": "${workspaceFolder}/config-app/backend"
+      },
+      "group": "none",
+      "problemMatcher": [],
+      "presentation": {
+        "reveal": "always",
+        "panel": "new"
+      }
+    },
+    
+    // Compound Tasks
+    {
+      "label": "Full Clean & Build",
+      "dependsOrder": "sequence",
+      "dependsOn": [
+        "Flutter: Clean",
+        "Flutter: Pub Get",
+        "Flutter: Analyze",
+        "Flutter: Build APK Debug"
+      ],
+      "group": "build",
+      "problemMatcher": []
+    },
+    {
+      "label": "Quality Assurance",
+      "dependsOrder": "sequence",
+      "dependsOn": [
+        "Flutter: Analyze",
+        "Flutter: Test"
+      ],
+      "group": "test",
+      "problemMatcher": []
+    }
+  ]
+}

@@ -1,0 +1,60 @@
+{
+  // Extensões recomendadas para o projeto AutoCore
+  "recommendations": [
+    // Flutter & Dart
+    "dart-code.dart-code",
+    "dart-code.flutter",
+    
+    // Python
+    "ms-python.python",
+    "ms-python.vscode-pylance",
+    "ms-python.debugpy",
+    
+    // Git
+    "eamodio.gitlens",
+    "donjayamanne.githistory",
+    
+    // Markdown
+    "yzhang.markdown-all-in-one",
+    "bierner.markdown-preview-github-styles",
+    
+    // TODO Tree
+    "gruntfuggly.todo-tree",
+    
+    // Docker (se usar)
+    "ms-azuretools.vscode-docker",
+    
+    // YAML
+    "redhat.vscode-yaml",
+    
+    // JSON
+    "zainchen.json",
+    
+    // Code Quality
+    "dbaeumer.vscode-eslint",
+    "esbenp.prettier-vscode",
+    
+    // Icons
+    "vscode-icons-team.vscode-icons",
+    
+    // Utils
+    "streetsidesoftware.code-spell-checker",
+    "streetsidesoftware.code-spell-checker-portuguese-brazilian",
+    "wayou.vscode-todo-highlight",
+    "alefragnani.bookmarks",
+    "oderwat.indent-rainbow",
+    "mechatroner.rainbow-csv",
+    
+    // REST Client
+    "humao.rest-client",
+    
+    // Make
+    "ms-vscode.makefile-tools"
+  ],
+  
+  "unwantedRecommendations": [
+    // Extensões que podem conflitar
+    "msjsdiag.debugger-for-chrome",
+    "felixfbecker.php-debug"
+  ]
+}

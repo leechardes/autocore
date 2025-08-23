@@ -1,0 +1,103 @@
+{
+  // Configurações do Dart/Flutter
+  "dart.analysisExcludedFolders": [
+    "build",
+    "docs",
+    ".dart_tool"
+  ],
+  "dart.showTodos": false,  // Desabilita TODOs do plugin Dart (usamos TODO Tree)
+  
+  // Configurações do TODO Tree
+  "todo-tree.general.tags": [
+    "TODO",
+    "FIXME",
+    "HACK",
+    "NOTE",
+    "WARNING",
+    "XXX",
+    "[ ]",
+    "[x]",
+    "BUG",
+    "OPTIMIZE",
+    "REFACTOR"
+  ],
+  
+  // Regex para encontrar TODOs (suporta diferentes formatos)
+  "todo-tree.regex.regex": "(//|#|<!--|;|/\\*|^|^\\s*(-|\\d+.))\\s*($TAGS)(\\(.*\\))?:?\\s*",
+  
+  // Incluir arquivos Dart
+  "todo-tree.filtering.includeGlobs": [
+    "**/*.dart",
+    "**/*.md",
+    "**/*.yaml",
+    "**/*.json"
+  ],
+  
+  // Excluir pastas desnecessárias
+  "todo-tree.filtering.excludeGlobs": [
+    "**/node_modules/**",
+    "**/.dart_tool/**",
+    "**/build/**",
+    "**/*.g.dart",
+    "**/*.freezed.dart"
+  ],
+  
+  // Cores personalizadas para diferentes tags
+  "todo-tree.highlights.customHighlight": {
+    "TODO": {
+      "icon": "check-circle",
+      "type": "text",
+      "foreground": "#FFA500",
+      "iconColour": "#FFA500"
+    },
+    "FIXME": {
+      "icon": "bug",
+      "type": "text",
+      "foreground": "#FF0000",
+      "iconColour": "#FF0000"
+    },
+    "HACK": {
+      "icon": "tools",
+      "type": "text",
+      "foreground": "#FF00FF",
+      "iconColour": "#FF00FF"
+    },
+    "NOTE": {
+      "icon": "note",
+      "type": "text",
+      "foreground": "#00FFFF",
+      "iconColour": "#00FFFF"
+    }
+  },
+  
+  // Agrupar por tags
+  "todo-tree.tree.groupedByTag": true,
+  
+  // Mostrar contagem de TODOs
+  "todo-tree.tree.showCountsInTree": true,
+  
+  // Scan workspace on startup
+  "todo-tree.general.statusBar": "total",
+  "todo-tree.tree.scanMode": "workspace",
+  
+  // Formato dos TODOs no código
+  "todo-tree.general.tagGroups": {
+    "FIXME": ["FIXME", "FIX", "BUG"],
+    "TODO": ["TODO", "HACK"],
+    "NOTE": ["NOTE", "INFO", "WARNING"]
+  },
+  
+  // Configurações extras do Flutter
+  "editor.formatOnSave": true,
+  "dart.flutterSdkPath": null,  // Usa o Flutter do PATH
+  "[dart]": {
+    "editor.formatOnSave": true,
+    "editor.formatOnType": true,
+    "editor.rulers": [80],
+    "editor.selectionHighlight": false,
+    "editor.suggest.snippetsPreventQuickSuggestions": false,
+    "editor.suggestSelection": "first",
+    "editor.tabCompletion": "onlySnippets",
+    "editor.wordBasedSuggestions": false
+  }
+}

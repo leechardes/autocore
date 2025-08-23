@@ -1,0 +1,139 @@
+{
+  "git.enabled": true,
+  "git.autofetch": true,
+  "git.confirmSync": false,
+  "git.enableSmartCommit": true,
+  "git.ignoreLegacyWarning": true,
+  "git.autoRepositoryDetection": true,
+  
+  // Configurações do TODO Tree - Simplificado para funcionar com Dart
+  "todo-tree.general.tags": [
+    "TODO",
+    "FIXME",
+    "XXX",
+    "HACK",
+    "NOTE",
+    "WARNING",
+    "BUG",
+    "OPTIMIZE",
+    "REFACTOR"
+  ],
+  
+  // Usar regex padrão (sem customização que pode quebrar Dart)
+  // Removido para usar o padrão que funciona melhor
+  
+  // Forçar scan do workspace inteiro
+  "todo-tree.tree.scanMode": "workspace",
+  
+  // IMPORTANTE: Desabilitar filtros que podem estar bloqueando Dart
+  "todo-tree.filtering.excludeGlobs": [
+    "**/node_modules/**",
+    "**/.git/**"
+  ],
+  
+  // Incluir explicitamente arquivos Dart
+  "todo-tree.filtering.includeGlobs": [
+    "**/*"
+  ],
+  
+  // Configurações para melhorar detecção
+  "todo-tree.general.statusBar": "total",
+  "todo-tree.tree.autoRefresh": true,
+  "todo-tree.tree.showCountsInTree": true,
+  
+  // Usar flat view que funciona com Dart
+  "todo-tree.tree.grouped": false,
+  "todo-tree.tree.flat": true,
+  
+  // Configuração de arquivos
+  "todo-tree.ripgrep.ripgrep": "",
+  "todo-tree.ripgrep.ripgrepArgs": "--hidden --no-ignore",
+  
+  // Forçar detecção em comentários
+  "todo-tree.highlights.enabled": true,
+  "todo-tree.highlights.highlightDelay": 500,
+  
+  // Debug - mostrar arquivos ignorados
+  "todo-tree.tree.showBadges": true,
+  "todo-tree.tree.showNumberOfChildren": true,
+  
+  // Configuração específica para Dart
+  "files.associations": {
+    "*.dart": "dart"
+  },
+  
+  // Configurações do Flutter
+  "dart.flutterSdkPath": "/Users/leechardes/development/flutter",
+  "dart.openDevTools": "flutter",
+  "dart.debugExternalPackageLibraries": false,
+  "dart.debugSdkLibraries": false,
+  "dart.evaluateGettersInDebugViews": true,
+  "dart.previewFlutterUiGuides": true,
+  "dart.previewFlutterUiGuidesCustomTracking": true,
+  "dart.showTodos": true,
+  
+  // Debug configurations
+  "debug.console.fontSize": 14,
+  "debug.console.wordWrap": false,
+  "debug.internalConsoleOptions": "openOnSessionStart",
+  "debug.showBreakpointsInOverviewRuler": true,
+  "debug.toolBarLocation": "docked",
+  
+  // Flutter specific
+  "flutter.debugMode": "debug",
+  "flutter.hotReloadOnSave": "all",
+  "flutter.showStructuredErrors": true,
+  
+  // Editor configurations for Dart
+  "editor.formatOnSave": true,
+  "editor.formatOnType": true,
+  "editor.rulers": [80, 120],
+  "editor.selectionHighlight": true,
+  "editor.suggest.snippetsPreventQuickSuggestions": false,
+  "editor.suggestSelection": "first",
+  "editor.tabCompletion": "onlySnippets",
+  "editor.wordBasedSuggestions": "matchingDocuments",
+  "[dart]": {
+    "editor.formatOnSave": true,
+    "editor.formatOnType": true,
+    "editor.rulers": [80],
+    "editor.selectionHighlight": false,
+    "editor.suggest.snippetsPreventQuickSuggestions": false,
+    "editor.suggestSelection": "first",
+    "editor.tabCompletion": "onlySnippets",
+    "editor.wordBasedSuggestions": "matchingDocuments"
+  },
+  
+  // Python configurations
+  "python.defaultInterpreterPath": "${workspaceFolder}/.venv/bin/python",
+  "python.terminal.activateEnvironment": true,
+  
+  // Exclude files from explorer
+  "files.exclude": {
+    "**/.git": true,
+    "**/.svn": true,
+    "**/.hg": true,
+    "**/CVS": true,
+    "**/.DS_Store": true,
+    "**/Thumbs.db": true,
+    "**/*.pyc": true,
+    "**/__pycache__": true,
+    "**/build": false,
+    "**/.dart_tool": true,
+    "**/.flutter-plugins": true,
+    "**/.flutter-plugins-dependencies": true,
+    "**/.packages": true,
+    "**/.pub": true
+  },
+  
+  // Search exclusions
+  "search.exclude": {
+    "**/node_modules": true,
+    "**/bower_components": true,
+    "**/*.code-search": true,
+    "**/build": true,
+    "**/.dart_tool": true,
+    "**/.flutter-plugins": true,
+    "**/.flutter-plugins-dependencies": true
+  }
+}
