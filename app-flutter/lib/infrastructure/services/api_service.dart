@@ -1,12 +1,10 @@
 import 'dart:async';
 
-import 'package:dio/dio.dart';
-
 import 'package:autocore_app/core/utils/logger.dart';
-import 'package:autocore_app/domain/models/app_config.dart';
-import 'package:autocore_app/infrastructure/services/config_service.dart';
 import 'package:autocore_app/domain/entities/macro.dart';
+import 'package:autocore_app/domain/models/app_config.dart';
 import 'package:autocore_app/domain/models/screen_config.dart';
+import 'package:dio/dio.dart';
 
 class ApiService {
   static final ApiService _instance = ApiService._internal();
@@ -19,10 +17,10 @@ class ApiService {
   AppConfig? _config;
   bool _initialized = false;
   
-  void init() {
+  void init({AppConfig? config}) {
     if (_initialized) return;
     
-    _config = ConfigService.instance.currentConfig;
+    _config = config ?? AppConfig.development();
     
     _dio = Dio(BaseOptions(
       baseUrl: _config!.apiUrl,
@@ -85,7 +83,7 @@ class ApiService {
     
     try {
       AppLogger.info('Buscando screens de: ${_config!.apiUrl}/api/screens');
-      final response = await _dio!.get('/api/screens');
+      final response = await _dio!.get<dynamic>('/api/screens');
       
       AppLogger.debug('Response status: ${response.statusCode}');
       AppLogger.debug('Response data type: ${response.data.runtimeType}');
@@ -93,31 +91,32 @@ class ApiService {
       if (response.data is List) {
         // API retorna diretamente uma lista
         final screensList = (response.data as List).map((screenData) {
+          final data = screenData as Map<String, dynamic>;
           // Adapta os dados do backend para o formato esperado
           final adaptedData = <String, dynamic>{
-            'id': screenData['id'].toString(), // Converte int para string
-            'name': screenData['name'] ?? screenData['title'] ?? '',
-            'description': screenData['description'],
-            'icon': screenData['icon'],
-            'route': '/screen/${screenData['id']}',
-            'items': [], // Backend não envia items na listagem
+            'id': data['id'].toString(), // Converte int para string
+            'name': data['name'] ?? data['title'] ?? '',
+            'description': data['description'],
+            'icon': data['icon'],
+            'route': '/screen/${data['id']}',
+            'items': <Map<String, dynamic>>[], // Backend não envia items na listagem
             'layout': 'grid',
-            'columns': screenData['columns_mobile'] ?? 2,
+            'columns': data['columns_mobile'] ?? 2,
             'showHeader': true,
             'showNavigation': true,
             'customProperties': {
-              'screen_type': screenData['screen_type'],
-              'is_visible': screenData['is_visible'],
-              'position': screenData['position'],
+              'screen_type': data['screen_type'],
+              'is_visible': data['is_visible'],
+              'position': data['position'],
             },
-            'createdAt': screenData['created_at'],
+            'createdAt': data['created_at'],
           };
           return ScreenConfig.fromJson(adaptedData);
         }).toList();
         AppLogger.info('Screens carregadas do backend: ${screensList.length}');
         return screensList;
-      } else if (response.data is Map && response.data!['screens'] != null) {
-        final screens = (response.data!['screens'] as List)
+      } else if (response.data is Map && (response.data! as Map<String, dynamic>)['screens'] != null) {
+        final screens = ((response.data! as Map<String, dynamic>)['screens'] as List)
             .map((json) => ScreenConfig.fromJson(json as Map<String, dynamic>))
             .toList();
         
@@ -141,7 +140,7 @@ class ApiService {
     
     try {
       AppLogger.info('Buscando macros de: ${_config!.apiUrl}/api/macros/');
-      final response = await _dio!.get('/api/macros/');
+      final response = await _dio!.get<dynamic>('/api/macros/');
       
       AppLogger.debug('Macros response status: ${response.statusCode}');
       AppLogger.debug('Macros response data: ${response.data}');
@@ -149,36 +148,37 @@ class ApiService {
       if (response.data is List) {
         // Adapta o formato do backend para o modelo Flutter
         final macrosList = (response.data as List).map((macroData) {
+          final data = macroData as Map<String, dynamic>;
           AppLogger.debug('Macro original do backend: $macroData');
           
           // Converte o formato do backend para o formato esperado pelo modelo
           final adaptedData = <String, dynamic>{
-            'id': macroData['id'],
-            'name': macroData['name'] ?? '',
-            'description': macroData['description'],
-            'icon': macroData['icon'] ?? '⚡',
-            'enabled': macroData['is_active'] ?? true,
+            'id': data['id'],
+            'name': data['name'] ?? '',
+            'description': data['description'],
+            'icon': data['icon'] ?? '⚡',
+            'enabled': data['is_active'] ?? true,
             'triggerType': 'manual', // Força sempre manual já que o valor do backend está correto
             'triggerConfig': <String, dynamic>{},
             'actions': [
               // Cria uma ação dummy até o backend enviar as ações reais
               <String, dynamic>{
-                'id': 'action_${macroData['id']}_1',
+                'id': 'action_${data['id']}_1',
                 'type': 'mqtt_publish',
                 'config': <String, dynamic>{
-                  'topic': 'autocore/macros/${macroData['id']}/execute',
+                  'topic': 'autocore/macros/${data['id']}/execute',
                   'payload': '{"executed": true}',
                 },
-                'description': 'Executa macro ${macroData['name']}',
+                'description': 'Executa macro ${data['name']}',
                 'enabled': true,
               }
             ], // Ação temporária até backend enviar
             'metadata': <String, dynamic>{
-              'execution_count': macroData['execution_count'] ?? 0,
-              'last_executed': macroData['last_executed'],
+              'execution_count': data['execution_count'] ?? 0,
+              'last_executed': data['last_executed'],
             },
-            'createdAt': macroData['created_at'],
-            'executionCount': macroData['execution_count'] ?? 0,
+            'createdAt': data['created_at'],
+            'executionCount': data['execution_count'] ?? 0,
             'showInUi': true,
             'isSystem': false,
           };
@@ -196,31 +196,32 @@ class ApiService {
         
         AppLogger.info('Macros carregadas do backend: ${macrosList.length}');
         return macrosList;
-      } else if (response.data is Map && response.data!['macros'] != null) {
+      } else if (response.data is Map && (response.data! as Map<String, dynamic>)['macros'] != null) {
         // Caso a API retorne um objeto com array de macros
-        final macros = (response.data!['macros'] as List).map((macroData) {
+        final macros = ((response.data! as Map<String, dynamic>)['macros'] as List).map((macroData) {
+          final data = macroData as Map<String, dynamic>;
           final adaptedData = <String, dynamic>{
-            'id': macroData['id'],
-            'name': macroData['name'] ?? '',
-            'description': macroData['description'],
-            'icon': macroData['icon'] ?? '⚡',
-            'enabled': macroData['is_active'] ?? true,
+            'id': data['id'],
+            'name': data['name'] ?? '',
+            'description': data['description'],
+            'icon': data['icon'] ?? '⚡',
+            'enabled': data['is_active'] ?? true,
             'triggerType': 'manual', // Força sempre manual
             'triggerConfig': <String, dynamic>{},
             'actions': [
               <String, dynamic>{
-                'id': 'action_${macroData['id']}_1',
+                'id': 'action_${data['id']}_1',
                 'type': 'mqtt_publish',
                 'config': <String, dynamic>{
-                  'topic': 'autocore/macros/${macroData['id']}/execute',
+                  'topic': 'autocore/macros/${data['id']}/execute',
                   'payload': '{"executed": true}',
                 },
-                'description': 'Executa macro ${macroData['name']}',
+                'description': 'Executa macro ${data['name']}',
                 'enabled': true,
               }
             ],
             'metadata': <String, dynamic>{},
-            'executionCount': macroData['execution_count'] ?? 0,
+            'executionCount': data['execution_count'] ?? 0,
             'showInUi': true,
             'isSystem': false,
           };

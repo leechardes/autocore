@@ -117,6 +117,14 @@ autocore/
 - [Guias de Deploy](docs/deployment/deployment-guide.md)
 - [Segurança](docs/standards/security.md)
 
+## 📝 Padrões de Documentação
+
+Todos os arquivos de documentação em pastas docs/ devem usar MAIÚSCULAS no nome, mantendo .md minúsculo. Arquivos de agentes devem preservar o prefixo AXX-.
+
+Exemplos:
+- `flutter-config.md` → `FLUTTER-CONFIG.md`
+- `A01-agent-name.md` → `A01-AGENT-NAME.md`
+
 ## 🔒 Segurança
 
 Sistema de heartbeat para relés críticos que desliga automaticamente em caso de perda de conexão ou travamento.

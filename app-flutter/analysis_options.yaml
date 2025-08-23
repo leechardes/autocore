@@ -16,7 +16,8 @@ analyzer:
   errors:
     missing_required_param: error
     missing_return: error
-    todo: warning
+    todo: ignore  # TODOs são gerenciados por extensão separada
+    fixme: ignore  # FIXMEs são gerenciados por extensão separada
     deprecated_member_use_from_same_package: ignore
     invalid_annotation_target: ignore
 
@@ -63,7 +64,7 @@ linter:
     empty_constructor_bodies: true
     exhaustive_cases: true
     file_names: true
-    flutter_style_todos: true
+    flutter_style_todos: false  # Gerenciado por extensão separada
     implementation_imports: true
     library_names: true
     library_prefixes: true
