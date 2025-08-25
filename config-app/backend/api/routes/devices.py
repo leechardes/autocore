@@ -125,5 +125,9 @@ async def create_device(device: DeviceCreate):
             created_at=new_device.created_at,
             updated_at=new_device.updated_at
         )
+    except ValueError as e:
+        # Erro de validação/conflito - retorna 409 Conflict
+        raise HTTPException(status_code=409, detail=str(e))
     except Exception as e:
+        # Outros erros - retorna 500 Internal Server Error
         raise HTTPException(status_code=500, detail=str(e))

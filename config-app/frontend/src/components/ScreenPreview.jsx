@@ -134,36 +134,46 @@ const ScreenPreview = ({ isOpen, onClose }) => {
   const loadFullConfig = async () => {
     // Evitar múltiplas chamadas simultâneas
     if (loadingRef.current) {
+      console.log('⚠️ Já está carregando, ignorando chamada duplicada')
       return
     }
     
     try {
+      console.log('🔄 Iniciando carregamento da configuração...')
       loadingRef.current = true
       setLoading(true)
       
       // Usar novo endpoint config/full
+      console.log('📡 Chamando API config/full...')
       const configData = await api.getPreviewConfig()
+      console.log('✅ Dados recebidos:', configData)
       
       // Adaptar dados para o formato do preview
       const adaptedConfig = adaptConfigToPreview(configData)
+      console.log('✅ Config adaptada:', adaptedConfig)
       setFullConfig(adaptedConfig)
       setScreens(adaptedConfig.screens || [])
       setTelemetry(adaptedConfig.telemetry || {})
       
       // Selecionar primeira tela visível para o dispositivo atual
       const deviceConfig = deviceTypes.find(d => d.id === deviceType)
+      console.log('📱 Device config:', deviceConfig)
       const firstVisible = adaptedConfig.screens.find(s => 
         s.is_visible && s[deviceConfig.show]
       )
+      console.log('🖥️ Primeira tela visível:', firstVisible)
+      
       if (firstVisible) {
         // Passar a config adaptada diretamente
         await navigateToScreen(firstVisible, adaptedConfig)
       }
       
       // Marcar como pronto
+      console.log('✅ Marcando como pronto (isReady = true)')
       setIsReady(true)
     } catch (error) {
       console.error('❌ Erro carregando configuração:', error)
+      console.error('Stack trace:', error.stack)
       // Fallback: tentar carregar telas individualmente
       try {
         const screensData = await api.getScreens()
@@ -174,8 +184,11 @@ const ScreenPreview = ({ isOpen, onClose }) => {
         }
       } catch (fallbackError) {
         console.error('❌ Erro no fallback:', fallbackError)
+        // Se tudo falhar, marcar como pronto mesmo assim para não travar
+        setIsReady(true)
       }
     } finally {
+      console.log('🏁 Finally: setLoading(false) e loadingRef.current = false')
       setLoading(false)
       loadingRef.current = false
     }
@@ -183,12 +196,18 @@ const ScreenPreview = ({ isOpen, onClose }) => {
 
   // Navegar para tela
   const navigateToScreen = async (screen, configOverride = null) => {
-    if (!screen) return
+    if (!screen) {
+      console.log('❌ navigateToScreen: screen é null')
+      return
+    }
     
+    console.log('🔄 navigateToScreen chamada para:', screen.name)
     const device = deviceTypes.find(d => d.id === deviceType)
+    console.log('📱 Device atual:', device)
     
     // Verificar se a tela é visível no dispositivo atual
     if (!screen[device.show]) {
+      console.log(`❌ Tela não visível para ${device.name}. Campo ${device.show}:`, screen[device.show])
       alert(`Esta tela não está configurada para ${device.name}`)
       return
     }
@@ -198,22 +217,36 @@ const ScreenPreview = ({ isOpen, onClose }) => {
       
       // Usar config passada ou a do state
       const configToUse = configOverride || fullConfig
+      console.log('📦 Config usada:', configToUse ? 'disponível' : 'null')
       
       // Se temos dados do config/full, usar os itens já carregados
       let items = []
       if (configToUse && configToUse.screens) {
         const fullScreen = configToUse.screens.find(s => s.id === screen.id)
+        console.log('🖥️ Screen encontrada no config:', fullScreen ? 'sim' : 'não')
         items = fullScreen?.items || []
+        console.log(`📋 Items carregados do config: ${items.length}`)
       } else {
+        console.log('⚠️ Usando fallback para carregar items')
         // Fallback: carregar itens individualmente
         items = await api.getScreenItems(screen.id)
       }
+      
+      console.log('🔍 Items antes do filtro:', items.length)
+      console.log('Items completos:', items)
+      console.log('Items resumo:', items.map(i => ({
+        name: i.name,
+        is_active: i.is_active,
+        size_display_small: i.size_display_small,
+        item_type: i.item_type
+      })))
       
       // Filtrar itens ativos e visíveis no dispositivo atual
       const visibleItems = items.filter(item => 
         shouldShowItem(item, deviceType)
       )
       
+      console.log(`✅ Items visíveis após filtro: ${visibleItems.length}`)
       setScreenItems(visibleItems)
       
       // Atualizar navegação
@@ -340,10 +373,12 @@ const ScreenPreview = ({ isOpen, onClose }) => {
 
   // Renderizar item
   const renderItem = (item) => {
+    console.log('🔧 renderItem chamada para:', item.name, 'tipo:', item.item_type)
     const device = deviceTypes.find(d => d.id === deviceType)
     const itemSize = getItemSize(item, deviceType)
     const IconComponent = iconMap[item.icon] || Circle
     const isActive = itemStates[item.id] || false
+    console.log('📏 Item size:', itemSize, 'isActive:', isActive)
     
     // Classes de tamanho
     const sizeClasses = {
@@ -377,7 +412,7 @@ const ScreenPreview = ({ isOpen, onClose }) => {
     const heightClass = itemSize === 'large' ? 'h-24' : itemSize === 'small' ? 'h-16' : 'h-20'
     
     switch (normalizeItemType(item.item_type)) {
-      case 'BUTTON':
+      case 'button':
         return (
           <Button
             key={item.id}
@@ -397,7 +432,7 @@ const ScreenPreview = ({ isOpen, onClose }) => {
           </Button>
         )
         
-      case 'SWITCH':
+      case 'switch':
         return (
           <Card key={item.id} className={`${sizeClass} p-4`}>
             <div className="flex items-center justify-between">
@@ -413,7 +448,7 @@ const ScreenPreview = ({ isOpen, onClose }) => {
           </Card>
         )
         
-      case 'GAUGE':
+      case 'gauge':
         const gaugeValue = item.currentValue || itemStates[item.id] || 0
         const minValue = item.min_value || 0
         const maxValue = item.max_value || 100
@@ -459,7 +494,7 @@ const ScreenPreview = ({ isOpen, onClose }) => {
           </Card>
         )
         
-      case 'DISPLAY':
+      case 'display':
         const displayValue = item.currentValue !== undefined ? item.currentValue : itemStates[item.id] || 0
         const formattedValue = item.formattedValue || `${displayValue}${item.unit || ''}`
         const fontSize = itemSize === 'large' ? 'text-3xl' : itemSize === 'small' ? 'text-xl' : 'text-2xl'
@@ -500,6 +535,7 @@ const ScreenPreview = ({ isOpen, onClose }) => {
         )
         
       default:
+        console.log('⚠️ Tipo de item não reconhecido:', item.item_type, normalizeItemType(item.item_type))
         return null
     }
   }
@@ -676,9 +712,15 @@ const ScreenPreview = ({ isOpen, onClose }) => {
                           gridTemplateColumns: `repeat(${getScreenColumns(currentScreen, deviceType)}, 1fr)`
                         }}
                       >
+                        {console.log('🎨 Renderizando items:', screenItems.length, screenItems)}
                         {screenItems
                           .sort((a, b) => (a.position || 0) - (b.position || 0))
-                          .map(item => renderItem(item))}
+                          .map(item => {
+                            console.log('🎯 Renderizando item:', item.name, item.item_type)
+                            const rendered = renderItem(item)
+                            console.log('📦 Item renderizado:', rendered)
+                            return rendered
+                          })}
                       </div>
                     )}
                   </div>

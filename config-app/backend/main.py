@@ -1281,7 +1281,12 @@ def get_preview_configuration():
                             {"min": 30, "max": 70, "color": "#FF9800"},
                             {"min": 70, "max": 100, "color": "#F44336"}
                         ] if compare_item_types(item.item_type, "gauge") else None),
-                        "size": getattr(item, 'size', item.size_display_large or "medium"),
+                        # Retornar apenas campos que existem no banco
+                        "size_mobile": item.size_mobile,
+                        "size_display_small": item.size_display_small,
+                        "size_display_large": item.size_display_large,
+                        "size_web": item.size_web,
+                        "is_active": item.is_active,
                         "color_theme": getattr(item, 'color_theme', "primary"),
                         "custom_colors": {
                             "background": getattr(item, 'bg_color', None),
@@ -1543,13 +1548,12 @@ async def get_full_configuration(
                                     {"min": 30, "max": 70, "color": "#FF9800"},
                                     {"min": 70, "max": 100, "color": "#F44336"}
                                 ] if compare_item_types(item.item_type, "gauge") else None),
-                                # CORREÇÃO: Retornar size baseado no tipo do dispositivo
+                                # Retornar apenas campos que existem no banco
                                 "size_mobile": item.size_mobile,
                                 "size_display_small": item.size_display_small,
                                 "size_display_large": item.size_display_large,
                                 "size_web": item.size_web,
-                                # Usar o campo correto baseado no tipo de display
-                                "size": getattr(item, display_size_field, "normal"),
+                                "is_active": item.is_active,
                                 "color_theme": getattr(item, 'color_theme', "primary"),
                                 "custom_colors": {
                                     "background": getattr(item, 'bg_color', None),

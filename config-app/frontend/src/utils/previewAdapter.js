@@ -230,23 +230,27 @@ export function getColorForValue(value, colorRanges) {
  * @returns {boolean} Se deve mostrar o item
  */
 export function shouldShowItem(item, deviceType) {
+  // Item precisa estar ativo
   if (!item.is_active) return false
 
-  // Mapeamento de tipos de dispositivo para campos de visibilidade
-  const visibilityFields = {
-    'mobile': 'show_on_mobile',
-    'display_small': 'show_on_display_small',
-    'display_large': 'show_on_display_large',
-    'web': 'show_on_web'
+  // Items não têm campos show_on_*, apenas size_*
+  // Se o item tem um tamanho definido para o dispositivo, ele deve ser mostrado
+  const sizeFields = {
+    'mobile': 'size_mobile',
+    'display_small': 'size_display_small',
+    'display_large': 'size_display_large',
+    'web': 'size_web'
   }
 
-  const field = visibilityFields[deviceType]
-  if (field && item[field] !== undefined) {
-    return item[field]
+  const field = sizeFields[deviceType]
+  
+  // Se o item tem um tamanho definido (não null/undefined) para este dispositivo, mostrar
+  if (field && item[field]) {
+    return true
   }
 
-  // Se não tem campo específico, mostrar por padrão
-  return true
+  // Se não tem tamanho definido, não mostrar
+  return false
 }
 
 /**

@@ -85,7 +85,28 @@ class DeviceRepository(BaseRepository):
     
     def create(self, device_data: Dict) -> Device:
         """Cria novo dispositivo"""
+        from sqlalchemy.exc import IntegrityError
+        
         with SessionLocal() as session:
+            # Verificar se UUID já existe
+            existing_uuid = session.query(Device).filter(
+                Device.uuid == device_data['uuid'],
+                Device.is_active == True
+            ).first()
+            
+            if existing_uuid:
+                raise ValueError(f"Device with UUID {device_data['uuid']} already exists")
+            
+            # Verificar se MAC address já existe
+            if device_data.get('mac_address'):
+                existing_mac = session.query(Device).filter(
+                    Device.mac_address == device_data['mac_address'],
+                    Device.is_active == True
+                ).first()
+                
+                if existing_mac:
+                    raise ValueError(f"Device with MAC address {device_data['mac_address']} already exists")
+            
             # Normalizar device_type para lowercase
             device_type = str(device_data['type']).lower()
             
@@ -102,9 +123,19 @@ class DeviceRepository(BaseRepository):
                 capabilities_json=json.dumps(device_data.get('capabilities', {}))
             )
             session.add(device)
-            session.commit()
-            session.refresh(device)
-            return device
+            
+            try:
+                session.commit()
+                session.refresh(device)
+                return device
+            except IntegrityError as e:
+                session.rollback()
+                if 'UNIQUE constraint failed: devices.uuid' in str(e):
+                    raise ValueError(f"Device with UUID {device_data['uuid']} already exists")
+                elif 'UNIQUE constraint failed: devices.mac_address' in str(e):
+                    raise ValueError(f"Device with MAC address {device_data['mac_address']} already exists")
+                else:
+                    raise ValueError(f"Integrity constraint violation: {str(e)}")
     
     def update_status(self, device_id: int, status: str, ip_address: str = None):
         """Atualiza status do dispositivo"""
