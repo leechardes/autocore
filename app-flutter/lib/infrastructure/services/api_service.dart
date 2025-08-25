@@ -75,7 +75,10 @@ class ApiService {
 
       if (response.statusCode == 200 && response.data != null) {
         AppLogger.info('Configuração completa carregada com sucesso');
-        return ConfigFullResponse.fromJson(response.data!);
+
+        final config = ConfigFullResponse.fromJson(response.data!);
+
+        return config;
       }
 
       throw Exception('Falha ao carregar configuração: ${response.statusCode}');
