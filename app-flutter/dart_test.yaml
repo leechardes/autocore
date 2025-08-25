@@ -1,0 +1,13 @@
+test_on: "vm"
+coverage:
+  - "lib/**"
+exclude:
+  - "lib/**/*.g.dart"
+  - "lib/**/*.freezed.dart"  
+  - "lib/**/generated/**"
+  - "test/**"
+timeout: "30s"
+# Retry failed tests
+retry: 2
+# Show test output in real time
+reporter: "expanded"

@@ -1,8 +1,11 @@
+import 'package:autocore_app/core/constants/device_constants.dart';
 import 'package:autocore_app/core/helpers/telemetry_binding.dart';
 import 'package:autocore_app/core/models/api/api_screen_config.dart';
 import 'package:autocore_app/core/models/api/api_screen_item.dart';
 import 'package:autocore_app/core/models/api/telemetry_data.dart';
+import 'package:autocore_app/core/utils/logger.dart';
 import 'package:autocore_app/features/screens/widgets/screen_item_factory.dart';
+import 'package:autocore_app/providers/config_provider.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
@@ -46,8 +49,39 @@ class DynamicScreenBuilder extends ConsumerWidget {
       backgroundColor: _getScreenBackgroundColor(theme),
       body: RefreshIndicator(
         onRefresh: () async {
-          // TODO: Implementar refresh da configuração
-          await Future<void>.delayed(const Duration(milliseconds: 500));
+          // Implementa refresh da configuração
+          try {
+            AppLogger.info('Iniciando refresh da configuração da tela: ${screenConfig.name}');
+            
+            // Força refresh da configuração completa via provider
+            const deviceUuid = DeviceConstants.deviceUuid;
+            final _ = ref.refresh(configFullProvider(deviceUuid));
+            
+            AppLogger.info('Configuração da tela atualizada com sucesso');
+            
+            // Feedback visual de sucesso
+            if (context.mounted) {
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(
+                  content: Text('Configuração atualizada'),
+                  backgroundColor: Colors.green,
+                  duration: Duration(seconds: 2),
+                ),
+              );
+            }
+          } catch (e) {
+            AppLogger.error('Erro ao atualizar configuração da tela', error: e);
+            
+            if (context.mounted) {
+              ScaffoldMessenger.of(context).showSnackBar(
+                SnackBar(
+                  content: Text('Erro ao atualizar: $e'),
+                  backgroundColor: Colors.red,
+                  duration: const Duration(seconds: 3),
+                ),
+              );
+            }
+          }
         },
         child: _buildScreenContent(context, theme),
       ),
@@ -105,6 +139,8 @@ class DynamicScreenBuilder extends ConsumerWidget {
     return Padding(
       padding: const EdgeInsets.all(16.0),
       child: GridView.builder(
+        // Add key for better performance
+        key: PageStorageKey<String>('grid_${screenConfig.id}'),
         gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
           crossAxisCount: screenConfig.columns,
           crossAxisSpacing: 12.0,
@@ -118,7 +154,11 @@ class DynamicScreenBuilder extends ConsumerWidget {
             return const SizedBox.shrink();
           }
 
-          return _buildScreenItem(context, item);
+          // Wrap with RepaintBoundary for better performance
+          return RepaintBoundary(
+            key: ValueKey(item.id),
+            child: _buildScreenItem(context, item),
+          );
         },
       ),
     );
@@ -126,15 +166,20 @@ class DynamicScreenBuilder extends ConsumerWidget {
 
   Widget _buildListLayout(BuildContext context, ThemeData theme) {
     return ListView.builder(
+      // Add key for better performance
+      key: PageStorageKey<String>('list_${screenConfig.id}'),
       padding: const EdgeInsets.all(16.0),
       itemCount: screenConfig.items.length,
       itemBuilder: (context, index) {
         final item = screenConfig.items[index];
         if (!item.visible || !item.enabled) return const SizedBox.shrink();
 
-        return Padding(
-          padding: const EdgeInsets.only(bottom: 12.0),
-          child: _buildScreenItem(context, item),
+        return RepaintBoundary(
+          key: ValueKey(item.id),
+          child: Padding(
+            padding: const EdgeInsets.only(bottom: 12.0),
+            child: _buildScreenItem(context, item),
+          ),
         );
       },
     );
@@ -142,14 +187,18 @@ class DynamicScreenBuilder extends ConsumerWidget {
 
   Widget _buildCustomLayout(BuildContext context, ThemeData theme) {
     return SingleChildScrollView(
+      key: PageStorageKey<String>('custom_${screenConfig.id}'),
       padding: const EdgeInsets.all(16.0),
       child: Column(
         children: screenConfig.items
             .where((item) => item.visible && item.enabled)
             .map(
-              (item) => Padding(
-                padding: const EdgeInsets.only(bottom: 12.0),
-                child: _buildScreenItem(context, item),
+              (item) => RepaintBoundary(
+                key: ValueKey(item.id),
+                child: Padding(
+                  padding: const EdgeInsets.only(bottom: 12.0),
+                  child: _buildScreenItem(context, item),
+                ),
               ),
             )
             .toList(),

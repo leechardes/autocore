@@ -59,10 +59,10 @@ _$ACThemeImpl _$$ACThemeImplFromJson(
   spacingMd: (json['spacingMd'] as num?)?.toDouble() ?? 16.0,
   spacingLg: (json['spacingLg'] as num?)?.toDouble() ?? 24.0,
   spacingXl: (json['spacingXl'] as num?)?.toDouble() ?? 32.0,
-  fontFamily: json['fontFamily'] as String? ?? 'Roboto',
-  fontSizeSmall: (json['fontSizeSmall'] as num?)?.toDouble() ?? 12.0,
+  fontFamily: json['fontFamily'] as String? ?? 'Inter',
+  fontSizeSmall: (json['fontSizeSmall'] as num?)?.toDouble() ?? 11.0,
   fontSizeMedium: (json['fontSizeMedium'] as num?)?.toDouble() ?? 14.0,
-  fontSizeLarge: (json['fontSizeLarge'] as num?)?.toDouble() ?? 16.0,
+  fontSizeLarge: (json['fontSizeLarge'] as num?)?.toDouble() ?? 24.0,
   fontWeightLight: json['fontWeightLight'] == null
       ? FontWeight.w300
       : const FontWeightConverter().fromJson(json['fontWeightLight'] as String),
@@ -75,7 +75,7 @@ _$ACThemeImpl _$$ACThemeImplFromJson(
       ? FontWeight.w600
       : const FontWeightConverter().fromJson(json['fontWeightBold'] as String),
   animationFast: json['animationFast'] == null
-      ? const Duration(milliseconds: 150)
+      ? const Duration(milliseconds: 200)
       : const DurationConverter().fromJson(
           (json['animationFast'] as num).toInt(),
         ),

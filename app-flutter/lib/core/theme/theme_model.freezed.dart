@@ -58,21 +58,26 @@ mixin _$ACTheme {
   double get spacingSm => throw _privateConstructorUsedError;
   double get spacingMd => throw _privateConstructorUsedError;
   double get spacingLg => throw _privateConstructorUsedError;
-  double get spacingXl => throw _privateConstructorUsedError; // Tipografia
-  String get fontFamily => throw _privateConstructorUsedError;
-  double get fontSizeSmall => throw _privateConstructorUsedError;
-  double get fontSizeMedium => throw _privateConstructorUsedError;
-  double get fontSizeLarge => throw _privateConstructorUsedError;
+  double get spacingXl =>
+      throw _privateConstructorUsedError; // Tipografia - Ajustada para match com frontend React
+  String get fontFamily =>
+      throw _privateConstructorUsedError; // Match com React (Inter)
+  double get fontSizeSmall =>
+      throw _privateConstructorUsedError; // text-xs (12px no web = 11pt mobile)
+  double get fontSizeMedium =>
+      throw _privateConstructorUsedError; // text-sm equivalente
+  double get fontSizeLarge =>
+      throw _privateConstructorUsedError; // text-2xl para valores
   @FontWeightConverter()
   FontWeight get fontWeightLight => throw _privateConstructorUsedError;
   @FontWeightConverter()
   FontWeight get fontWeightRegular => throw _privateConstructorUsedError;
   @FontWeightConverter()
-  FontWeight get fontWeightBold => throw _privateConstructorUsedError; // Animações
+  FontWeight get fontWeightBold => throw _privateConstructorUsedError; // Animações - Especificação A34-PHASE3-POLISH-FIXES: transições suaves 200-300ms
   @DurationConverter()
-  Duration get animationFast => throw _privateConstructorUsedError;
+  Duration get animationFast => throw _privateConstructorUsedError; // 200ms conforme especificação
   @DurationConverter()
-  Duration get animationNormal => throw _privateConstructorUsedError;
+  Duration get animationNormal => throw _privateConstructorUsedError; // 300ms conforme especificação
   @DurationConverter()
   Duration get animationSlow => throw _privateConstructorUsedError;
   @CurveConverter()
@@ -577,14 +582,14 @@ class _$ACThemeImpl implements _ACTheme {
     this.spacingMd = 16.0,
     this.spacingLg = 24.0,
     this.spacingXl = 32.0,
-    this.fontFamily = 'Roboto',
-    this.fontSizeSmall = 12.0,
+    this.fontFamily = 'Inter',
+    this.fontSizeSmall = 11.0,
     this.fontSizeMedium = 14.0,
-    this.fontSizeLarge = 16.0,
+    this.fontSizeLarge = 24.0,
     @FontWeightConverter() this.fontWeightLight = FontWeight.w300,
     @FontWeightConverter() this.fontWeightRegular = FontWeight.w400,
     @FontWeightConverter() this.fontWeightBold = FontWeight.w600,
-    @DurationConverter() this.animationFast = const Duration(milliseconds: 150),
+    @DurationConverter() this.animationFast = const Duration(milliseconds: 200),
     @DurationConverter()
     this.animationNormal = const Duration(milliseconds: 300),
     @DurationConverter() this.animationSlow = const Duration(milliseconds: 500),
@@ -687,19 +692,23 @@ class _$ACThemeImpl implements _ACTheme {
   @override
   @JsonKey()
   final double spacingXl;
-  // Tipografia
+  // Tipografia - Ajustada para match com frontend React
   @override
   @JsonKey()
   final String fontFamily;
+  // Match com React (Inter)
   @override
   @JsonKey()
   final double fontSizeSmall;
+  // text-xs (12px no web = 11pt mobile)
   @override
   @JsonKey()
   final double fontSizeMedium;
+  // text-sm equivalente
   @override
   @JsonKey()
   final double fontSizeLarge;
+  // text-2xl para valores
   @override
   @JsonKey()
   @FontWeightConverter()
@@ -712,15 +721,17 @@ class _$ACThemeImpl implements _ACTheme {
   @JsonKey()
   @FontWeightConverter()
   final FontWeight fontWeightBold;
-  // Animações
+  // Animações - Especificação A34-PHASE3-POLISH-FIXES: transições suaves 200-300ms
   @override
   @JsonKey()
   @DurationConverter()
   final Duration animationFast;
+  // 200ms conforme especificação
   @override
   @JsonKey()
   @DurationConverter()
   final Duration animationNormal;
+  // 300ms conforme especificação
   @override
   @JsonKey()
   @DurationConverter()
@@ -964,15 +975,15 @@ abstract class _ACTheme implements ACTheme {
   @override
   double get spacingLg;
   @override
-  double get spacingXl; // Tipografia
+  double get spacingXl; // Tipografia - Ajustada para match com frontend React
   @override
-  String get fontFamily;
+  String get fontFamily; // Match com React (Inter)
   @override
-  double get fontSizeSmall;
+  double get fontSizeSmall; // text-xs (12px no web = 11pt mobile)
   @override
-  double get fontSizeMedium;
+  double get fontSizeMedium; // text-sm equivalente
   @override
-  double get fontSizeLarge;
+  double get fontSizeLarge; // text-2xl para valores
   @override
   @FontWeightConverter()
   FontWeight get fontWeightLight;
@@ -981,13 +992,13 @@ abstract class _ACTheme implements ACTheme {
   FontWeight get fontWeightRegular;
   @override
   @FontWeightConverter()
-  FontWeight get fontWeightBold; // Animações
+  FontWeight get fontWeightBold; // Animações - Especificação A34-PHASE3-POLISH-FIXES: transições suaves 200-300ms
   @override
   @DurationConverter()
-  Duration get animationFast;
+  Duration get animationFast; // 200ms conforme especificação
   @override
   @DurationConverter()
-  Duration get animationNormal;
+  Duration get animationNormal; // 300ms conforme especificação
   @override
   @DurationConverter()
   Duration get animationSlow;

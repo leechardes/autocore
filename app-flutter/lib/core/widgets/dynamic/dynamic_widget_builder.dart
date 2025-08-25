@@ -59,34 +59,37 @@ class DynamicWidgetBuilder {
     final stateKey = '$deviceId.$channelId';
     final currentState = state?[stateKey] ?? false;
 
-    return ACControlTile(
-      id: config.id,
-      label: (props['label'] as String?) ?? 'Control',
-      subtitle: props['subtitle'] as String?,
-      icon: _getIconData((props['icon'] as String?) ?? 'lightbulb'),
-      type: _getControlType(props['controlType'] as String?),
-      size: _getControlSize(props['size'] as String?),
-      value: currentState as bool,
-      dimmerValue: (state?['$stateKey.dimmer'] as num?)?.toDouble(),
-      onToggle: (value) {
-        onAction?.call('toggle', {
-          'deviceId': deviceId,
-          'channelId': channelId,
-          'value': value,
-        });
-      },
-      onDimmerChanged: (value) {
-        onAction?.call('dimmer', {
-          'deviceId': deviceId,
-          'channelId': channelId,
-          'value': value,
-        });
-      },
-      isOnline: (state?['$deviceId.online'] as bool?) ?? true,
-      confirmAction: (props['confirmAction'] as bool?) ?? false,
-      confirmMessage: props['confirmMessage'] as String?,
-      activeColor: _getColor(props['activeColor'] as String?),
-      inactiveColor: _getColor(props['inactiveColor'] as String?),
+    // RepaintBoundary para evitar rebuilds desnecessários
+    return RepaintBoundary(
+      child: ACControlTile(
+        id: config.id,
+        label: (props['label'] as String?) ?? 'Control',
+        subtitle: props['subtitle'] as String?,
+        icon: _getIconData((props['icon'] as String?) ?? 'lightbulb'),
+        type: _getControlType(props['controlType'] as String?),
+        size: _getControlSize(props['size'] as String?),
+        value: currentState as bool,
+        dimmerValue: (state?['$stateKey.dimmer'] as num?)?.toDouble(),
+        onToggle: (value) {
+          onAction?.call('toggle', {
+            'deviceId': deviceId,
+            'channelId': channelId,
+            'value': value,
+          });
+        },
+        onDimmerChanged: (value) {
+          onAction?.call('dimmer', {
+            'deviceId': deviceId,
+            'channelId': channelId,
+            'value': value,
+          });
+        },
+        isOnline: (state?['$deviceId.online'] as bool?) ?? true,
+        confirmAction: (props['confirmAction'] as bool?) ?? false,
+        confirmMessage: props['confirmMessage'] as String?,
+        activeColor: _getColor(props['activeColor'] as String?),
+        inactiveColor: _getColor(props['inactiveColor'] as String?),
+      ),
     );
   }
 
@@ -144,17 +147,20 @@ class DynamicWidgetBuilder {
     final stateKey = props['stateKey'] as String?;
     final value = ((state?[stateKey] ?? props['value'] ?? 0) as num).toDouble();
 
-    return ACGauge(
-      value: value,
-      min: (props['min'] as num?)?.toDouble() ?? 0,
-      max: (props['max'] as num?)?.toDouble() ?? 100,
-      type: _getGaugeType(props['type'] as String?),
-      unit: props['unit'] as String?,
-      label: props['label'] as String?,
-      width: (props['width'] as num?)?.toDouble(),
-      height: (props['height'] as num?)?.toDouble(),
-      primaryColor: _getColor(props['primaryColor'] as String?),
-      zones: _buildGaugeZones(props['zones']),
+    // RepaintBoundary para widgets de gauge que são expensive
+    return RepaintBoundary(
+      child: ACGauge(
+        value: value,
+        min: (props['min'] as num?)?.toDouble() ?? 0,
+        max: (props['max'] as num?)?.toDouble() ?? 100,
+        type: _getGaugeType(props['type'] as String?),
+        unit: props['unit'] as String?,
+        label: props['label'] as String?,
+        width: (props['width'] as num?)?.toDouble(),
+        height: (props['height'] as num?)?.toDouble(),
+        primaryColor: _getColor(props['primaryColor'] as String?),
+        zones: _buildGaugeZones(props['zones']),
+      ),
     );
   }
 
@@ -239,18 +245,31 @@ class DynamicWidgetBuilder {
   ) {
     final props = config.properties;
 
-    return ACGrid(
-      type: _getGridType(props['type'] as String?),
-      columns: props['columns'] as int?,
-      minColumns: (props['minColumns'] as int?) ?? 1,
-      maxColumns: (props['maxColumns'] as int?) ?? 6,
-      minItemWidth: (props['minItemWidth'] as num?)?.toDouble(),
-      aspectRatio: (props['aspectRatio'] as num?)?.toDouble() ?? 1.0,
-      children: config.children
-          .map(
-            (child) => build(context, child, state: state, onAction: onAction),
-          )
-          .toList(),
+    // RepaintBoundary para grids com muitos children
+    return RepaintBoundary(
+      child: ACGrid(
+        type: _getGridType(props['type'] as String?),
+        columns: props['columns'] as int?,
+        minColumns: (props['minColumns'] as int?) ?? 1,
+        maxColumns: (props['maxColumns'] as int?) ?? 6,
+        minItemWidth: (props['minItemWidth'] as num?)?.toDouble(),
+        aspectRatio: (props['aspectRatio'] as num?)?.toDouble() ?? 1.0,
+        children: config.children
+            .asMap()
+            .entries
+            .map(
+              (entry) => KeyedSubtree(
+                key: ValueKey('${config.id}_grid_${entry.key}'),
+                child: build(
+                  context,
+                  entry.value,
+                  state: state,
+                  onAction: onAction,
+                ),
+              ),
+            )
+            .toList(),
+      ),
     );
   }
 
@@ -271,8 +290,18 @@ class DynamicWidgetBuilder {
       ),
       mainAxisSize: _getMainAxisSize(props['mainAxisSize'] as String?),
       children: config.children
+          .asMap()
+          .entries
           .map(
-            (child) => build(context, child, state: state, onAction: onAction),
+            (entry) => KeyedSubtree(
+              key: ValueKey('${config.id}_column_${entry.key}'),
+              child: build(
+                context,
+                entry.value,
+                state: state,
+                onAction: onAction,
+              ),
+            ),
           )
           .toList(),
     );
@@ -295,8 +324,18 @@ class DynamicWidgetBuilder {
       ),
       mainAxisSize: _getMainAxisSize(props['mainAxisSize'] as String?),
       children: config.children
+          .asMap()
+          .entries
           .map(
-            (child) => build(context, child, state: state, onAction: onAction),
+            (entry) => KeyedSubtree(
+              key: ValueKey('${config.id}_row_${entry.key}'),
+              child: build(
+                context,
+                entry.value,
+                state: state,
+                onAction: onAction,
+              ),
+            ),
           )
           .toList(),
     );

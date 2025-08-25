@@ -28,6 +28,10 @@ class MqttService {
   final Map<String, StreamController<String>> _subscriptions = {};
   final Map<String, StreamSubscription<dynamic>> _streamSubscriptions = {};
 
+  // Debounce para comandos - evita spam
+  final Map<String, Timer> _debounceTimers = {};
+  final Map<String, String> _pendingMessages = {};
+
   bool _isConnected = false;
   bool _isConnecting = false;
   Timer? _reconnectTimer;
@@ -280,6 +284,48 @@ class MqttService {
     bool retain = false,
   }) async {
     return publish(topic, jsonEncode(data), qos: qos, retain: retain);
+  }
+
+  /// Publica mensagem com debounce para evitar spam de comandos
+  Future<void> publishWithDebounce(
+    String topic,
+    String message, {
+    MqttQos? qos,
+    bool retain = false,
+    Duration delay = const Duration(milliseconds: 300),
+  }) async {
+    // Cancela timer anterior se existir
+    _debounceTimers[topic]?.cancel();
+
+    // Armazena mensagem pendente
+    _pendingMessages[topic] = message;
+
+    // Cria novo timer
+    _debounceTimers[topic] = Timer(delay, () async {
+      final pendingMessage = _pendingMessages[topic];
+      if (pendingMessage != null) {
+        await publish(topic, pendingMessage, qos: qos, retain: retain);
+        _pendingMessages.remove(topic);
+        _debounceTimers.remove(topic);
+      }
+    });
+  }
+
+  /// Publica JSON com debounce
+  Future<void> publishJsonWithDebounce(
+    String topic,
+    Map<String, dynamic> data, {
+    MqttQos? qos,
+    bool retain = false,
+    Duration delay = const Duration(milliseconds: 300),
+  }) async {
+    return publishWithDebounce(
+      topic,
+      jsonEncode(data),
+      qos: qos,
+      retain: retain,
+      delay: delay,
+    );
   }
 
   /// Subscreve a um tópico e retorna stream de mensagens

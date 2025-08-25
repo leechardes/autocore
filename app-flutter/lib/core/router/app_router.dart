@@ -1,3 +1,4 @@
+import 'package:autocore_app/core/constants/device_constants.dart';
 import 'package:autocore_app/core/extensions/context_extensions.dart';
 import 'package:autocore_app/core/models/api/api_screen_config.dart';
 import 'package:autocore_app/core/models/api/telemetry_data.dart';
@@ -6,6 +7,7 @@ import 'package:autocore_app/features/dashboard/dashboard_screen.dart';
 import 'package:autocore_app/features/dashboard/providers/dashboard_provider.dart';
 import 'package:autocore_app/features/screens/dynamic_screen_builder.dart';
 import 'package:autocore_app/features/settings/settings_screen.dart';
+import 'package:autocore_app/infrastructure/services/mqtt_service.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -251,39 +253,96 @@ class _DynamicScreenWrapperState extends ConsumerState<DynamicScreenWrapper> {
     );
   }
 
-  void _handleButtonCommand(
+  Future<void> _handleButtonCommand(
     String itemId,
     String command,
     Map<String, dynamic>? payload,
-  ) {
-    // TODO: Implementar execução de comando via MQTT/API
+  ) async {
     AppLogger.info('Button command: $itemId - $command - payload: $payload');
 
-    // Por enquanto, apenas feedback visual
-    if (mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('Comando $command executado'),
-          backgroundColor: Colors.green,
-          duration: const Duration(seconds: 2),
-        ),
-      );
+    try {
+      final mqttService = MqttService.instance;
+      
+      // Tópico para comandos do dispositivo
+      const topic = 'autocore/devices/${DeviceConstants.deviceUuid}/commands';
+      final message = {
+        'itemId': itemId,
+        'command': command,
+        'payload': payload ?? {},
+        'timestamp': DateTime.now().toIso8601String(),
+      };
+      
+      // Envia comando via MQTT com debounce
+      await mqttService.publishJsonWithDebounce(topic, message);
+      
+      AppLogger.info('Comando MQTT enviado com sucesso: $command');
+      
+      // Feedback visual de sucesso
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Comando $command enviado'),
+            backgroundColor: Colors.green,
+            duration: const Duration(seconds: 2),
+          ),
+        );
+      }
+    } catch (e) {
+      AppLogger.error('Erro ao enviar comando MQTT', error: e);
+      
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Erro ao enviar comando: $e'),
+            backgroundColor: Colors.red,
+            duration: const Duration(seconds: 3),
+          ),
+        );
+      }
     }
   }
 
-  void _handleSwitchCommand(String itemId, bool value) {
-    // TODO: Implementar toggle via MQTT/API
+  Future<void> _handleSwitchCommand(String itemId, bool value) async {
     AppLogger.info('Switch command: $itemId - value: $value');
 
-    // Por enquanto, apenas feedback visual
-    if (mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('Switch ${value ? "ligado" : "desligado"}'),
-          backgroundColor: value ? Colors.green : Colors.orange,
-          duration: const Duration(seconds: 2),
-        ),
-      );
+    try {
+      final mqttService = MqttService.instance;
+      
+      // Tópico para controle de relés
+      const topic = 'autocore/devices/${DeviceConstants.deviceUuid}/relays/set';
+      final message = {
+        'itemId': itemId,
+        'state': value,
+        'timestamp': DateTime.now().toIso8601String(),
+      };
+      
+      // Envia comando de toggle via MQTT
+      await mqttService.publishJsonWithDebounce(topic, message);
+      
+      AppLogger.info('Toggle MQTT enviado com sucesso: $itemId -> $value');
+      
+      // Feedback visual de sucesso
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Switch ${value ? "ligado" : "desligado"}'),
+            backgroundColor: value ? Colors.green : Colors.orange,
+            duration: const Duration(seconds: 2),
+          ),
+        );
+      }
+    } catch (e) {
+      AppLogger.error('Erro ao enviar toggle MQTT', error: e);
+      
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Erro ao alternar switch: $e'),
+            backgroundColor: Colors.red,
+            duration: const Duration(seconds: 3),
+          ),
+        );
+      }
     }
   }
 }
