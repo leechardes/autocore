@@ -1,11 +1,13 @@
-# 📡 API Reference - AutoTech HMI Display v2 MQTT Protocol
+# 📡 API Reference - AutoTech HMI Display v2 Protocolo Híbrido MQTT/REST
 
 ## 📋 Índice
 
 - [Visão Geral](#visão-geral)
-- [Estrutura de Tópicos](#estrutura-de-tópicos)
+- [API REST](#api-rest)
+- [Estrutura de Tópicos MQTT](#estrutura-de-tópicos-mqtt)
 - [Formatos de Mensagem](#formatos-de-mensagem)
 - [Endpoints MQTT](#endpoints-mqtt)
+- [Endpoints REST](#endpoints-rest)
 - [Comandos de Controle](#comandos-de-controle)
 - [Status e Telemetria](#status-e-telemetria)
 - [Sistema de Configuração](#sistema-de-configuração)
@@ -14,12 +16,20 @@
 
 ## 🎯 Visão Geral
 
-O AutoTech HMI Display v2 comunica-se exclusivamente através do protocolo MQTT, operando como cliente que:
+O AutoTech HMI Display v2 utiliza um protocolo híbrido MQTT/REST para máxima flexibilidade:
 
+### **Protocolo MQTT** (Primário)
 - **Recebe**: Configurações dinâmicas e comandos do Gateway
 - **Envia**: Comandos de controle, status e telemetria
 - **Subscreve**: Tópicos de configuração e status de dispositivos
 - **Publica**: Comandos para dispositivos e relatórios de status
+
+### **API REST** (Complementar)
+- **Configurações**: Endpoint unificado `/api/config/full/{device_uuid}`
+- **Dispositivos**: Listagem e gerenciamento via `/api/devices`
+- **Telas**: Configuração de interfaces via `/api/screens`
+- **Ícones**: Carregamento de ícones via `/api/icons`
+- **Fallback**: MQTT como fallback se REST falhar
 
 ### Características Principais
 - **QoS 0**: Para telemetria e status (fire-and-forget)
@@ -28,7 +38,167 @@ O AutoTech HMI Display v2 comunica-se exclusivamente através do protocolo MQTT,
 - **Buffer**: 20KB para suportar configurações grandes
 - **Reconnect**: Automático com resubscrição de tópicos
 
-## 🌐 Estrutura de Tópicos
+## 🌐 API REST
+
+### Configuração Base
+```cpp
+// Configurações definidas em DeviceConfig.h
+#define API_PROTOCOL "http"
+#define API_SERVER "192.168.4.1"
+#define API_PORT 8080
+#define API_BASE_PATH "/api"
+#define API_TIMEOUT 10000
+#define API_RETRY_COUNT 3
+#define API_RETRY_DELAY 1000
+#define API_USE_AUTH false
+#define API_CACHE_TTL 30000
+```
+
+### Endpoints Disponíveis
+
+#### 1. **Configuração Unificada** ⭐ *Recomendado*
+```
+GET /api/config/full/{device_uuid}
+```
+**Descrição**: Endpoint otimizado que retorna configuração completa em uma única requisição
+**Parâmetros**: 
+- `device_uuid`: UUID único do dispositivo HMI
+**Resposta**: Objeto JSON com todas as configurações necessárias
+
+```json
+{
+  "version": "2.0.0",
+  "protocol_version": "1.0",
+  "devices": [...],
+  "relay_boards": [...],
+  "screens": [...],
+  "icons": {...},
+  "theme": {...},
+  "system": {...}
+}
+```
+
+#### 2. **Dispositivos**
+```
+GET /api/devices
+```
+**Descrição**: Lista todos os dispositivos registrados no sistema
+**Resposta**: Array de dispositivos
+
+```json
+[
+  {
+    "id": 1,
+    "uuid": "esp32_dev_001234",
+    "type": "hmi_display", 
+    "name": "HMI Principal",
+    "status": "online"
+  }
+]
+```
+
+#### 3. **Placas de Relé**
+```
+GET /api/relays/boards
+```
+**Descrição**: Lista todas as placas de relé configuradas
+**Resposta**: Array de placas de relé
+
+```json
+[
+  {
+    "id": 1,
+    "device_id": 2,
+    "name": "Placa Principal",
+    "total_channels": 16,
+    "active_channels": 12
+  }
+]
+```
+
+#### 4. **Telas**
+```
+GET /api/screens
+```
+**Descrição**: Lista todas as telas configuradas
+**Resposta**: Array de telas
+
+```json
+[
+  {
+    "id": 1,
+    "name": "home",
+    "title": "Menu Principal",
+    "type": "menu",
+    "order": 0
+  }
+]
+```
+
+#### 5. **Itens de Tela**
+```
+GET /api/screens/{screen_id}/items
+```
+**Descrição**: Retorna todos os itens/componentes de uma tela específica
+**Parâmetros**: 
+- `screen_id`: ID da tela
+**Resposta**: Array de itens da tela
+
+#### 6. **Ícones**
+```
+GET /api/icons?platform=esp32
+```
+**Descrição**: Retorna mapeamento de ícones otimizado para ESP32
+**Parâmetros**: 
+- `platform`: Plataforma alvo (esp32)
+**Resposta**: Objeto com mapeamentos de ícones
+
+```json
+{
+  "light_on": "💡",
+  "light_off": "🔸",
+  "engine": "🔧"
+}
+```
+
+#### 7. **Temas**
+```
+GET /api/themes
+```
+**Descrição**: Retorna configurações de tema visual
+**Resposta**: Objeto com definições de tema
+
+### Autenticação e Segurança
+
+```cpp
+// Headers enviados automaticamente pelo ScreenApiClient
+"Accept: application/json"
+"Content-Type: application/json"
+"User-Agent: AutoCore-HMI-v2.0.0"
+
+// Se API_USE_AUTH = true
+"Authorization: Bearer {API_AUTH_TOKEN}"
+```
+
+### Cache e Performance
+
+O `ScreenApiClient` implementa cache inteligente:
+- **TTL**: 30 segundos por padrão (configurável)
+- **Invalidação**: Automática após TTL ou erro
+- **Estratégia**: Cache-first com fallback para rede
+
+### Tratamento de Erros
+
+```cpp
+// Códigos HTTP tratados especificamente:
+200: Sucesso
+404: Endpoint não encontrado
+500: Erro interno do servidor  
+503: Serviço indisponível
+-1:  Falha de conexão de rede
+```
+
+## 🌐 Estrutura de Tópicos MQTT
 
 ### Hierarquia Global
 ```
@@ -330,6 +500,155 @@ Todas as mensagens seguem este formato base:
   "last_change": "2025-01-18T11:58:30Z",
   "total_on_time": 1800
 }
+```
+
+## 🔌 Endpoints REST
+
+### Classe ScreenApiClient
+
+A classe `ScreenApiClient` gerencia toda comunicação REST do dispositivo:
+
+```cpp
+// Exemplo de uso da classe ScreenApiClient
+ScreenApiClient* apiClient = new ScreenApiClient();
+if (apiClient->begin()) {
+    JsonDocument config;
+    if (apiClient->loadConfiguration(config)) {
+        // Configuração carregada com sucesso
+    }
+}
+```
+
+### Métodos Disponíveis
+
+#### 1. **Configuração Completa**
+```cpp
+bool loadConfiguration(JsonDocument& config);
+bool loadFullConfiguration(JsonDocument& config);
+```
+**Descrição**: Carrega configuração completa usando endpoint unificado
+**Performance**: 1 requisição vs 4+ requisições do método legado
+
+#### 2. **Listagem de Dispositivos**
+```cpp
+bool getDevices(JsonArray& devices);
+```
+**Descrição**: Retorna array com todos os dispositivos registrados
+
+#### 3. **Placas de Relé**
+```cpp
+bool getRelayBoards(JsonArray& boards);
+```
+**Descrição**: Retorna array com todas as placas de relé
+
+#### 4. **Telas e Itens**
+```cpp
+bool getScreens(JsonArray& screens);
+bool getScreenItems(int screenId, JsonArray& items);
+```
+**Descrição**: Carrega definições de telas e seus componentes
+
+#### 5. **Recursos Visuais**
+```cpp
+bool getIcons(JsonDocument& icons);
+bool getThemes(JsonDocument& themes);
+```
+**Descrição**: Carrega ícones e temas visuais
+
+### Configuração de Rede
+
+#### Parâmetros de Configuração
+```cpp
+// DeviceConfig.h - Seção API REST
+#define API_PROTOCOL "http"              // Protocolo (http/https)
+#define API_SERVER "192.168.4.1"        // IP do servidor backend
+#define API_PORT 8080                    // Porta do servidor
+#define API_BASE_PATH "/api"             // Caminho base da API
+#define API_TIMEOUT 10000                // Timeout em ms
+#define API_RETRY_COUNT 3                // Número de tentativas
+#define API_RETRY_DELAY 1000             // Delay entre tentativas
+#define API_USE_AUTH false               // Usar autenticação
+#define API_AUTH_TOKEN "your_token"      // Token de autenticação
+#define API_CACHE_TTL 30000              // Cache TTL em ms
+```
+
+#### Device Registration
+```cpp
+// Auto-registro do dispositivo
+bool DeviceRegistration::performSmartRegistration();
+```
+**Funcionalidade**: 
+- Auto-registra o dispositivo no backend
+- Obtém credenciais MQTT dinâmicas se disponíveis
+- Atualiza configuração de rede automaticamente
+
+### Registry de Dispositivos
+
+#### DeviceRegistry (Singleton)
+```cpp
+DeviceRegistry* registry = DeviceRegistry::getInstance();
+
+// Adicionar dispositivo
+DeviceInfo device(1, "esp32_001", "hmi_display", "HMI Principal");
+registry->addDevice(device);
+
+// Adicionar placa de relé
+RelayBoardInfo board(1, 2, "Placa Principal", 16);
+registry->addRelayBoard(board);
+
+// Buscar por UUID
+DeviceInfo* device = registry->getDeviceByUUID("esp32_001");
+```
+
+### Fluxo de Carregamento
+
+#### 1. **Inicialização**
+```mermaid
+sequenceDiagram
+    participant M as Main
+    participant A as ScreenApiClient
+    participant B as Backend
+    participant R as DeviceRegistry
+    
+    M->>A: begin()
+    A->>B: Test Connection
+    B-->>A: 200 OK
+    A-->>M: Ready
+    M->>A: loadConfiguration()
+    A->>B: GET /config/full/{uuid}
+    B-->>A: Full Config JSON
+    A->>R: Populate Registry
+    A-->>M: Config Loaded
+```
+
+#### 2. **Fallback MQTT**
+Se a API REST falhar, o sistema automaticamente usa MQTT como fallback:
+```cpp
+// No ConfigReceiver
+if (!apiClient->loadConfiguration(config)) {
+    // Fallback para MQTT
+    return loadConfigFromMQTT(config);
+}
+```
+
+### Error Handling
+
+#### Códigos de Erro REST
+```cpp
+// ScreenApiClient error codes
+-1:  Connection failed
+200: Success
+404: Not found
+500: Internal server error
+503: Service unavailable
+```
+
+#### Log de Debugging
+```cpp
+// Logs detalhados para diagnóstico
+logger->debug("ScreenApiClient: Request URL: " + url);
+logger->debug("ScreenApiClient: Response size: " + String(response.length()));
+logger->error("ScreenApiClient: HTTP error: " + String(lastHttpCode));
 ```
 
 ## ⚡ Comandos de Controle

@@ -83,30 +83,77 @@ nano include/config/DeviceConfig.h
 ## 📁 Estrutura do Projeto
 
 ```
-autotech_hmi_display_v2/
-├── docs/                      # Documentação completa
-│   ├── ARCHITECTURE.md
-│   ├── API_REFERENCE.md
-│   └── ...
-├── include/                   # Headers (.h)
-│   ├── config/               # Configurações
-│   │   ├── DeviceConfig.h    # Config principal
-│   │   └── DeviceConfig.example.h
-│   ├── core/                 # Núcleo do sistema
-│   │   ├── Logger.h
-│   │   ├── MQTTClient.h
-│   │   └── ConfigManager.h
-│   ├── ui/                   # Interface de usuário
-│   │   ├── ScreenManager.h
-│   │   ├── ScreenFactory.h
-│   │   └── Theme.h
-│   ├── communication/        # Comunicação MQTT
-│   ├── navigation/           # Sistema de navegação
-│   └── input/               # Entrada (touch, botões)
-├── src/                      # Implementações (.cpp)
-│   ├── main.cpp             # Ponto de entrada
-│   ├── core/
-│   ├── ui/
+esp32-display/
+├── docs/                          # Documentação completa
+│   ├── ARCHITECTURE.md           # Arquitetura do sistema
+│   ├── API_REFERENCE.md          # Protocolo MQTT/REST
+│   ├── CONFIGURATION_GUIDE.md    # Guia de configuração JSON
+│   ├── DEVELOPMENT_GUIDE.md      # Este documento
+│   ├── agents/                   # Agentes de automação
+│   ├── architecture/             # Diagramas de arquitetura
+│   ├── communication/            # Protocolos de comunicação
+│   ├── components/               # Documentação de componentes
+│   ├── hardware/                 # Especificações de hardware
+│   └── templates/                # Templates de código
+├── include/                       # Headers (.h)
+│   ├── config/                   # Configurações
+│   │   ├── DeviceConfig.h        # Config principal do dispositivo
+│   │   └── DeviceConfig.example.h # Template de configuração
+│   ├── core/                     # Sistema central
+│   │   ├── Logger.h              # Sistema de logging
+│   │   ├── MQTTClient.h          # Cliente MQTT
+│   │   ├── MQTTProtocol.h        # Definições de protocolo
+│   │   └── ConfigManager.h       # Gerenciador de configurações
+│   ├── network/                  # Rede e APIs ⭐ Novo
+│   │   ├── ScreenApiClient.h     # Cliente API REST
+│   │   └── DeviceRegistration.h  # Auto-registro de dispositivos
+│   ├── ui/                       # Interface de usuário
+│   │   ├── ScreenManager.h       # Gerenciador de telas
+│   │   ├── ScreenFactory.h       # Factory de telas
+│   │   ├── IconManager.h         # Gerenciador de ícones
+│   │   ├── DataBinder.h          # Vinculação de dados
+│   │   └── Theme.h               # Sistema de temas
+│   ├── models/                   # Modelos de dados ⭐ Novo
+│   │   └── DeviceModels.h        # Modelos de dispositivos/placas
+│   ├── commands/                 # Sistema de comandos ⭐ Novo
+│   │   └── CommandSender.h       # Envio de comandos MQTT
+│   ├── communication/            # Comunicação MQTT
+│   │   ├── ConfigReceiver.h      # Recebedor de configurações
+│   │   ├── StatusReporter.h      # Reporter de status
+│   │   └── ButtonStateManager.h  # Gerenciador de estado dos botões
+│   ├── navigation/               # Sistema de navegação
+│   │   ├── Navigator.h           # Navegador entre telas
+│   │   └── ButtonHandler.h       # Handler de botões físicos
+│   ├── input/                    # Entrada (touch, botões)
+│   │   └── TouchHandler.h        # Handler do touchscreen
+│   ├── screens/                  # Implementações de telas
+│   │   └── HomeScreen.h          # Tela principal
+│   ├── utils/                    # Utilitários ⭐ Novo
+│   │   ├── DeviceUtils.h         # Utils de dispositivo (UUID, MAC)
+│   │   └── StringUtils.h         # Utilitários de string
+│   ├── Layout components         # Componentes de layout
+│   │   ├── Container.h           # Container base
+│   │   ├── GridContainer.h       # Container em grade 3x2
+│   │   ├── Header.h              # Cabeçalho de telas
+│   │   ├── NavigationBar.h       # Barra de navegação
+│   │   ├── NavButton.h           # Botões de navegação
+│   │   ├── Layout.h              # Sistema de layout
+│   │   ├── LayoutConfig.h        # Configurações de layout
+│   │   └── ScreenBase.h          # Classe base para telas
+│   └── lv_conf.h                 # Configuração LVGL
+├── src/                          # Implementações (.cpp)
+│   ├── main.cpp                  # Ponto de entrada principal
+│   ├── core/                     # Sistema central
+│   ├── network/                  # APIs e rede ⭐ Novo
+│   ├── ui/                       # Interface de usuário
+│   ├── models/                   # Modelos de dados ⭐ Novo
+│   ├── commands/                 # Comandos ⭐ Novo
+│   ├── communication/            # Comunicação MQTT
+│   ├── navigation/               # Navegação
+│   ├── input/                    # Entrada
+│   ├── screens/                  # Telas
+│   ├── utils/                    # Utilitários ⭐ Novo
+│   └── Layout components/        # Implementação de layout
 │   └── ...
 ├── lib/                      # Bibliotecas locais
 ├── test/                     # Testes unitários

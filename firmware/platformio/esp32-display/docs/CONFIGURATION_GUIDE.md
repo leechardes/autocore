@@ -149,6 +149,42 @@ O AutoTech HMI Display v2 é **100% configurável** via JSON, eliminando complet
       "level": "info",
       "mqtt_debug": false,
       "ui_debug": false
+    },
+    "networking": {
+      "mqtt": {
+        "broker": "192.168.4.1",
+        "port": 1883,
+        "username": "",
+        "password": "",
+        "topics": {
+          "config_request": "autocore/gateway/config/request",
+          "config_response": "autocore/gateway/config/response",
+          "config_update": "autocore/gateway/config/update"
+        }
+      },
+      "api": {
+        "enabled": true,
+        "protocol": "http",
+        "server": "192.168.4.1",
+        "port": 8080,
+        "base_path": "/api",
+        "timeout": 10000,
+        "retry_count": 3,
+        "retry_delay": 1000,
+        "cache_ttl": 30000,
+        "auth": {
+          "enabled": false,
+          "token": ""
+        },
+        "endpoints": {
+          "config_full": "/config/full/{device_uuid}",
+          "devices": "/devices",
+          "relay_boards": "/relays/boards",
+          "screens": "/screens",
+          "icons": "/icons?platform=esp32",
+          "themes": "/themes"
+        }
+      }
     }
   }
 }
@@ -173,6 +209,27 @@ O AutoTech HMI Display v2 é **100% configurável** via JSON, eliminando complet
 | `grid_rows` | int | 3 | Linhas do grid |
 | `margin` | int | 10 | Margem externa (px) |
 | `gap` | int | 5 | Espaço entre itens (px) |
+
+#### API REST Settings ⭐ *Nova Funcionalidade*
+| Parâmetro | Tipo | Padrão | Descrição |
+|-----------|------|---------|-----------|
+| `enabled` | bool | true | Habilita API REST |
+| `protocol` | string | "http" | Protocolo (http/https) |
+| `server` | string | "192.168.4.1" | IP do servidor backend |
+| `port` | int | 8080 | Porta do servidor |
+| `base_path` | string | "/api" | Caminho base da API |
+| `timeout` | int | 10000 | Timeout por requisição (ms) |
+| `retry_count` | int | 3 | Tentativas em caso de falha |
+| `retry_delay` | int | 1000 | Delay entre tentativas (ms) |
+| `cache_ttl` | int | 30000 | Tempo de vida do cache (ms) |
+
+#### MQTT Settings
+| Parâmetro | Tipo | Padrão | Descrição |
+|-----------|------|---------|-----------|
+| `broker` | string | "192.168.4.1" | IP do broker MQTT |
+| `port` | int | 1883 | Porta do broker |
+| `username` | string | "" | Usuário MQTT (opcional) |
+| `password` | string | "" | Senha MQTT (opcional) |
 
 ## 📱 Definição de Telas
 

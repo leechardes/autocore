@@ -117,27 +117,54 @@ graph TB
 ### 📦 Módulos Principais
 
 #### 1. **Core System**
-- **Main Loop**: Coordena todos os componentes
-- **Logger**: Sistema de logging configurável
-- **WiFi Manager**: Gerenciamento de conexão WiFi
-- **MQTT Client**: Cliente MQTT otimizado para ESP32
+- **Main Loop** (`main.cpp`): Coordena todos os componentes e ciclo principal
+- **Logger** (`core/Logger`): Sistema de logging configurável com níveis
+- **ConfigManager** (`core/ConfigManager`): Gerencia configurações JSON dinâmicas
+- **MQTTClient** (`core/MQTTClient`): Cliente MQTT otimizado para ESP32
+- **MQTTProtocol** (`core/MQTTProtocol`): Definições de protocolo MQTT
 
-#### 2. **Configuration System**
-- **Config Manager**: Gerencia configurações recebidas
-- **Config Receiver**: Recebe configurações via MQTT
-- **Hot Reload**: Atualiza UI sem reinicialização
+#### 2. **Network & API Layer**
+- **ScreenApiClient** (`network/ScreenApiClient`): Cliente REST API para configurações
+- **DeviceRegistration** (`network/DeviceRegistration`): Auto-registro de dispositivos
+- **ConfigReceiver** (`communication/ConfigReceiver`): Recebe configurações via MQTT/API
+- **StatusReporter** (`communication/StatusReporter`): Reporta status e telemetria
+- **ButtonStateManager** (`communication/ButtonStateManager`): Gerencia estado dos botões
 
-#### 3. **User Interface**
-- **Screen Manager**: Gerencia todas as telas
-- **Screen Factory**: Cria telas dinamicamente
-- **Navigator**: Sistema de navegação
-- **Theme System**: Temas visuais configuráveis
+#### 3. **User Interface Framework**
+- **ScreenManager** (`ui/ScreenManager`): Gerencia todas as telas e transições
+- **ScreenFactory** (`ui/ScreenFactory`): Factory para criação dinâmica de telas
+- **ScreenBase** (`ScreenBase`): Classe base para todas as telas
+- **IconManager** (`ui/IconManager`): Gerenciamento de ícones LVGL
+- **Theme** (`ui/Theme`): Sistema de temas visuais configuráveis
+- **DataBinder** (`ui/DataBinder`): Vinculação de dados para widgets dinâmicos
 
-#### 4. **Input/Output**
-- **Button Handler**: Gerencia botões físicos
-- **Touch Handler**: Gerencia touch screen
-- **Command Sender**: Envia comandos MQTT
-- **Status Reporter**: Reporta status do dispositivo
+#### 4. **Layout System**
+- **Layout** (`Layout`): Sistema de cálculo de layout adaptativo
+- **Container** (`Container`): Container base para componentes
+- **GridContainer** (`GridContainer`): Container com layout em grade 3x2
+- **Header** (`Header`): Componente de cabeçalho de telas
+- **NavigationBar** (`NavigationBar`): Barra de navegação inferior
+- **NavButton** (`NavButton`): Botões de navegação personalizáveis
+
+#### 5. **Input/Navigation**
+- **Navigator** (`navigation/Navigator`): Sistema de navegação entre telas
+- **ButtonHandler** (`navigation/ButtonHandler`): Gerencia botões físicos
+- **TouchHandler** (`input/TouchHandler`): Gerencia touch screen XPT2046
+
+#### 6. **Screen Implementations**
+- **HomeScreen** (`screens/HomeScreen`): Implementação da tela principal
+
+#### 7. **Command & Control**
+- **CommandSender** (`commands/CommandSender`): Envia comandos MQTT para dispositivos
+
+#### 8. **Models & Data**
+- **DeviceModels** (`models/DeviceModels`): Modelos de dados de dispositivos
+- **DeviceRegistry**: Registry singleton para dispositivos e placas de relé
+
+#### 9. **Utilities**
+- **DeviceUtils** (`utils/DeviceUtils`): Utilitários de dispositivo (UUID, MAC, etc)
+- **StringUtils** (`utils/StringUtils`): Utilitários para manipulação de strings
+- **LayoutConfig** (`LayoutConfig`): Configurações de posicionamento e dimensões
 
 ## 🔄 Fluxo de Dados
 
