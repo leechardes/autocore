@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react'
+import { Routes, Route, useNavigate, useLocation } from 'react-router-dom'
 import { Car, Gauge, Cpu, ToggleLeft, Monitor, Radio, Palette, Settings, Menu, Sun, Moon, RefreshCw, Plus, FileJson, Activity, Play, Zap } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
@@ -13,17 +14,38 @@ import CANBusPage from './pages/CANBusPage.jsx'
 import CANParametersPage from './pages/CANParametersPage.jsx'
 import MQTTMonitorPage from './pages/MQTTMonitorPage.jsx'
 import MacrosPage from './pages/MacrosPage.jsx'
-import ThemeSelector from './components/ThemeSelector'
+import VehicleManager from './pages/Vehicle/VehicleManager'
+import { ThemeProvider } from '@/providers/theme-provider'
+import { ThemeToggle } from './components/theme-toggle'
 import HelpModal from './components/HelpModal'
 import { AutoCoreLogoCompact } from './components/AutoCoreLogo'
 import api from '@/lib/api'
 
 function App() {
+  const navigate = useNavigate()
+  const location = useLocation()
   const [loading, setLoading] = useState(true)
-  const [isDark, setIsDark] = useState(false)
-  const [currentPage, setCurrentPage] = useState('dashboard')
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
   const [refreshing, setRefreshing] = useState(false)
+  
+  // Derive current page from URL
+  const getCurrentPage = () => {
+    const path = location.pathname
+    if (path.startsWith('/vehicle')) return 'vehicle'
+    if (path === '/' || path === '/dashboard') return 'dashboard'
+    if (path.startsWith('/devices')) return 'devices'
+    if (path.startsWith('/relays')) return 'relays'
+    if (path.startsWith('/macros')) return 'macros'
+    if (path.startsWith('/screens')) return 'screens'
+    if (path.startsWith('/config')) return 'config'
+    if (path.startsWith('/settings')) return 'settings'
+    if (path.startsWith('/themes')) return 'themes'
+    if (path.startsWith('/can')) return 'can'
+    if (path.startsWith('/mqtt')) return 'mqtt'
+    return 'dashboard'
+  }
+  
+  const currentPage = getCurrentPage()
   
   // Data state
   const [status, setStatus] = useState({
@@ -65,104 +87,105 @@ function App() {
       name: 'Dashboard',
       icon: Gauge,
       title: 'Dashboard',
-      description: 'Visão geral do sistema'
+      description: 'Visão geral do sistema',
+      path: '/'
+    },
+    {
+      id: 'vehicle',
+      name: 'Veículo',
+      icon: Car,
+      title: 'Gerenciamento de Veículo',
+      description: 'Gerenciar veículo do sistema',
+      path: '/vehicle'
     },
     {
       id: 'devices',
       name: 'Dispositivos',
       icon: Cpu,
       title: 'Dispositivos',
-      description: 'Gerenciar dispositivos ESP32'
+      description: 'Gerenciar dispositivos ESP32',
+      path: '/devices'
     },
     {
       id: 'relays',
       name: 'Relés',
       icon: Zap,
       title: 'Configuração de Relés',
-      description: 'Configurar canais e placas de relé'
+      description: 'Configurar canais e placas de relé',
+      path: '/relays'
     },
     {
       id: 'macros',
       name: 'Macros',
       icon: Play,
       title: 'Macros e Automações',
-      description: 'Gerenciar sequências de ações programáveis'
+      description: 'Gerenciar sequências de ações programáveis',
+      path: '/macros'
     },
     {
       id: 'screens',
       name: 'Telas',
       icon: Monitor,
       title: 'Editor de Telas',
-      description: 'Configurar layouts visuais'
+      description: 'Configurar layouts visuais',
+      path: '/screens'
     },
     {
       id: 'can',
       name: 'CAN Bus',
       icon: Radio,
       title: 'Sinais CAN',
-      description: 'Configurar telemetria CAN'
+      description: 'Configurar telemetria CAN',
+      path: '/can'
     },
     {
       id: 'mqtt',
       name: 'Monitor MQTT',
       icon: Activity,
       title: 'Monitor MQTT',
-      description: 'Monitor em tempo real das mensagens MQTT'
+      description: 'Monitor em tempo real das mensagens MQTT',
+      path: '/mqtt'
     },
     {
       id: 'config',
       name: 'Gerador Config',
       icon: FileJson,
       title: 'Gerador de Configuração',
-      description: 'Gerar arquivos JSON, C++ e YAML para ESP32'
+      description: 'Gerar arquivos JSON, C++ e YAML para ESP32',
+      path: '/config'
     },
     {
       id: 'themes',
       name: 'Temas',
       icon: Palette,
       title: 'Temas e Aparência',
-      description: 'Personalizar visual'
+      description: 'Personalizar visual',
+      path: '/themes'
     },
     {
       id: 'settings',
       name: 'Configurações',
       icon: Settings,
       title: 'Configurações',
-      description: 'Configurações do sistema'
+      description: 'Configurações do sistema',
+      path: '/settings'
     }
   ]
 
   // Initialize app
   useEffect(() => {
     const initApp = async () => {
-      
-      // Initialize theme
-      const savedTheme = localStorage.getItem('theme')
-      const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches
-      const darkMode = savedTheme === 'dark' || (!savedTheme && prefersDark)
-      
-      setIsDark(darkMode)
-      document.documentElement.classList.toggle('dark', darkMode)
-      
       // Load initial data
       await loadInitialData()
-      
       setLoading(false)
     }
 
     initApp()
 
-    // Set up navigation listener
-    const handleNavigate = (event) => {
-      setCurrentPage(event.detail)
-    }
-    window.addEventListener('navigate', handleNavigate)
-
     // Set up periodic updates
     const interval = setInterval(loadInitialData, 30000)
     return () => {
       clearInterval(interval)
-      window.removeEventListener('navigate', handleNavigate)
     }
   }, [])
 
@@ -208,13 +231,6 @@ function App() {
     }
   }
 
-  // Theme toggle
-  const toggleTheme = () => {
-    const newIsDark = !isDark
-    setIsDark(newIsDark)
-    document.documentElement.classList.toggle('dark', newIsDark)
-    localStorage.setItem('theme', newIsDark ? 'dark' : 'light')
-  }
 
   // Manual refresh
   const refreshData = async () => {
@@ -244,7 +260,8 @@ function App() {
   }
 
   return (
-    <div className="flex h-screen bg-background">
+    <ThemeProvider defaultTheme="system" storageKey="autocore-theme">
+      <div className="flex h-screen bg-background">
       {/* Sidebar */}
       <nav className={`${mobileMenuOpen ? 'translate-x-0' : '-translate-x-full'} fixed inset-y-0 left-0 z-50 w-64 bg-card border-r transition-transform duration-300 ease-in-out md:relative md:translate-x-0`}>
         {/* Logo */}
@@ -270,7 +287,7 @@ function App() {
                 variant={currentPage === item.id ? "default" : "ghost"}
                 className="w-full justify-start"
                 onClick={() => {
-                  setCurrentPage(item.id)
+                  navigate(item.path)
                   setMobileMenuOpen(false)
                 }}
               >
@@ -321,8 +338,8 @@ function App() {
           </div>
           
           <div className="flex items-center space-x-2">
-            {/* Theme Selector */}
-            <ThemeSelector />
+            {/* Theme Toggle */}
+            <ThemeToggle />
             
             {/* Refresh */}
             <Button variant="ghost" size="icon" onClick={refreshData} disabled={refreshing}>
@@ -336,120 +353,102 @@ function App() {
 
         {/* Page Content */}
         <div className="flex-1 overflow-auto p-6">
-          {currentPage === 'dashboard' && (
-            <div className="space-y-6">
-              {/* Stats Cards */}
-              <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-                {stats.map((stat, index) => {
-                  const Icon = stat.icon
-                  return (
-                    <Card key={index}>
-                      <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                        <CardTitle className="text-sm font-medium text-muted-foreground">
-                          {stat.title}
-                        </CardTitle>
-                        <Icon className="h-4 w-4 text-muted-foreground" />
-                      </CardHeader>
-                      <CardContent>
-                        <div className="text-2xl font-bold">{stat.value}</div>
-                        <p className="text-xs text-muted-foreground">{stat.description}</p>
-                      </CardContent>
-                    </Card>
-                  )
-                })}
+          <Routes>
+            {/* Dashboard */}
+            <Route path="/" element={
+              <div className="space-y-6">
+                {/* Stats Cards */}
+                <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+                  {stats.map((stat, index) => {
+                    const Icon = stat.icon
+                    return (
+                      <Card key={index}>
+                        <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                          <CardTitle className="text-sm font-medium text-muted-foreground">
+                            {stat.title}
+                          </CardTitle>
+                          <Icon className="h-4 w-4 text-muted-foreground" />
+                        </CardHeader>
+                        <CardContent>
+                          <div className="text-2xl font-bold">{stat.value}</div>
+                          <p className="text-xs text-muted-foreground">{stat.description}</p>
+                        </CardContent>
+                      </Card>
+                    )
+                  })}
+                </div>
+
+                {/* Quick Actions */}
+                <Card>
+                  <CardHeader>
+                    <CardTitle>Ações Rápidas</CardTitle>
+                    <CardDescription>
+                      Acesso rápido às funcionalidades principais
+                    </CardDescription>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+                      {[
+                        { icon: Car, title: 'Gerenciar Veículo', desc: 'Cadastrar veículo', path: '/vehicle' },
+                        { icon: Plus, title: 'Adicionar Device', desc: 'Descobrir novo ESP32', path: '/devices' },
+                        { icon: Settings, title: 'Configurar Relés', desc: 'Mapear canais', path: '/relays' },
+                        { icon: Monitor, title: 'Editar Telas', desc: 'Layout visual', path: '/screens' }
+                      ].map((action, index) => {
+                        const Icon = action.icon
+                        return (
+                          <Button
+                            key={index}
+                            variant="outline"
+                            className="h-auto flex-col items-start space-y-2 p-4"
+                            onClick={() => navigate(action.path)}
+                          >
+                            <Icon className="h-5 w-5 text-primary" />
+                            <div className="text-left">
+                              <p className="font-medium">{action.title}</p>
+                              <p className="text-sm text-muted-foreground">{action.desc}</p>
+                            </div>
+                          </Button>
+                        )
+                      })}
+                    </div>
+                  </CardContent>
+                </Card>
               </div>
-
-              {/* Quick Actions */}
-              <Card>
-                <CardHeader>
-                  <CardTitle>Ações Rápidas</CardTitle>
-                  <CardDescription>
-                    Acesso rápido às funcionalidades principais
-                  </CardDescription>
-                </CardHeader>
-                <CardContent>
-                  <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-                    {[
-                      { icon: Plus, title: 'Adicionar Device', desc: 'Descobrir novo ESP32', page: 'devices' },
-                      { icon: Settings, title: 'Configurar Relés', desc: 'Mapear canais', page: 'relays' },
-                      { icon: Monitor, title: 'Editar Telas', desc: 'Layout visual', page: 'screens' },
-                      { icon: FileJson, title: 'Gerar Config', desc: 'Download JSON', page: 'config' }
-                    ].map((action, index) => {
-                      const Icon = action.icon
-                      return (
-                        <Button
-                          key={index}
-                          variant="outline"
-                          className="h-auto flex-col items-start space-y-2 p-4"
-                          onClick={() => setCurrentPage(action.page)}
-                        >
-                          <Icon className="h-5 w-5 text-primary" />
-                          <div className="text-left">
-                            <p className="font-medium">{action.title}</p>
-                            <p className="text-sm text-muted-foreground">{action.desc}</p>
-                          </div>
-                        </Button>
-                      )
-                    })}
-                  </div>
-                </CardContent>
-              </Card>
-            </div>
-          )}
-
-          {currentPage === 'devices' && (
-            <DevicesPage />
-          )}
-
-          {currentPage === 'relays' && (
-            <RelaysPage />
-          )}
-          
-          {currentPage === 'macros' && (
-            <MacrosPage />
-          )}
-
-          {currentPage === 'screens' && (
-            <ScreensPageV2 />
-          )}
-
-          {currentPage === 'config' && (
-            <ConfigGeneratorPage />
-          )}
-
-          {currentPage === 'settings' && (
-            <ConfigSettingsPage />
-          )}
-
-          {currentPage === 'themes' && (
-            <DeviceThemesPage />
-          )}
-
-          {currentPage === 'can' && (
-            <CANBusPage />
-          )}
-
-          {currentPage === 'can-parameters' && (
-            <CANParametersPage />
-          )}
-
-          {currentPage === 'mqtt' && (
-            <MQTTMonitorPage />
-          )}
-
-          {currentPage !== 'dashboard' && currentPage !== 'devices' && currentPage !== 'relays' && currentPage !== 'screens' && currentPage !== 'config' && currentPage !== 'settings' && currentPage !== 'themes' && currentPage !== 'can' && currentPage !== 'can-parameters' && currentPage !== 'mqtt' && (
-            <div className="flex flex-col items-center justify-center py-12">
-              <Monitor className="h-12 w-12 text-muted-foreground mb-4" />
-              <h3 className="text-lg font-semibold mb-2">Em Desenvolvimento</h3>
-              <p className="text-muted-foreground">Página {currentPageData.title} em implementação</p>
-            </div>
-          )}
+            } />
+            
+            {/* Vehicle Route */}
+            <Route path="/vehicle" element={<VehicleManager />} />
+            
+            {/* Other Routes */}
+            <Route path="/devices" element={<DevicesPage />} />
+            <Route path="/relays" element={<RelaysPage />} />
+            <Route path="/macros" element={<MacrosPage />} />
+            <Route path="/screens" element={<ScreensPageV2 />} />
+            <Route path="/config" element={<ConfigGeneratorPage />} />
+            <Route path="/settings" element={<ConfigSettingsPage />} />
+            <Route path="/themes" element={<DeviceThemesPage />} />
+            <Route path="/can" element={<CANBusPage />} />
+            <Route path="/mqtt" element={<MQTTMonitorPage />} />
+            
+            {/* Fallback route */}
+            <Route path="*" element={
+              <div className="flex flex-col items-center justify-center py-12">
+                <Monitor className="h-12 w-12 text-muted-foreground mb-4" />
+                <h3 className="text-lg font-semibold mb-2">Página não encontrada</h3>
+                <p className="text-muted-foreground">A página solicitada não existe</p>
+                <Button className="mt-4" onClick={() => navigate('/')}>
+                  Voltar ao Dashboard
+                </Button>
+              </div>
+            } />
+          </Routes>
         </div>
       </main>
       
-      {/* Toast Notifications */}
-      <Toaster position="bottom-right" />
-    </div>
+        {/* Toast Notifications */}
+        <Toaster position="bottom-right" />
+      </div>
+    </ThemeProvider>
   )
 }
 

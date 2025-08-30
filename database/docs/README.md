@@ -16,9 +16,10 @@ O AutoCore usa SQLite como banco principal com planejamento de migração para P
 ## 📁 Estrutura da Documentação
 
 ### 🔧 Models & Schema
+- [`database/`](./database/) - Estrutura central de database, schemas e modelos
 - [`models/`](./models/) - Documentação dos SQLAlchemy models
 - [`schemas/`](./schemas/) - Estrutura do banco, ER diagrams, constraints
-- [`api/`](./api/) - Padrões SQLAlchemy, queries, repositories
+- [`services/`](./services/) - Padrões SQLAlchemy, queries, repositories
 
 ### 🔄 Migrations & Deployment  
 - [`migrations/`](./migrations/) - Alembic workflows e histórico
@@ -127,7 +128,7 @@ Os agentes automatizam tarefas do database:
 - **A04-backup-manager**: Gerencia backups automatizados
 - **A05-performance-analyzer**: Analisa queries lentas
 
-Ver [Agentes Dashboard](./agents/dashboard.md) para mais detalhes.
+Ver [Agentes Dashboard](./agents/A98-DASHBOARD.md) para mais detalhes.
 
 ## 📞 Suporte
 

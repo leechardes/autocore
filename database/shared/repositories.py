@@ -1159,3 +1159,9 @@ class IconsRepository(BaseRepository):
 
 # Instância singleton
 icons = IconsRepository()
+
+# Vehicle Repository (importado de arquivo separado)
+from .vehicle_repository import VehicleRepository, create_vehicle_repository, get_vehicle_repository
+
+# Adiciona vehicles ao módulo para compatibilidade
+vehicles = get_vehicle_repository

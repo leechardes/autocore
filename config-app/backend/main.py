@@ -29,13 +29,18 @@ load_dotenv()
 
 # Import repositories do database
 from shared.repositories import devices, relays, telemetry, events, config, icons
+from shared.vehicle_repository import create_vehicle_repository
 
 # Import MQTT Monitor
 from services.mqtt_monitor import mqtt_monitor
 
 # Import Routes  
-from api.routes import simulators, macros
+from api.routes import simulators, macros, vehicles
 from api import mqtt_routes, protocol_routes
+
+# Import Middleware
+from api.middleware.rate_limiting import rate_limit_middleware
+from api.middleware.validation import validation_middleware
 
 # Import normalizers
 from utils.normalizers import (
@@ -76,9 +81,10 @@ app = FastAPI(
 )
 
 # ====================================
-# CORS
+# MIDDLEWARE
 # ====================================
 
+# CORS
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],  # Em produção, especificar origins
@@ -86,6 +92,10 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+# Security and Rate Limiting Middleware
+app.middleware("http")(rate_limit_middleware)
+app.middleware("http")(validation_middleware)
 
 # ====================================
 # MODELOS PYDANTIC
@@ -1343,6 +1353,58 @@ def get_preview_configuration():
         
         config_data["screens"] = screens_data
         
+        # Preview vehicle - usar veículo real se disponível, senão dados simulados
+        try:
+            vehicle_repo = create_vehicle_repository()
+            vehicle_data = vehicle_repo.get_vehicle()
+            
+            if vehicle_data:
+                config_data["vehicle"] = {
+                    "configured": True,
+                    "data": vehicle_data
+                }
+            else:
+                # Dados simulados quando não há veículo cadastrado
+                config_data["vehicle"] = {
+                    "configured": False,
+                    "data": {
+                        "id": 1,
+                        "uuid": "preview-vehicle",
+                        "plate": "ABC1D23",
+                        "brand": "Toyota",
+                        "model": "Corolla",
+                        "version": "XEi 2.0",
+                        "year_model": 2023,
+                        "fuel_type": "flex",
+                        "status": "active",
+                        "odometer": 15420,
+                        "full_name": "Toyota Corolla XEi 2.0 2023",
+                        "is_online": True
+                    }
+                }
+            
+            vehicle_repo.session.close()
+        except Exception as e:
+            logger.warning(f"Error loading vehicle for preview: {e}")
+            # Fallback para dados simulados
+            config_data["vehicle"] = {
+                "configured": False,
+                "data": {
+                    "id": 1,
+                    "uuid": "preview-vehicle",
+                    "plate": "ABC1D23",
+                    "brand": "Toyota",
+                    "model": "Corolla",
+                    "version": "XEi 2.0",
+                    "year_model": 2023,
+                    "fuel_type": "flex",
+                    "status": "active",
+                    "odometer": 15420,
+                    "full_name": "Toyota Corolla XEi 2.0 2023",
+                    "is_online": True
+                }
+            }
+        
         # Devices registry
         all_devices = devices.get_all(active_only=True)
         config_data["devices"] = [
@@ -1434,6 +1496,28 @@ async def get_full_configuration(
         # Validações de entrada
         if device_uuid and len(device_uuid) > 100:
             raise HTTPException(400, "Device UUID muito longo")
+        
+        # Buscar veículo SEMPRE (antes de qualquer condição)
+        vehicle_config = None
+        try:
+            vehicle_repo = create_vehicle_repository()
+            vehicle_data = vehicle_repo.get_vehicle()
+            
+            if vehicle_data:
+                vehicle_config = {
+                    "configured": True,
+                    "data": vehicle_data
+                }
+            else:
+                vehicle_config = {
+                    "configured": False,
+                    "data": None
+                }
+            
+            vehicle_repo.session.close()
+        except Exception as e:
+            logger.warning(f"Error loading vehicle: {e}")
+            vehicle_config = {"configured": False, "data": None}
         
         # Verificar se é modo preview
         is_preview_mode = (device_uuid == "preview") or preview or (device_uuid is None)
@@ -1639,6 +1723,9 @@ async def get_full_configuration(
             }
             for b in boards
         ]
+        
+        # Vehicle - usar veículo buscado anteriormente
+        config_data["vehicle"] = vehicle_config
         
         # Theme padrão - sempre incluir
         default_theme = config.get_default_theme()
@@ -2200,6 +2287,7 @@ async def get_mqtt_topics():
 # Registrar routers
 app.include_router(simulators.router)
 app.include_router(macros.router)
+app.include_router(vehicles.router)
 app.include_router(mqtt_routes.router)
 app.include_router(protocol_routes.router)
 

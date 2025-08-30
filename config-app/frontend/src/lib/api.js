@@ -3,7 +3,7 @@
 
 class AutoCoreAPI {
   constructor() {
-    this.baseURL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8081/api'
+    this.baseURL = import.meta.env.VITE_API_URL || 'http://localhost:8081/api'
     this.timeout = 10000 // 10 seconds
   }
 
@@ -307,6 +307,46 @@ class AutoCoreAPI {
       console.error('❌ Erro em getPreviewConfig:', error)
       throw error
     }
+  }
+
+  // ===================================
+  // VEHICLE ENDPOINT (Singular - Single Vehicle System)
+  // ===================================
+
+  async getVehicle() {
+    return this.get('/vehicle')
+  }
+
+  async createOrUpdateVehicle(vehicleData) {
+    return this.post('/vehicle', vehicleData)
+  }
+
+  async deleteVehicle() {
+    return this.delete('/vehicle')
+  }
+
+  async resetVehicle() {
+    return this.delete('/vehicle/reset')
+  }
+
+  async updateVehicleOdometer(odometer) {
+    return this.patch('/vehicle/odometer', { current_mileage: odometer })
+  }
+
+  async updateVehicleLocation(lat, lng) {
+    return this.patch('/vehicle/location', { latitude: lat, longitude: lng })
+  }
+
+  async updateVehicleStatus(status) {
+    return this.patch('/vehicle/status', { status })
+  }
+
+  async getVehicleMaintenanceHistory() {
+    return this.get('/vehicle/maintenance')
+  }
+
+  async scheduleVehicleMaintenance(maintenanceData) {
+    return this.post('/vehicle/maintenance', maintenanceData)
   }
 
   // ===================================

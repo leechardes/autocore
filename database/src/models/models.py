@@ -7,7 +7,7 @@ from typing import Optional
 from sqlalchemy import (
     create_engine, Column, Integer, String, Boolean, 
     Float, Text, DateTime, ForeignKey, UniqueConstraint, 
-    Index, CheckConstraint
+    Index, CheckConstraint, Table
 )
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import relationship, sessionmaker
@@ -64,6 +64,7 @@ class Device(Base):
     # Relacionamentos
     relay_boards = relationship("RelayBoard", back_populates="device", cascade="all, delete-orphan")
     telemetry_data = relationship("TelemetryData", back_populates="device", cascade="all, delete-orphan")
+    vehicles = relationship("Vehicle", secondary="vehicle_devices", back_populates="devices")
     
     # Índices
     __table_args__ = (
@@ -297,6 +298,9 @@ class User(Base):
     created_at = Column(DateTime, default=func.now())
     updated_at = Column(DateTime, default=func.now(), onupdate=func.now())
     
+    # Relacionamentos
+    vehicles = relationship("Vehicle", back_populates="owner")
+    
     # Índices
     __table_args__ = (
         Index('idx_users_username', 'username'),
@@ -436,6 +440,358 @@ class Icon(Base):
         Index('idx_icons_category', 'category'),
         Index('idx_icons_active', 'is_active'),
     )
+
+# ====================================
+# VEHICLE MANAGEMENT
+# ====================================
+
+# Tabela associativa Vehicle-Device (N:M)
+vehicle_devices = Table(
+    'vehicle_devices',
+    Base.metadata,
+    Column('vehicle_id', Integer, ForeignKey('vehicles.id', ondelete='CASCADE'), primary_key=True),
+    Column('device_id', Integer, ForeignKey('devices.id', ondelete='CASCADE'), primary_key=True),
+    Column('device_role', String(30), default='secondary'),  # primary, secondary, tracker, etc
+    Column('installed_at', DateTime, default=func.now()),
+    Column('is_active', Boolean, default=True),
+    
+    # Index para queries comuns
+    Index('idx_vehicle_devices_vehicle', 'vehicle_id'),
+    Index('idx_vehicle_devices_device', 'device_id'),
+    Index('idx_vehicle_devices_role', 'device_role'),
+)
+
+class Vehicle(Base):
+    """
+    Veículos cadastrados no sistema AutoCore - APENAS 1 REGISTRO PERMITIDO
+    
+    Sistema modificado para suportar apenas 1 veículo único no sistema:
+    - ID fixo = 1 para garantir unicidade
+    - Constraint check_single_vehicle_record para validar
+    - Identificação oficial (placa, chassi, renavam)
+    - Dados técnicos (marca, modelo, motorização)
+    - Relacionamento com usuários proprietários
+    - Integração com dispositivos ESP32
+    - Controle de manutenção e vencimentos
+    - Telemetria e localização
+    """
+    __tablename__ = 'vehicles'
+    
+    # ================================
+    # PRIMARY KEY & IDENTIFICATION
+    # ================================
+    
+    id = Column(Integer, primary_key=True, default=1)  # ID fixo para garantir apenas 1 registro
+    uuid = Column(String(36), unique=True, nullable=False)
+    
+    # Identificação oficial brasileira
+    plate = Column(String(10), unique=True, nullable=False)      # ABC1234 ou ABC1D23
+    chassis = Column(String(30), unique=True, nullable=False)    # Chassi/VIN
+    renavam = Column(String(20), unique=True, nullable=False)    # Código RENAVAM
+    
+    # ================================
+    # VEHICLE INFORMATION
+    # ================================
+    
+    # Basic info
+    brand = Column(String(50), nullable=False)           # Toyota, Ford, Honda, etc
+    model = Column(String(100), nullable=False)          # Corolla, Focus, Civic, etc  
+    version = Column(String(100), nullable=True)         # XEI, Titanium, LX, etc
+    year_manufacture = Column(Integer, nullable=False)   # Ano de fabricação
+    year_model = Column(Integer, nullable=False)         # Ano modelo
+    
+    # Appearance
+    color = Column(String(30), nullable=True)            # Branco, Preto, Prata, etc
+    color_code = Column(String(10), nullable=True)       # Código da cor do fabricante
+    
+    # ================================
+    # ENGINE & TECHNICAL
+    # ================================
+    
+    # Fuel and propulsion
+    fuel_type = Column(String(20), nullable=False)       # flex, gasoline, ethanol, diesel, electric, hybrid
+    
+    # Engine specs
+    engine_capacity = Column(Integer, nullable=True)     # Cilindradas em cc
+    engine_power = Column(Integer, nullable=True)        # Potência em cv
+    engine_torque = Column(Integer, nullable=True)       # Torque em Nm
+    transmission = Column(String(20), nullable=True)     # manual, automatic, cvt
+    
+    # Category
+    category = Column(String(30), nullable=False)        # passenger, commercial, motorcycle, truck, bus
+    usage_type = Column(String(30), nullable=True)       # personal, commercial, fleet, taxi
+    
+    # ================================
+    # RELATIONSHIPS
+    # ================================
+    
+    # Owner (obrigatório)
+    user_id = Column(Integer, ForeignKey('users.id', ondelete='CASCADE'), nullable=False)
+    
+    # Primary device (opcional, um ESP32 principal)
+    primary_device_id = Column(Integer, ForeignKey('devices.id', ondelete='SET NULL'), nullable=True)
+    
+    # ================================
+    # STATUS & TELEMETRY
+    # ================================
+    
+    # Operational status
+    status = Column(String(20), default='inactive', nullable=False)  # active, inactive, maintenance, retired, sold
+    
+    # Mileage
+    odometer = Column(Integer, default=0, nullable=False)            # Quilometragem atual
+    odometer_unit = Column(String(5), default='km', nullable=False)  # km, mi
+    
+    # Location (JSON format)
+    last_location = Column(Text, nullable=True)                      # {"lat": -23.55, "lng": -46.63, "timestamp": "2025-01-28T10:30:00Z", "accuracy": 5}
+    
+    # ================================
+    # MAINTENANCE & EXPIRY
+    # ================================
+    
+    # Next maintenance
+    next_maintenance_date = Column(DateTime, nullable=True)
+    next_maintenance_km = Column(Integer, nullable=True)
+    
+    # Important expiry dates
+    insurance_expiry = Column(DateTime, nullable=True)               # Vencimento do seguro
+    license_expiry = Column(DateTime, nullable=True)                 # Vencimento do licenciamento
+    inspection_expiry = Column(DateTime, nullable=True)              # Vencimento da vistoria
+    
+    # Last maintenance
+    last_maintenance_date = Column(DateTime, nullable=True)
+    last_maintenance_km = Column(Integer, nullable=True)
+    
+    # ================================
+    # CONFIGURATION & METADATA
+    # ================================
+    
+    # Vehicle-specific configuration (JSON)
+    vehicle_config = Column(Text, nullable=True)                     # JSON para configurações específicas
+    
+    # Notes and tags
+    notes = Column(Text, nullable=True)                              # Notas livres
+    tags = Column(Text, nullable=True)                               # JSON array: ["pessoal", "familia", "trabalho"]
+    
+    # System flags
+    is_active = Column(Boolean, default=True, nullable=False)        # Ativo no sistema
+    is_tracked = Column(Boolean, default=True, nullable=False)       # Deve ser rastreado/monitorado
+    
+    # ================================
+    # AUDIT FIELDS (OBRIGATÓRIO)
+    # ================================
+    
+    created_at = Column(DateTime, default=func.now(), nullable=False)
+    updated_at = Column(DateTime, default=func.now(), onupdate=func.now(), nullable=False)
+    deleted_at = Column(DateTime, nullable=True)                     # Soft delete
+    
+    # ================================
+    # RELATIONSHIPS
+    # ================================
+    
+    # Owner relationship
+    owner = relationship("User", back_populates="vehicles")
+    
+    # Primary device relationship
+    primary_device = relationship("Device", foreign_keys=[primary_device_id])
+    
+    # Multiple devices (many-to-many através de tabela associativa)
+    devices = relationship("Device", 
+                         secondary="vehicle_devices",
+                         back_populates="vehicles")
+    
+    # ================================
+    # CONSTRAINTS & INDEXES
+    # ================================
+    
+    __table_args__ = (
+        # CONSTRAINT PRIMÁRIO: Garantir apenas 1 registro com ID = 1
+        CheckConstraint('id = 1', name='check_single_vehicle_record'),
+        
+        # Unique indexes
+        Index('idx_vehicles_uuid', 'uuid'),
+        Index('idx_vehicles_plate', 'plate'),
+        Index('idx_vehicles_chassis', 'chassis'), 
+        Index('idx_vehicles_renavam', 'renavam'),
+        
+        # Search indexes
+        Index('idx_vehicles_brand_model', 'brand', 'model'),
+        Index('idx_vehicles_user', 'user_id'),
+        Index('idx_vehicles_status', 'status'),
+        Index('idx_vehicles_active', 'is_active'),
+        Index('idx_vehicles_tracked', 'is_tracked'),
+        
+        # Composite indexes for common queries
+        Index('idx_vehicles_user_active', 'user_id', 'is_active'),
+        Index('idx_vehicles_brand_year', 'brand', 'year_model'),
+        Index('idx_vehicles_status_active', 'status', 'is_active'),
+        
+        # Check constraints for data validation
+        CheckConstraint(
+            "fuel_type IN ('flex', 'gasoline', 'ethanol', 'diesel', 'electric', 'hybrid')",
+            name='check_vehicles_valid_fuel_type'
+        ),
+        CheckConstraint(
+            "category IN ('passenger', 'commercial', 'motorcycle', 'truck', 'bus')",
+            name='check_vehicles_valid_category'
+        ),
+        CheckConstraint(
+            "status IN ('active', 'inactive', 'maintenance', 'retired', 'sold')",
+            name='check_vehicles_valid_status'
+        ),
+        CheckConstraint(
+            "year_manufacture >= 1900 AND year_manufacture <= 2030",
+            name='check_vehicles_valid_manufacture_year'
+        ),
+        CheckConstraint(
+            "year_model >= year_manufacture AND year_model <= (year_manufacture + 1)",
+            name='check_vehicles_valid_model_year'
+        ),
+        CheckConstraint(
+            "odometer >= 0",
+            name='check_vehicles_valid_odometer'
+        ),
+        CheckConstraint(
+            "length(plate) >= 7 AND length(plate) <= 8",  # ABC1234 (7) ou ABC1D23 (8)
+            name='check_vehicles_valid_plate_format'
+        ),
+        CheckConstraint(
+            "length(chassis) >= 17",  # VIN padrão tem 17 caracteres
+            name='check_vehicles_valid_chassis_length'
+        ),
+    )
+    
+    # ================================
+    # CLASS METHODS (REGISTRO ÚNICO)
+    # ================================
+    
+    @classmethod
+    def get_single_instance(cls, session):
+        """
+        Retorna o único registro de veículo, criando se não existir
+        
+        Args:
+            session: Sessão SQLAlchemy ativa
+            
+        Returns:
+            Instância do Vehicle (ID = 1)
+        """
+        vehicle = session.query(cls).filter(cls.id == 1).first()
+        if not vehicle:
+            # Cria registro com ID fixo = 1 (dados mínimos)
+            vehicle = cls(
+                id=1,
+                uuid=str(__import__('uuid').uuid4()),
+                plate='PENDING',
+                chassis='PENDING' + 'X' * 12,  # 17 chars mínimo
+                renavam='PENDING',
+                brand='Pendente',
+                model='Pendente',
+                year_manufacture=2020,
+                year_model=2020,
+                fuel_type='flex',
+                category='passenger',
+                user_id=1,  # Assume user ID 1 existe
+                status='inactive'
+            )
+            session.add(vehicle)
+            session.flush()
+        return vehicle
+    
+    # ================================
+    # INSTANCE METHODS
+    # ================================
+    
+    def __repr__(self):
+        return f"<Vehicle {self.plate} - {self.brand} {self.model} ({self.year_model})>"
+    
+    def __str__(self):
+        return f"{self.brand} {self.model} {self.year_model} - {self.plate}"
+    
+    @property
+    def full_name(self):
+        """Nome completo do veículo"""
+        parts = [self.brand, self.model]
+        if self.version:
+            parts.append(self.version)
+        parts.append(str(self.year_model))
+        return " ".join(parts)
+    
+    @property
+    def age_years(self):
+        """Idade do veículo em anos"""
+        from datetime import datetime
+        return datetime.now().year - self.year_model
+    
+    @property
+    def is_online(self):
+        """Verifica se veículo está online (via device principal)"""
+        if self.primary_device:
+            return self.primary_device.status == 'online'
+        return False
+    
+    @property
+    def needs_maintenance(self):
+        """Verifica se precisa de manutenção"""
+        from datetime import datetime, timedelta
+        
+        # Check date
+        if self.next_maintenance_date:
+            if self.next_maintenance_date <= datetime.now():
+                return True
+        
+        # Check km
+        if self.next_maintenance_km:
+            if self.odometer >= self.next_maintenance_km:
+                return True
+        
+        return False
+    
+    @property
+    def has_expired_documents(self):
+        """Verifica se tem documentos vencidos"""
+        from datetime import datetime
+        now = datetime.now()
+        
+        return any([
+            self.insurance_expiry and self.insurance_expiry <= now,
+            self.license_expiry and self.license_expiry <= now,
+            self.inspection_expiry and self.inspection_expiry <= now,
+        ])
+    
+    def update_location(self, latitude: float, longitude: float, accuracy: int = None):
+        """Atualiza localização do veículo"""
+        import json
+        from datetime import datetime
+        
+        location_data = {
+            'lat': latitude,
+            'lng': longitude,
+            'timestamp': datetime.now().isoformat(),
+        }
+        
+        if accuracy:
+            location_data['accuracy'] = accuracy
+        
+        self.last_location = json.dumps(location_data)
+    
+    def get_location(self):
+        """Retorna localização como dict"""
+        if not self.last_location:
+            return None
+        
+        import json
+        try:
+            return json.loads(self.last_location)
+        except (json.JSONDecodeError, TypeError):
+            return None
+    
+    def update_odometer(self, new_km: int):
+        """Atualiza quilometragem com validação"""
+        if new_km >= self.odometer:
+            self.odometer = new_km
+            return True
+        return False
 
 # ====================================
 # ENGINE & SESSION

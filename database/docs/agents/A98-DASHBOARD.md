@@ -1,4 +1,4 @@
-# 📊 Database Agents Dashboard
+# 📊 A98-DASHBOARD - Database Agents Dashboard
 
 Dashboard de monitoramento em tempo real dos Database Agents do AutoCore.
 
